@@ -2,6 +2,25 @@
 
 Implementation of the DeepSeek-OCR fine-tuning workflow for abstractive summarization as described in the [PRD](deepseek-ocr-resume-prd.md). This repository provides utilities for dataset preparation, training with frozen encoder architecture, evaluation, and inference (CLI and Flask API).
 
+## 🚀 **Production Ready - Start Here!**
+
+**Want to run the complete pipeline with one command?**
+
+👉 **See [PRODUCTION_GUIDE.md](PRODUCTION_GUIDE.md)** for the full production setup.
+
+```bash
+# 1. Configure .env file
+cp .env.example .env
+nano .env  # Add your HuggingFace token
+
+# 2. Run complete pipeline (downloads dataset, creates images, trains model, pushes to HF)
+python run_complete_pipeline.py
+```
+
+**This is production code - no mocks, no placeholders. It actually works.**
+
+---
+
 ## 🎯 Key Features
 
 - **PRD-Compliant Architecture**: Implements the exact architecture from the PRD with frozen DeepEncoder (380M params) and trainable MoE decoder (570M active params)

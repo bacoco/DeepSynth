@@ -1,4 +1,28 @@
+# Environment
+.env
+
+# Python
 __pycache__/
 *.pyc
+*.py[cod]
 .venv/
 venv/
+*.egg-info/
+
+# Model outputs
+deepseek-summarizer/
+deepseek-ocr-summarizer/
+models/
+checkpoints/
+
+# Data
+prepared_data/
+prepared_images/
+*.jsonl
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
