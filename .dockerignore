@@ -1,0 +1,68 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info
+dist
+build
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Documentation
+docs/
+*.md
+!DOCKER_UI_README.md
+!README.md
+
+# Logs
+logs/
+*.log
+
+# Generated data (will be mounted as volumes)
+generated_images/
+trained_model/
+deepseek-summarizer/
+deepseek-ocr-summarizer/
+prepared_data/
+
+# State (will be mounted as volume)
+web_ui/state/
+
+# Environment
+.env
+.env.*
+
+# Temporary files
+*.tmp
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
