@@ -8,6 +8,7 @@ from typing import Iterable, Optional
 
 from data.dataset_loader import load_local_jsonl
 from .config import TrainerConfig
+from .deepseek_trainer import DeepSeekOCRTrainer
 from .trainer import SummarizationTrainer
 
 try:
@@ -85,6 +86,11 @@ def main() -> None:
     parser.add_argument("--hub-model-id", help="Target Hub repository for the trained model")
     parser.add_argument("--hub-token", help="Hugging Face token to authenticate push operations")
     parser.add_argument("--hub-private", action="store_true", help="Create the Hub repository as private")
+    parser.add_argument(
+        "--use-deepseek-ocr",
+        action="store_true",
+        help="Use DeepSeekOCRTrainer with frozen encoder (recommended for PRD implementation)"
+    )
 
     args = parser.parse_args()
 
@@ -105,7 +111,13 @@ def main() -> None:
         config.hub_private = args.hub_private
         config.hub_token = args.hub_token
 
-    trainer = SummarizationTrainer(config)
+    # Select trainer based on --use-deepseek-ocr flag
+    if args.use_deepseek_ocr:
+        LOGGER.info("Using DeepSeekOCRTrainer with frozen encoder architecture")
+        trainer = DeepSeekOCRTrainer(config)
+    else:
+        LOGGER.info("Using generic SummarizationTrainer")
+        trainer = SummarizationTrainer(config)
     if args.hf_dataset:
         train_dataset = _load_hf_dataset(args.hf_dataset, args.hf_train_split)
         if train_dataset is None:
