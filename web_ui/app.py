@@ -15,6 +15,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from web_ui.state_manager import StateManager, JobStatus
 from web_ui.dataset_generator import IncrementalDatasetGenerator, ModelTrainer
+from training.optimal_configs import (
+    list_benchmark_datasets,
+    get_optimal_config,
+    PRESET_CONFIGS
+)
 
 # Configure logging
 logging.basicConfig(
@@ -267,6 +272,105 @@ def health_check():
     return jsonify({
         'status': 'healthy',
         'jobs_count': len(state_manager.list_jobs())
+    })
+
+
+@app.route('/api/datasets/presets', methods=['GET'])
+def get_dataset_presets():
+    """Get available dataset presets for benchmarking."""
+    datasets = list_benchmark_datasets()
+    return jsonify({'datasets': datasets})
+
+
+@app.route('/api/training/presets', methods=['GET'])
+def get_training_presets():
+    """Get optimal training configuration presets."""
+    presets = {
+        name: config.to_dict()
+        for name, config in PRESET_CONFIGS.items()
+    }
+    return jsonify({'presets': presets})
+
+
+@app.route('/api/training/optimal-config/<preset>', methods=['GET'])
+def get_optimal_training_config(preset):
+    """Get optimal configuration for a specific preset."""
+    config = get_optimal_config(preset)
+    if config:
+        return jsonify({'config': config.to_dict()})
+    return jsonify({'error': 'Preset not found'}), 404
+
+
+@app.route('/api/benchmark/create', methods=['POST'])
+def create_benchmark_dataset():
+    """Create a benchmark dataset for evaluation."""
+    try:
+        data = request.json
+
+        # Validate required fields
+        if 'benchmark_name' not in data:
+            return jsonify({'error': 'Missing required field: benchmark_name'}), 400
+
+        benchmark_info = list_benchmark_datasets().get(data['benchmark_name'])
+        if not benchmark_info:
+            return jsonify({'error': 'Unknown benchmark dataset'}), 400
+
+        # Create job configuration for benchmark dataset
+        config = {
+            'source_dataset': benchmark_info['name'],
+            'source_subset': benchmark_info['subset'],
+            'source_split': data.get('split', 'train'),
+            'text_field': benchmark_info['text_field'],
+            'summary_field': benchmark_info['summary_field'],
+            'output_dir': data.get('output_dir', f'./benchmarks/{data["benchmark_name"]}'),
+            'max_samples': data.get('max_samples'),
+            'dataset_name': f'{data["benchmark_name"]}-benchmark',
+            'hf_username': data.get('hf_username', os.environ.get('HF_USERNAME')),
+            'hf_dataset_repo': data.get('hf_dataset_repo'),
+            'private_dataset': data.get('private_dataset', False),
+            'is_benchmark': True
+        }
+
+        # Create job
+        job_id = state_manager.create_job('dataset_generation', config)
+
+        # Start generation in background
+        thread = Thread(
+            target=_run_dataset_generation,
+            args=(job_id,),
+            daemon=True
+        )
+        thread.start()
+
+        return jsonify({
+            'job_id': job_id,
+            'message': 'Benchmark dataset generation started',
+            'status': 'in_progress',
+            'benchmark_info': benchmark_info
+        })
+
+    except Exception as e:
+        logger.error(f"Error creating benchmark dataset: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/metrics/<job_id>', methods=['GET'])
+def get_job_metrics(job_id):
+    """Get metrics for a completed training job."""
+    job = state_manager.get_job(job_id)
+    if not job:
+        return jsonify({'error': 'Job not found'}), 404
+
+    if job.job_type != 'model_training':
+        return jsonify({'error': 'Metrics only available for training jobs'}), 400
+
+    # Get metrics from job state
+    metrics = job.config.get('metrics', {})
+
+    return jsonify({
+        'job_id': job_id,
+        'metrics': metrics,
+        'model_output_path': job.model_output_path
     })
 
 

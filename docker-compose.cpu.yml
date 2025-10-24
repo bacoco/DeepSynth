@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  deepseek-dataset-generator:
+    build:
+      context: .
+      dockerfile: Dockerfile.cpu
+    container_name: deepseek-dataset-generator-cpu
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mount state directory for persistence
+      - ./web_ui/state:/app/web_ui/state
+      # Mount output directories
+      - ./generated_images:/app/generated_images
+      - ./datasets:/app/datasets
+      # Mount logs
+      - ./logs:/app/logs
+    environment:
+      # HuggingFace Configuration
+      - HF_TOKEN=${HF_TOKEN}
+      - HF_USERNAME=${HF_USERNAME}
+
+      # Flask Configuration
+      - FLASK_ENV=production
+      - SECRET_KEY=${SECRET_KEY:-change-this-secret-key}
+      - HOST=0.0.0.0
+      - PORT=5000
+
+      # Python Configuration
+      - PYTHONUNBUFFERED=1
+
+      # Disable GPU for dataset generation
+      - CUDA_VISIBLE_DEVICES=""
+      - NO_CUDA=1
+
+    restart: unless-stopped
+
+    command: python3 -m web_ui.app --mode=dataset
+
+networks:
+  default:
+    name: deepseek-network
