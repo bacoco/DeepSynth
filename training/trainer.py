@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterable, Optional
 
 import torch
@@ -126,6 +127,20 @@ class SummarizationTrainer:
             self.model.save_pretrained(output_dir)
             self.tokenizer.save_pretrained(output_dir)
             LOGGER.info("Saved checkpoint to %s", output_dir)
+
+        if self.config.push_to_hub:
+            repo_id = self.config.hub_model_id or Path(self.config.output_dir).name
+            LOGGER.info("Pushing final model to Hugging Face Hub: %s", repo_id)
+            self.model.push_to_hub(
+                repo_id,
+                use_auth_token=self.config.hub_token,
+                private=self.config.hub_private,
+            )
+            self.tokenizer.push_to_hub(
+                repo_id,
+                use_auth_token=self.config.hub_token,
+            )
+            LOGGER.info("Model and tokenizer uploaded to %s", repo_id)
 
 
 __all__ = ["SummarizationTrainer"]
