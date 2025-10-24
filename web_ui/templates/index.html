@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepSeek Dataset Generator & Trainer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>DeepSeek Dataset Generator & Trainer</h1>
+            <p class="subtitle">Generate datasets and train models with resume capability</p>
+        </header>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('dataset')">Generate Dataset</button>
+            <button class="tab-btn" onclick="switchTab('training')">Train Model</button>
+            <button class="tab-btn" onclick="switchTab('jobs')">Monitor Jobs</button>
+        </div>
+
+        <!-- Dataset Generation Tab -->
+        <div id="dataset-tab" class="tab-content active">
+            <h2>Dataset Generation</h2>
+            <form id="dataset-form">
+                <div class="form-section">
+                    <h3>Source Dataset</h3>
+                    <div class="form-group">
+                        <label for="source_dataset">HuggingFace Dataset*</label>
+                        <input type="text" id="source_dataset" name="source_dataset"
+                               placeholder="e.g., ccdv/cnn_dailymail" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="source_subset">Subset (optional)</label>
+                        <input type="text" id="source_subset" name="source_subset"
+                               placeholder="e.g., 3.0.0">
+                    </div>
+                    <div class="form-group">
+                        <label for="source_split">Split</label>
+                        <select id="source_split" name="source_split">
+                            <option value="train" selected>train</option>
+                            <option value="validation">validation</option>
+                            <option value="test">test</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Field Mapping</h3>
+                    <div class="form-group">
+                        <label for="text_field">Text Field*</label>
+                        <input type="text" id="text_field" name="text_field"
+                               placeholder="e.g., article" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="summary_field">Summary Field*</label>
+                        <input type="text" id="summary_field" name="summary_field"
+                               placeholder="e.g., highlights" required>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Output Configuration</h3>
+                    <div class="form-group">
+                        <label for="output_dir">Output Directory*</label>
+                        <input type="text" id="output_dir" name="output_dir"
+                               value="./generated_images" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="max_samples">Max Samples (optional)</label>
+                        <input type="number" id="max_samples" name="max_samples"
+                               placeholder="Leave empty for all samples">
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>HuggingFace Hub</h3>
+                    <div class="form-group">
+                        <label for="hf_username">HF Username</label>
+                        <input type="text" id="hf_username" name="hf_username"
+                               placeholder="Your HuggingFace username">
+                    </div>
+                    <div class="form-group">
+                        <label for="dataset_name">Dataset Name</label>
+                        <input type="text" id="dataset_name" name="dataset_name"
+                               placeholder="e.g., my-vision-dataset">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="private_dataset" name="private_dataset">
+                            Private Dataset
+                        </label>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Generate Dataset</button>
+            </form>
+        </div>
+
+        <!-- Training Tab -->
+        <div id="training-tab" class="tab-content">
+            <h2>Model Training</h2>
+            <form id="training-form">
+                <div class="form-section">
+                    <h3>Dataset</h3>
+                    <div class="form-group">
+                        <label for="dataset_repo">HuggingFace Dataset Repo*</label>
+                        <input type="text" id="dataset_repo" name="dataset_repo"
+                               placeholder="username/dataset-name" required>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Model Configuration</h3>
+                    <div class="form-group">
+                        <label for="model_name">Model Name</label>
+                        <input type="text" id="model_name" name="model_name"
+                               value="deepseek-ai/DeepSeek-OCR">
+                    </div>
+                    <div class="form-group">
+                        <label for="output_dir_train">Output Directory</label>
+                        <input type="text" id="output_dir_train" name="output_dir"
+                               value="./trained_model">
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Training Parameters</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="batch_size">Batch Size</label>
+                            <input type="number" id="batch_size" name="batch_size" value="2">
+                        </div>
+                        <div class="form-group">
+                            <label for="num_epochs">Epochs</label>
+                            <input type="number" id="num_epochs" name="num_epochs" value="1">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="learning_rate">Learning Rate</label>
+                            <input type="text" id="learning_rate" name="learning_rate" value="2e-5">
+                        </div>
+                        <div class="form-group">
+                            <label for="max_length">Max Length</label>
+                            <input type="number" id="max_length" name="max_length" value="512">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="mixed_precision">Mixed Precision</label>
+                            <select id="mixed_precision" name="mixed_precision">
+                                <option value="bf16" selected>bf16</option>
+                                <option value="fp16">fp16</option>
+                                <option value="no">no</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="gradient_accumulation_steps">Gradient Accumulation</label>
+                            <input type="number" id="gradient_accumulation_steps"
+                                   name="gradient_accumulation_steps" value="4">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Push to HuggingFace Hub</h3>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="push_to_hub" name="push_to_hub">
+                            Push model to Hub
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="hub_model_id">Model ID (username/model-name)</label>
+                        <input type="text" id="hub_model_id" name="hub_model_id"
+                               placeholder="username/model-name">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Start Training</button>
+            </form>
+        </div>
+
+        <!-- Jobs Monitoring Tab -->
+        <div id="jobs-tab" class="tab-content">
+            <h2>Job Monitor</h2>
+            <div class="filter-bar">
+                <button class="btn btn-small" onclick="filterJobs('all')">All</button>
+                <button class="btn btn-small" onclick="filterJobs('dataset_generation')">Dataset</button>
+                <button class="btn btn-small" onclick="filterJobs('model_training')">Training</button>
+                <button class="btn btn-small" onclick="refreshJobs()">Refresh</button>
+            </div>
+            <div id="jobs-container">
+                <p class="loading">Loading jobs...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container"></div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
