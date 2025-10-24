@@ -117,11 +117,29 @@ class DeepSeekOCRTrainer:
             100 * trainable / total if total > 0 else 0
         )
 
-    def _encode_images(self, image_paths: list[str]) -> torch.Tensor:
+    def _load_image(self, image_input):
+        """Load an image from either a file path or PIL Image object.
+
+        Args:
+            image_input: Either a string path or PIL.Image object
+
+        Returns:
+            PIL.Image object in RGB mode
+        """
+        if isinstance(image_input, str):
+            # Load from file path
+            return Image.open(image_input).convert("RGB")
+        elif hasattr(image_input, 'convert'):
+            # Already a PIL Image
+            return image_input.convert("RGB")
+        else:
+            raise ValueError(f"Unsupported image input type: {type(image_input)}")
+
+    def _encode_images(self, image_inputs: list) -> torch.Tensor:
         """Encode images through frozen DeepEncoder to get visual tokens.
 
         Args:
-            image_paths: List of paths to PNG images
+            image_inputs: List of either image paths (str) or PIL.Image objects
 
         Returns:
             Visual tokens tensor [batch_size, seq_len, hidden_dim]
@@ -131,10 +149,10 @@ class DeepSeekOCRTrainer:
         visual_tokens = []
 
         with torch.no_grad():  # Encoder is frozen
-            for image_path in image_paths:
+            for image_input in image_inputs:
                 try:
-                    # Load image
-                    image = Image.open(image_path).convert("RGB")
+                    # Load image (handles both paths and PIL Images)
+                    image = self._load_image(image_input)
 
                     # The actual encoding would use model.encode_images or similar
                     # This is a placeholder for the DeepSeek-OCR specific API
@@ -154,7 +172,7 @@ class DeepSeekOCRTrainer:
                         visual_tokens.append(tokens)
 
                 except Exception as exc:
-                    LOGGER.error("Failed to encode image %s: %s", image_path, exc)
+                    LOGGER.error("Failed to encode image %s: %s", image_input, exc)
                     raise
 
         if not visual_tokens:
@@ -164,20 +182,20 @@ class DeepSeekOCRTrainer:
 
     def _prepare_batch(
         self,
-        image_paths: list[str],
+        images: list,
         summaries: list[str]
     ) -> VisualBatch:
         """Prepare a training batch with visual tokens and target summaries.
 
         Args:
-            image_paths: Paths to document images
+            images: List of either image paths (str) or PIL.Image objects
             summaries: Target summary texts
 
         Returns:
             VisualBatch with encoded images and tokenized summaries
         """
         # Encode images to visual tokens (frozen encoder)
-        visual_tokens = self._encode_images(image_paths)
+        visual_tokens = self._encode_images(images)
 
         # Tokenize target summaries
         summary_tokens = self.tokenizer(
@@ -231,7 +249,7 @@ class DeepSeekOCRTrainer:
         """Train the model on the provided dataset.
 
         Args:
-            dataset: Iterable of dicts with 'image_path' and 'summary' keys
+            dataset: Iterable of dicts with 'image' or 'image_path' and 'summary' keys
         """
         self.model.train()
 
@@ -264,18 +282,19 @@ class DeepSeekOCRTrainer:
             batch_summaries = []
 
             for step, sample in enumerate(dataset_list, start=1):
-                # Collect batch
-                batch_images.append(sample.get('image_path', ''))
-                batch_summaries.append(sample.get('summary', ''))
+                # Collect batch - handle both 'image' and 'image_path' fields
+                # HuggingFace datasets use 'image', local JSONL use 'image_path'
+                image = sample.get('image') or sample.get('image_path')
+                summary = sample.get('summary', '')
 
-                if len(batch_images) < self.config.batch_size:
+                if not image or not summary:
+                    LOGGER.warning("Skipping sample at step %s: missing image or summary", step)
                     continue
 
-                # Skip if any image paths are missing
-                if not all(batch_images):
-                    LOGGER.warning("Skipping batch with missing image paths")
-                    batch_images.clear()
-                    batch_summaries.clear()
+                batch_images.append(image)
+                batch_summaries.append(summary)
+
+                if len(batch_images) < self.config.batch_size:
                     continue
 
                 try:
