@@ -24,6 +24,10 @@ class TrainerConfig:
     optimizer: OptimizerConfig = field(default_factory=OptimizerConfig)
     log_interval: int = 10
     save_interval: int = 500
+    push_to_hub: bool = False
+    hub_model_id: Optional[str] = None
+    hub_private: bool = False
+    hub_token: Optional[str] = None
 
 
 __all__ = ["TrainerConfig", "OptimizerConfig"]
