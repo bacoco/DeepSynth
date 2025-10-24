@@ -1,0 +1,298 @@
+"""
+Incremental dataset generator with deduplication support.
+Handles resumable dataset generation and HuggingFace Hub uploads.
+"""
+
+import os
+import sys
+from pathlib import Path
+from typing import Dict, Optional, Callable
+import logging
+from datasets import Dataset, load_dataset, DatasetDict
+from huggingface_hub import HfApi, create_repo
+
+# Add parent directory to path to import project modules
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from data.text_to_image import TextToImageConverter
+from web_ui.state_manager import StateManager, JobStatus
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+class IncrementalDatasetGenerator:
+    """Generates datasets incrementally with deduplication."""
+
+    def __init__(self, state_manager: StateManager):
+        self.state_manager = state_manager
+        self.converter = TextToImageConverter()
+        self.hf_api = HfApi()
+
+    def generate_dataset(
+        self,
+        job_id: str,
+        progress_callback: Optional[Callable] = None
+    ):
+        """
+        Generate dataset incrementally with resumption support.
+
+        Args:
+            job_id: Job identifier
+            progress_callback: Optional callback for progress updates
+        """
+        job = self.state_manager.get_job(job_id)
+        if not job:
+            raise ValueError(f"Job {job_id} not found")
+
+        # Update status
+        job.status = JobStatus.IN_PROGRESS.value
+        self.state_manager.update_job(job)
+
+        try:
+            config = job.config
+
+            # Load source dataset
+            logger.info(f"Loading source dataset: {config['source_dataset']}")
+            source_ds = self._load_source_dataset(
+                config['source_dataset'],
+                config.get('source_subset'),
+                config.get('source_split', 'train')
+            )
+
+            # Get existing processed hashes
+            processed_hashes = self.state_manager.get_processed_hashes(job_id)
+            logger.info(f"Already processed: {len(processed_hashes)} samples")
+
+            # Set total samples
+            max_samples = config.get('max_samples')
+            total_samples = len(source_ds) if not max_samples else min(max_samples, len(source_ds))
+            job.total_samples = total_samples
+            self.state_manager.update_job(job)
+
+            # Process samples incrementally
+            processed_data = []
+            text_field = config.get('text_field', 'article')
+            summary_field = config.get('summary_field', 'highlights')
+
+            # Check if we need to load existing dataset
+            existing_data = []
+            if job.hf_dataset_repo:
+                existing_data = self._load_existing_dataset(job.hf_dataset_repo)
+                logger.info(f"Loaded {len(existing_data)} existing samples from HF")
+
+            for idx, sample in enumerate(source_ds):
+                # Check if we've reached max samples
+                if max_samples and job.processed_samples >= max_samples:
+                    break
+
+                try:
+                    # Get text content
+                    text_content = sample.get(text_field, '')
+                    if not text_content:
+                        continue
+
+                    # Check for duplicates
+                    if self.state_manager.is_duplicate(job_id, text_content):
+                        logger.debug(f"Skipping duplicate sample {idx}")
+                        continue
+
+                    # Generate image
+                    image_filename = f"image_{job.processed_samples:06d}.png"
+                    image_path = Path(config['output_dir']) / image_filename
+
+                    # Ensure output directory exists
+                    image_path.parent.mkdir(parents=True, exist_ok=True)
+
+                    # Convert text to image
+                    self.converter.text_to_image(text_content, str(image_path))
+
+                    # Create processed sample
+                    processed_sample = {
+                        'text': text_content,
+                        'summary': sample.get(summary_field, ''),
+                        'image_path': str(image_path),
+                        'source_index': idx
+                    }
+                    processed_data.append(processed_sample)
+
+                    # Mark as processed
+                    self.state_manager.mark_processed(job_id, text_content)
+
+                    # Update progress
+                    job.processed_samples += 1
+                    self.state_manager.update_job(job)
+
+                    # Progress callback
+                    if progress_callback:
+                        progress_callback(job.processed_samples, total_samples)
+
+                    # Periodic save to HF (every 100 samples)
+                    if len(processed_data) >= 100:
+                        self._save_to_hf(
+                            job,
+                            existing_data + processed_data,
+                            config
+                        )
+                        existing_data.extend(processed_data)
+                        processed_data = []
+
+                except Exception as e:
+                    logger.error(f"Error processing sample {idx}: {e}")
+                    job.failed_samples += 1
+                    job.error_count += 1
+                    job.last_error = str(e)
+                    self.state_manager.update_job(job)
+                    continue
+
+            # Final save to HF
+            if processed_data:
+                self._save_to_hf(
+                    job,
+                    existing_data + processed_data,
+                    config
+                )
+
+            # Mark job as completed
+            job.status = JobStatus.COMPLETED.value
+            self.state_manager.update_job(job)
+
+            logger.info(f"Dataset generation completed. Processed: {job.processed_samples}")
+
+        except Exception as e:
+            logger.error(f"Job failed: {e}")
+            job.status = JobStatus.FAILED.value
+            job.last_error = str(e)
+            self.state_manager.update_job(job)
+            raise
+
+    def _load_source_dataset(self, dataset_name: str, subset: Optional[str], split: str):
+        """Load source dataset from HuggingFace."""
+        if subset:
+            return load_dataset(dataset_name, subset, split=split)
+        return load_dataset(dataset_name, split=split)
+
+    def _load_existing_dataset(self, repo_id: str):
+        """Load existing dataset from HuggingFace Hub."""
+        try:
+            ds = load_dataset(repo_id, split='train')
+            return list(ds)
+        except Exception as e:
+            logger.warning(f"Could not load existing dataset: {e}")
+            return []
+
+    def _save_to_hf(self, job, data: list, config: Dict):
+        """Save dataset to HuggingFace Hub."""
+        if not data:
+            return
+
+        try:
+            # Create dataset
+            dataset = Dataset.from_list(data)
+
+            # Create or update repo
+            repo_id = config.get('hf_dataset_repo')
+            if not repo_id:
+                hf_username = config.get('hf_username', os.environ.get('HF_USERNAME'))
+                dataset_name = config.get('dataset_name', 'generated-dataset')
+                repo_id = f"{hf_username}/{dataset_name}"
+
+            # Create repo if it doesn't exist
+            try:
+                create_repo(repo_id, repo_type="dataset", exist_ok=True)
+            except Exception as e:
+                logger.warning(f"Repo might already exist: {e}")
+
+            # Push to hub
+            dataset.push_to_hub(
+                repo_id,
+                private=config.get('private_dataset', False)
+            )
+
+            # Update job with repo info
+            job.hf_dataset_repo = repo_id
+            self.state_manager.update_job(job)
+
+            logger.info(f"Saved {len(data)} samples to {repo_id}")
+
+        except Exception as e:
+            logger.error(f"Error saving to HuggingFace Hub: {e}")
+            raise
+
+
+class ModelTrainer:
+    """Handles model training with resumption support."""
+
+    def __init__(self, state_manager: StateManager):
+        self.state_manager = state_manager
+
+    def train_model(
+        self,
+        job_id: str,
+        progress_callback: Optional[Callable] = None
+    ):
+        """
+        Train model with checkpoint resumption.
+
+        Args:
+            job_id: Job identifier
+            progress_callback: Optional callback for progress updates
+        """
+        from training.deepseek_trainer_v2 import ProductionDeepSeekTrainer
+        from training.config import TrainerConfig
+
+        job = self.state_manager.get_job(job_id)
+        if not job:
+            raise ValueError(f"Job {job_id} not found")
+
+        # Update status
+        job.status = JobStatus.IN_PROGRESS.value
+        self.state_manager.update_job(job)
+
+        try:
+            config = job.config
+
+            # Create trainer config
+            trainer_config = TrainerConfig(
+                model_name=config.get('model_name', 'deepseek-ai/DeepSeek-OCR'),
+                output_dir=config.get('output_dir', './trained_model'),
+                batch_size=config.get('batch_size', 2),
+                num_epochs=config.get('num_epochs', 1),
+                learning_rate=float(config.get('learning_rate', 2e-5)),
+                max_length=config.get('max_length', 512),
+                mixed_precision=config.get('mixed_precision', 'bf16'),
+                gradient_accumulation_steps=config.get('gradient_accumulation_steps', 4),
+                push_to_hub=config.get('push_to_hub', False),
+                hub_model_id=config.get('hub_model_id'),
+                hf_token=config.get('hf_token', os.environ.get('HF_TOKEN'))
+            )
+
+            # Load dataset
+            dataset_repo = config.get('dataset_repo')
+            if not dataset_repo:
+                raise ValueError("dataset_repo is required for training")
+
+            logger.info(f"Loading training dataset from {dataset_repo}")
+
+            # Create trainer
+            trainer = ProductionDeepSeekTrainer(trainer_config)
+
+            # Train
+            logger.info("Starting training...")
+            trainer.train_from_hf_dataset(dataset_repo)
+
+            # Update job
+            job.status = JobStatus.COMPLETED.value
+            job.model_output_path = trainer_config.output_dir
+            if trainer_config.push_to_hub:
+                job.hf_dataset_repo = trainer_config.hub_model_id
+            self.state_manager.update_job(job)
+
+            logger.info("Training completed successfully")
+
+        except Exception as e:
+            logger.error(f"Training failed: {e}")
+            job.status = JobStatus.FAILED.value
+            job.last_error = str(e)
+            self.state_manager.update_job(job)
+            raise
