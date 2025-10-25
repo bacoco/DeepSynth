@@ -1,6 +1,6 @@
 # 🌍 DeepSeek Multilingual Vision-Text Dataset
 
-> **1.24M+ multilingual text-image pairs for vision-language model training**
+> **1.29M+ multilingual text-image pairs for vision-language model training**
 
 [![Dataset](https://img.shields.io/badge/🤗%20Dataset-baconnier/deepseek--vision--complete-blue)](https://huggingface.co/datasets/baconnier/deepseek-vision-complete)
 [![Cross-Computer](https://img.shields.io/badge/Cross--Computer-Resumable-green)](#global-incremental-processing)
@@ -37,8 +37,9 @@ cp .env.example .env
 | 🇺🇸 **English News** | CNN/DailyMail | 287,113 | ✅ Ready | News articles |
 | 🇺🇸 **English BBC** | XSum Reduced | ~50,000 | ✅ Ready | Extreme summarization |
 | 📜 **Legal English** | BillSum | 22,218 | ✅ Ready | US Congressional bills |
+| 🧠 **Scientific English** | arXiv Abstracts (first 50K) | 50,000 | 🎯 Sampled | Research papers with abstracts (recommended 10K–50K images) |
 
-**Total: ~1,239,348 multilingual text-image pairs**
+**Total: ~1,289,348 multilingual text-image pairs**
 
 ---
 
@@ -295,7 +296,7 @@ print(f"Avg text length: {sum(text_lengths)/len(text_lengths):.0f} chars")
   author={Global Incremental Builder},
   year={2024},
   url={https://huggingface.co/datasets/baconnier/deepseek-vision-complete},
-  note={1.24M+ multilingual text-image pairs for vision-language models}
+  note={1.29M+ multilingual text-image pairs for vision-language models}
 }
 ```
 

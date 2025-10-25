@@ -201,6 +201,12 @@
             background: #f0f3ff;
         }
 
+        .preset-card .recommendation {
+            color: #1d4ed8;
+            font-size: 0.85em;
+            margin: 6px 0;
+        }
+
         .preset-card h4 {
             color: #667eea;
             margin-bottom: 8px;
@@ -671,6 +677,7 @@
                     card.innerHTML = `
                         <h4>${key.toUpperCase()}</h4>
                         <p>${dataset.description}</p>
+                        ${dataset.recommended_samples ? `<p class="recommendation">${dataset.recommended_samples}</p>` : ''}
                         <p style="font-size: 0.8em; color: #999;">${dataset.size}</p>
                     `;
                     container.appendChild(card);
