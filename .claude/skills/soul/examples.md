@@ -1,87 +1,59 @@
-# SOUL Usage Examples
+# SOUL Automatic Behavior Examples
 
-## Example 1: Basic session documentation
+## Example 1: New project session
 
-After completing some development work:
+**User**: "Help me continue working on this React app"
 
-```bash
-# Analyze current session
-python scripts/trace_session.py --verbose
+**Claude with SOUL**:
+- Automatically detects existing project
+- Reads `.agent_handoff.md` to understand previous work
+- Reviews `.agent_log.md` for full context
+- Continues seamlessly: "I see you were working on the authentication component. The login form is complete but you mentioned needing to add password validation..."
 
-# Generate handoff notes
-python scripts/handoff_generator.py --both
-```
+## Example 2: After completing work
 
-**Result**: Creates comprehensive logs of what was accomplished.
+**User**: "I think we're done for today"
 
-## Example 2: Starting a new session
+**Claude with SOUL**:
+- Automatically analyzes what was accomplished
+- Creates comprehensive work log
+- Generates handoff notes for next session
+- "I've documented our progress. We completed the user authentication, fixed the API integration bug, and identified that the dashboard component needs optimization next."
 
-When beginning work on an existing project:
+## Example 3: Complex problem solving
 
-```bash
-# Check if previous session logs exist
-ls -la .agent_*
+**User**: "There's a bug in the payment system"
 
-# If they exist, review them:
-cat .agent_handoff.md
-cat .agent_log.md
-```
+**Claude with SOUL**:
+- Checks previous logs for similar issues
+- References past solutions and decisions
+- Documents the debugging process automatically
+- "I found we had a similar payment issue 3 sessions ago. Based on the previous solution and current symptoms, let me check the webhook configuration..."
 
-**Result**: Understand previous work and next steps.
+## Example 4: Multi-session project
 
-## Example 3: Custom configuration
+**Session 1**: Claude works on backend API
+**Session 2**: Claude (new instance) automatically:
+- Reads previous session context
+- Understands API decisions made
+- Continues with frontend integration seamlessly
+- "Based on the API structure we built yesterday, I'll now create the frontend components that match the endpoints..."
 
-Create `.soul_config.json`:
+## Example 5: Cross-model continuity
 
-```json
-{
-  "log_level": "detailed",
-  "include_git_diffs": true,
-  "max_log_entries": 100,
-  "custom_templates": true
-}
-```
+**Claude session**: Builds initial architecture
+**GPT session**: Automatically reads Claude's work logs
+**Gemini session**: Continues with full context of both previous sessions
 
-Then run with custom settings:
+**Result**: Perfect continuity across different AI models
 
-```bash
-python scripts/trace_session.py --config .soul_config.json
-```
+## Example 6: Long-term project memory
 
-## Example 4: Multi-agent handoff
+**Week 1**: Initial development
+**Week 4**: Claude automatically recalls:
+- Why certain architectural decisions were made
+- What problems were encountered and solved
+- What approaches were tried and abandoned
+- Current project status and immediate next steps
 
-Agent A completes work:
-```bash
-python scripts/handoff_generator.py --detailed
-```
-
-Agent B starts new session:
-```bash
-# Reviews .agent_handoff.md
-# Continues work
-# Documents new progress
-python scripts/trace_session.py --append
-```
-
-## Example 5: Problem tracking
-
-When solving complex issues:
-
-```bash
-# Document problem-solving process
-python scripts/trace_session.py --focus-problems --verbose
-```
-
-**Result**: Detailed analysis of problems encountered and solutions implemented.
-
-## Example 6: Cross-model compatibility
-
-For use with different AI models:
-
-```bash
-# Generate universal format logs
-python scripts/trace_session.py --universal-format
-python scripts/handoff_generator.py --cross-model
-```
-
-**Result**: Logs compatible with GPT, Claude, Gemini, etc.
+**No manual intervention needed** - SOUL handles all memory and continuity automatically.

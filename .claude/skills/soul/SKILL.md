@@ -1,48 +1,58 @@
 ---
 name: soul
-description: Creates persistent memory across AI agent sessions by automatically logging work, problems solved, and decisions made. Use when starting a new session, when development work is being completed, or when you need to document work for future agents.
+description: Gives Claude persistent memory across sessions by automatically creating work logs and handoff notes. Claude activates this skill when working on projects that need continuity between sessions.
 ---
 
-# SOUL - AI Agent Memory System
+# SOUL - Claude Memory Skill
 
-Automatically creates work logs and handoff notes for seamless agent collaboration across sessions.
+Automatically provides Claude with persistent memory and session continuity.
 
-## When to use
+## What SOUL does for Claude
 
-- Starting a new session (to understand previous work)
-- Completing development work (to document progress)
-- Switching between agents (to create handoffs)
-- Need to track problems solved and decisions made
+**Automatic Memory**: Claude remembers what was accomplished in previous sessions
+**Session Continuity**: Seamless transition between different Claude conversations  
+**Work Documentation**: Automatic logging of problems solved and decisions made
+**Context Preservation**: Maintains project context across time gaps
 
-## Core functionality
+## When Claude activates SOUL
 
-**Session Documentation**: Analyzes git changes and creates comprehensive work logs
-**Handoff Generation**: Creates structured notes for future agents
-**Memory Persistence**: Maintains context across multiple AI sessions
+Claude automatically uses this skill when:
+- Starting work on an existing project
+- Completing significant development work
+- Switching between different aspects of a project
+- Needing to understand previous decisions or solutions
 
-## Quick workflow
+## How it works
 
-1. Complete your development work
-2. Run session analysis: `python scripts/trace_session.py --verbose`
-3. Generate handoff: `python scripts/handoff_generator.py --both`
-4. Verify files created: `.agent_log.md`, `.agent_status.json`, `.agent_handoff.md`
+1. **Session Start**: Claude checks for existing work logs and context
+2. **During Work**: Claude tracks problems solved and decisions made  
+3. **Session End**: Claude creates comprehensive handoff notes
+4. **Next Session**: New Claude instance reads previous context and continues seamlessly
 
-## Files created
+## Files Claude creates
 
-- `.agent_log.md` - Complete work history with git analysis
-- `.agent_status.json` - Machine-readable session status
-- `.agent_handoff.md` - Next steps for future agents
+- `.agent_log.md` - Complete work history and context
+- `.agent_status.json` - Machine-readable project status
+- `.agent_handoff.md` - Immediate next steps and context
 
-## Configuration
+## Claude's automatic behavior
 
-Create `.soul_config.json` for customization:
+**No manual commands needed** - Claude handles everything automatically:
+- Detects when memory/continuity is needed
+- Analyzes git changes and project state
+- Creates appropriate documentation
+- Reads previous session context when starting
+
+## Configuration (optional)
+
+Claude can use custom settings via `.soul_config.json`:
 
 ```json
 {
-  "log_level": "detailed",
-  "include_git_diffs": false,
-  "max_log_entries": 50
+  "memory_depth": "detailed",
+  "include_code_analysis": true,
+  "session_continuity": "enhanced"
 }
 ```
 
-See other documentation files for detailed guides and examples.
+SOUL works seamlessly with Claude, GPT, Codex, and Gemini.
