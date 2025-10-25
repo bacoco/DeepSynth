@@ -1,0 +1,32 @@
+{
+  "thresholds": {
+    "pattern_frequency_min": 3,
+    "pattern_frequency_high": 6,
+    "impact_score_threshold": 0.5,
+    "trend_score_threshold": 0.3,
+    "urgency_score_threshold": 0.6,
+    "roi_score_threshold": 0.7,
+    "recommendation_min_score": 0.5
+  },
+  "analysis": {
+    "max_sessions_to_analyze": 50,
+    "file_correlation_threshold": 2,
+    "problem_recurrence_threshold": 2,
+    "temporal_pattern_window_days": 7,
+    "enable_ml_clustering": false,
+    "enable_nlp_analysis": false
+  },
+  "scoring": {
+    "frequency_weight": 0.25,
+    "impact_weight": 0.25,
+    "trend_weight": 0.15,
+    "urgency_weight": 0.20,
+    "roi_weight": 0.15
+  },
+  "output": {
+    "report_format": "both",
+    "include_examples": true,
+    "include_visualizations": false,
+    "verbose": true
+  }
+}
