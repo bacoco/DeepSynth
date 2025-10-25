@@ -290,16 +290,14 @@ def main():
     builder = IncrementalBuilder()
 
     sources = [
-        # PRIORITY: MLSUM Multilingual Summarization (as requested - using downloaded data)
+        # PRIORITY: MLSUM Multilingual Summarization (auto-download enabled)
         ('MLSUM', 'fr', 'text', 'summary'),                          # French news summarization - 392k examples
         ('MLSUM', 'es', 'text', 'summary'),                          # Spanish news summarization - 266k examples
         ('MLSUM', 'de', 'text', 'summary'),                          # German news summarization - 220k examples
 
-        # PRIORITY: English Summarization Datasets (high-quality)
+        # PRIORITY: English Summarization Datasets (verified and ready)
         ('cnn_dailymail', '3.0.0', 'article', 'highlights'),         # English news articles - 287k examples
         ('Rexhaif/xsum_reduced', None, 'text', 'target'),            # English BBC articles - XSum reduced version
-
-        # High-Quality Text Summarization Datasets
         ('billsum', None, 'text', 'summary'),                        # Legal documents - US bills (~22k examples)
     ]
 
