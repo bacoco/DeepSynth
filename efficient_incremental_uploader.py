@@ -107,4 +107,157 @@ class EfficientIncrementalUploader:
         })
 
         from datasets import Image as ImageFeature
-        dataset = dataset.cast_c
+        dataset = dataset.cast_column("image", ImageFeature())
+
+        return DatasetDict({'train': dataset})
+
+    def upload_batch_chunk(self, batch_files):
+        """Upload a chunk of batches and clean up after success"""
+        print(f"\\n📤 Uploading {len(batch_files)} batches...")
+
+        # Load samples
+        samples = self.load_batch_range(batch_files)
+        if not samples:
+            print("  ✗ Failed to load samples")
+            return False
+
+        print(f"  📊 Total samples in chunk: {len(samples)}")
+
+        # Create dataset from new samples
+        new_dataset_dict = self.create_dataset_from_samples(samples)
+        if not new_dataset_dict:
+            print("  ✗ Failed to create dataset")
+            return False
+
+        try:
+            print(f"  🚀 Uploading to: {self.dataset_name}")
+
+            # For first upload, create new dataset
+            if not self.upload_progress['dataset_created']:
+                try:
+                    self.api.delete_repo(repo_id=self.dataset_name, repo_type='dataset')
+                    print("  🗑️ Deleted existing dataset")
+                except:
+                    print("  ℹ️ No existing dataset to delete")
+
+                # Upload new dataset
+                final_dataset = new_dataset_dict
+                print("  📝 Creating new dataset")
+            else:
+                # APPEND to existing dataset
+                print("  📝 Loading existing dataset to append...")
+                try:
+                    from datasets import load_dataset
+                    existing_dataset = load_dataset(self.dataset_name, token=self.hf_token)
+
+                    # Combine existing and new data
+                    from datasets import concatenate_datasets
+                    combined_train = concatenate_datasets([
+                        existing_dataset['train'],
+                        new_dataset_dict['train']
+                    ])
+                    final_dataset = DatasetDict({'train': combined_train})
+                    print(f"  ✅ Combined: {len(existing_dataset['train'])} + {len(new_dataset_dict['train'])} = {len(combined_train)} samples")
+
+                except Exception as e:
+                    print(f"  ⚠ Failed to load existing dataset, creating new: {e}")
+                    final_dataset = new_dataset_dict
+
+            # Upload combined dataset
+            final_dataset.push_to_hub(
+                self.dataset_name,
+                private=False,
+                token=self.hf_token,
+                commit_message=f"Incremental update: +{len(samples)} samples (upload #{self.upload_progress['upload_count'] + 1})"
+            )
+
+            print(f"  ✅ Upload successful: https://huggingface.co/datasets/{self.dataset_name}")
+
+            # Update progress
+            last_batch_id = max(batch_id for batch_id, _ in batch_files)
+            self.upload_progress['last_uploaded_batch'] = last_batch_id
+            self.upload_progress['total_uploaded_samples'] += len(samples)
+            self.upload_progress['upload_count'] += 1
+            self.upload_progress['dataset_created'] = True
+            self.save_upload_progress()
+
+            # Clean up batch files after successful upload
+            self.cleanup_uploaded_batches(batch_files)
+
+            print(f"  📈 Total uploaded: {self.upload_progress['total_uploaded_samples']} samples")
+            return True
+
+        except Exception as e:
+            print(f"  ✗ Upload failed: {e}")
+            return False
+
+    def cleanup_uploaded_batches(self, batch_files):
+        """DELETE uploaded batch files to save disk space"""
+        print(f"  🧹 Deleting {len(batch_files)} batch files to save space...")
+
+        for batch_id, batch_file in batch_files:
+            try:
+                # DELETE the file completely to save disk space
+                batch_file.unlink()
+                print(f"    ✓ Deleted batch {batch_id}")
+            except Exception as e:
+                print(f"    ✗ Failed to delete batch {batch_id}: {e}")
+
+    def upload_all_pending(self):
+        """Upload all pending batches in chunks"""
+        print("🎯 EFFICIENT INCREMENTAL UPLOAD")
+        print("=" * 50)
+        print(f"📊 Dataset: {self.dataset_name}")
+        print(f"📊 Upload every {self.batches_per_upload} batches (~{self.batches_per_upload * 50} samples)")
+
+        pending_batches = self.get_pending_batches()
+
+        if not pending_batches:
+            print("⚠ No pending batches to upload")
+            return
+
+        print(f"📊 Found {len(pending_batches)} pending batches")
+
+        # Upload in chunks
+        for i in range(0, len(pending_batches), self.batches_per_upload):
+            chunk = pending_batches[i:i + self.batches_per_upload]
+
+            print(f"\\n📦 Chunk {i//self.batches_per_upload + 1}: batches {chunk[0][0]} to {chunk[-1][0]}")
+
+            success = self.upload_batch_chunk(chunk)
+
+            if not success:
+                print(f"❌ Failed to upload chunk, stopping")
+                break
+
+            # Small delay to avoid rate limiting
+            time.sleep(3)
+
+        print(f"\\n🎉 Upload complete!")
+        print(f"📊 Total uploads: {self.upload_progress['upload_count']}")
+        print(f"📊 Total samples: {self.upload_progress['total_uploaded_samples']}")
+        print(f"📊 Dataset: https://huggingface.co/datasets/{self.dataset_name}")
+
+    def should_upload_now(self):
+        """Check if we should upload now (every batches_per_upload batches)"""
+        pending = self.get_pending_batches()
+        return len(pending) >= self.batches_per_upload
+
+    def upload_if_ready(self):
+        """Upload if we have enough pending batches"""
+        if self.should_upload_now():
+            print(f"\\n🔄 Auto-upload triggered ({self.batches_per_upload} batches ready)")
+
+            pending_batches = self.get_pending_batches()
+            chunk = pending_batches[:self.batches_per_upload]
+
+            return self.upload_batch_chunk(chunk)
+
+        return False
+
+def main():
+    uploader = EfficientIncrementalUploader(batches_per_upload=100)
+    uploader.upload_all_pending()
+
+if __name__ == "__main__":
+    main()
