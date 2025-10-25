@@ -14,7 +14,7 @@ import logging
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from web_ui.state_manager import StateManager, JobStatus
-from web_ui.dataset_generator import IncrementalDatasetGenerator, ModelTrainer
+from web_ui.dataset_generator_improved import IncrementalDatasetGenerator, ModelTrainer
 from training.optimal_configs import (
     list_benchmark_datasets,
     get_optimal_config,
@@ -41,7 +41,7 @@ model_trainer = ModelTrainer(state_manager)
 @app.route('/')
 def index():
     """Render main UI."""
-    return render_template('index.html')
+    return render_template('index_improved.html')
 
 
 @app.route('/api/jobs', methods=['GET'])
