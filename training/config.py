@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Tuple
 
 
 @dataclass
@@ -35,6 +35,11 @@ class TrainerConfig:
     resume_from_checkpoint: Optional[str] = None
     metrics_output_path: Optional[str] = None
     save_metrics_to_hub: bool = True
+    expert_dropout_rate: float = 0.0
+    expert_dropout_min_keep: int = 1
+    bidrop_passes: int = 1
+    gate_dropout_rate: float = 0.0
+    gate_dropout_keywords: Tuple[str, ...] = ("gate", "router")
 
     def to_dict(self) -> dict:
         """Return a serialisable representation used by the web UI."""
@@ -57,6 +62,11 @@ class TrainerConfig:
             "resume_from_checkpoint": self.resume_from_checkpoint,
             "metrics_output_path": self.metrics_output_path,
             "save_metrics_to_hub": self.save_metrics_to_hub,
+            "expert_dropout_rate": self.expert_dropout_rate,
+            "expert_dropout_min_keep": self.expert_dropout_min_keep,
+            "bidrop_passes": self.bidrop_passes,
+            "gate_dropout_rate": self.gate_dropout_rate,
+            "gate_dropout_keywords": list(self.gate_dropout_keywords),
         }
 
 
