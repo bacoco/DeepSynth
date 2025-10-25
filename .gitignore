@@ -15,10 +15,18 @@ deepseek-ocr-summarizer/
 models/
 checkpoints/
 
-# Data
+# Data files (should go to HuggingFace, not GitHub)
 prepared_data/
 prepared_images/
 *.jsonl
+images_*/
+*_data/
+work/
+*_cache/
+*.png
+*.jpg
+*.jpeg
+test_images_output/
 
 # IDE
 .vscode/
