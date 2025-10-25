@@ -8,7 +8,8 @@ import sys
 from pathlib import Path
 from typing import Dict, Optional, Callable
 import logging
-from datasets import Dataset, load_dataset, DatasetDict
+from datasets import Dataset, DatasetDict, Features, Value, load_dataset
+from datasets.features import Image as HFImage
 from huggingface_hub import HfApi, create_repo
 
 # Add parent directory to path to import project modules
@@ -16,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from data.text_to_image import TextToImageConverter
 from web_ui.state_manager import StateManager, JobStatus
+from training.config import OptimizerConfig, TrainerConfig
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -112,6 +114,7 @@ class IncrementalDatasetGenerator:
                         'text': text_content,
                         'summary': sample.get(summary_field, ''),
                         'image_path': str(image_path),
+                        'image': str(image_path),
                         'source_index': idx
                     }
                     processed_data.append(processed_sample)
@@ -175,7 +178,7 @@ class IncrementalDatasetGenerator:
     def _load_existing_dataset(self, repo_id: str):
         """Load existing dataset from HuggingFace Hub."""
         try:
-            ds = load_dataset(repo_id, split='train')
+            ds = load_dataset(repo_id, split='train', token=os.environ.get('HF_TOKEN'))
             return list(ds)
         except Exception as e:
             logger.warning(f"Could not load existing dataset: {e}")
@@ -187,8 +190,18 @@ class IncrementalDatasetGenerator:
             return
 
         try:
-            # Create dataset
-            dataset = Dataset.from_list(data)
+            # Create dataset with explicit image feature so files are uploaded to HF
+            features = Features(
+                {
+                    'text': Value('string'),
+                    'summary': Value('string'),
+                    'image_path': Value('string'),
+                    'image': HFImage(),
+                    'source_index': Value('int32'),
+                }
+            )
+
+            dataset = Dataset.from_list(data, features=features)
 
             # Create or update repo
             repo_id = config.get('hf_dataset_repo')
@@ -198,15 +211,24 @@ class IncrementalDatasetGenerator:
                 repo_id = f"{hf_username}/{dataset_name}"
 
             # Create repo if it doesn't exist
+            token = config.get('hf_token', os.environ.get('HF_TOKEN'))
+
             try:
-                create_repo(repo_id, repo_type="dataset", exist_ok=True)
+                create_repo(
+                    repo_id,
+                    repo_type="dataset",
+                    exist_ok=True,
+                    token=token,
+                    private=config.get('private_dataset', False)
+                )
             except Exception as e:
                 logger.warning(f"Repo might already exist: {e}")
 
             # Push to hub
             dataset.push_to_hub(
                 repo_id,
-                private=config.get('private_dataset', False)
+                private=config.get('private_dataset', False),
+                token=token
             )
 
             # Update job with repo info
@@ -239,7 +261,6 @@ class ModelTrainer:
             progress_callback: Optional callback for progress updates
         """
         from training.deepseek_trainer_v2 import ProductionDeepSeekTrainer
-        from training.config import TrainerConfig
 
         job = self.state_manager.get_job(job_id)
         if not job:
@@ -253,18 +274,29 @@ class ModelTrainer:
             config = job.config
 
             # Create trainer config
+            optimizer_config = OptimizerConfig(
+                learning_rate=float(config.get('learning_rate', 2e-5)),
+                weight_decay=float(config.get('weight_decay', 0.01)),
+                warmup_steps=int(config.get('warmup_steps', 0)),
+            )
+
             trainer_config = TrainerConfig(
                 model_name=config.get('model_name', 'deepseek-ai/DeepSeek-OCR'),
                 output_dir=config.get('output_dir', './trained_model'),
-                batch_size=config.get('batch_size', 2),
-                num_epochs=config.get('num_epochs', 1),
-                learning_rate=float(config.get('learning_rate', 2e-5)),
-                max_length=config.get('max_length', 512),
+                batch_size=int(config.get('batch_size', 2)),
+                num_epochs=int(config.get('num_epochs', 1)),
+                max_length=int(config.get('max_length', 512)),
                 mixed_precision=config.get('mixed_precision', 'bf16'),
-                gradient_accumulation_steps=config.get('gradient_accumulation_steps', 4),
+                gradient_accumulation_steps=int(config.get('gradient_accumulation_steps', 4)),
+                optimizer=optimizer_config,
                 push_to_hub=config.get('push_to_hub', False),
                 hub_model_id=config.get('hub_model_id'),
-                hf_token=config.get('hf_token', os.environ.get('HF_TOKEN'))
+                hub_private=bool(config.get('hub_private', False)),
+                hub_token=config.get('hf_token', os.environ.get('HF_TOKEN')),
+                evaluation_split=config.get('evaluation_split'),
+                save_checkpoints_to_hub=bool(config.get('save_checkpoints_to_hub', True)),
+                resume_from_checkpoint=config.get('resume_from_checkpoint'),
+                save_metrics_to_hub=bool(config.get('save_metrics_to_hub', True)),
             )
 
             # Load dataset
@@ -279,13 +311,28 @@ class ModelTrainer:
 
             # Train
             logger.info("Starting training...")
-            trainer.train_from_hf_dataset(dataset_repo)
+            def progress_callback(processed: int, total: int):
+                job_state = self.state_manager.get_job(job_id)
+                if not job_state:
+                    return
+                job_state.total_samples = total or job_state.total_samples
+                job_state.processed_samples = processed
+                self.state_manager.update_job(job_state)
+
+            metrics, checkpoints = trainer.train_from_hf_dataset(
+                dataset_repo,
+                progress_callback=progress_callback
+            )
 
             # Update job
             job.status = JobStatus.COMPLETED.value
             job.model_output_path = trainer_config.output_dir
+            job.training_checkpoint = checkpoints.get('last_checkpoint')
+            job.config['metrics'] = metrics
+            job.config['checkpoints'] = checkpoints
+            job.config['metrics_path'] = str(Path(trainer_config.output_dir) / 'metrics.json')
             if trainer_config.push_to_hub:
-                job.hf_dataset_repo = trainer_config.hub_model_id
+                job.config['hub_model_id'] = trainer_config.hub_model_id
             self.state_manager.update_job(job)
 
             logger.info("Training completed successfully")
