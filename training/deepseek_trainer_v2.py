@@ -16,6 +16,7 @@ from PIL import Image
 from tqdm import tqdm
 
 from .config import TrainerConfig
+from .moe_dropout import ExpertGradientDropout, GateGradientDropout
 
 try:  # pragma: no cover - import validated at runtime
     from transformers import AutoModel, AutoTokenizer
@@ -61,6 +62,7 @@ class ProductionDeepSeekTrainer:
 
         self._freeze_vision_encoder()
         self._log_parameters()
+        self._setup_dropout_strategies()
 
         self.optimizer = torch.optim.AdamW(
             [p for p in self.model.parameters() if p.requires_grad],
@@ -94,6 +96,34 @@ class ProductionDeepSeekTrainer:
 
         LOGGER.info(f"Total parameters: {total:,} ({total/1e9:.2f}B)")
         LOGGER.info(f"Trainable: {trainable:,} ({trainable/1e6:.1f}M) - {100*trainable/total:.1f}%")
+
+    def _setup_dropout_strategies(self) -> None:
+        """Initialise optional dropout-based regularisation strategies."""
+
+        self.bidrop_passes = max(1, int(self.config.bidrop_passes))
+
+        self._expert_dropout = (
+            ExpertGradientDropout(
+                self.model,
+                dropout_rate=self.config.expert_dropout_rate,
+                min_keep=self.config.expert_dropout_min_keep,
+            )
+            if self.config.expert_dropout_rate > 0
+            else None
+        )
+
+        self._gate_dropout = (
+            GateGradientDropout(
+                self.model,
+                dropout_rate=self.config.gate_dropout_rate,
+                keywords=self.config.gate_dropout_keywords,
+            )
+            if self.config.gate_dropout_rate > 0
+            else None
+        )
+
+        if self.bidrop_passes > 1:
+            LOGGER.info("Bi-Drop enabled with %d subnet passes", self.bidrop_passes)
 
     def _load_image(self, image_input: Union[str, Image.Image]) -> Image.Image:
         """Load image from path or return PIL Image."""
@@ -170,27 +200,23 @@ class ProductionDeepSeekTrainer:
                 except ValueError:
                     continue
 
-                outputs = self.model(
+                step_loss = self._forward_with_bidrop(
                     input_ids=input_ids,
                     attention_mask=attention_mask,
                     labels=labels,
-                    return_dict=True,
                 )
 
-                loss = outputs.loss if hasattr(outputs, "loss") else outputs[0]
-                loss = loss / self.config.gradient_accumulation_steps
-                loss.backward()
-
                 if (global_step + 1) % self.config.gradient_accumulation_steps == 0:
+                    self._apply_gradient_dropout()
                     self.optimizer.step()
                     self.optimizer.zero_grad()
 
                 processed_samples += len(batch)
-                epoch_loss += loss.item() * self.config.gradient_accumulation_steps
+                epoch_loss += step_loss
                 num_batches += 1
                 global_step += 1
 
-                pbar.set_postfix({"loss": f"{loss.item():.4f}"})
+                pbar.set_postfix({"loss": f"{step_loss:.4f}"})
 
                 if progress_callback:
                     progress_callback(processed_samples, total_samples)
@@ -300,6 +326,54 @@ class ProductionDeepSeekTrainer:
 
         self.model.train()
         return sum(losses) / len(losses) if losses else 0.0
+
+    def _apply_gradient_dropout(self) -> None:
+        """Invoke configured dropout controllers on accumulated gradients."""
+
+        if self._expert_dropout is not None:
+            self._expert_dropout.apply()
+        if self._gate_dropout is not None:
+            self._gate_dropout.apply()
+
+    def _forward_with_bidrop(
+        self,
+        *,
+        input_ids: torch.Tensor,
+        attention_mask: torch.Tensor,
+        labels: torch.Tensor,
+    ) -> float:
+        """Compute a training loss possibly using Bi-Drop style sub-networks."""
+
+        if self.bidrop_passes <= 1:
+            outputs = self.model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                labels=labels,
+                return_dict=True,
+            )
+
+            loss = outputs.loss if hasattr(outputs, "loss") else outputs[0]
+            raw_loss = loss.detach().to(torch.float32).item()
+            scaled_loss = loss / self.config.gradient_accumulation_steps
+            scaled_loss.backward()
+            return raw_loss
+
+        raw_losses = []
+        for _ in range(self.bidrop_passes):
+            outputs = self.model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                labels=labels,
+                return_dict=True,
+            )
+
+            loss = outputs.loss if hasattr(outputs, "loss") else outputs[0]
+            raw_losses.append(loss.detach().to(torch.float32).item())
+            scaled_loss = loss / self.config.gradient_accumulation_steps
+            scaled_loss = scaled_loss / self.bidrop_passes
+            scaled_loss.backward()
+
+        return float(sum(raw_losses) / len(raw_losses))
 
     def save_model(self, output_dir: Union[str, Path]):
         """Save model and tokenizer."""
