@@ -14,6 +14,8 @@ class OptimizerConfig:
 
 @dataclass
 class TrainerConfig:
+    """Configuration values used by :class:`ProductionDeepSeekTrainer`."""
+
     model_name: str = "deepseek-ai/DeepSeek-OCR"
     output_dir: str = "./deepseek-summarizer"
     batch_size: int = 2
@@ -28,6 +30,34 @@ class TrainerConfig:
     hub_model_id: Optional[str] = None
     hub_private: bool = False
     hub_token: Optional[str] = None
+    evaluation_split: Optional[str] = "validation"
+    save_checkpoints_to_hub: bool = False
+    resume_from_checkpoint: Optional[str] = None
+    metrics_output_path: Optional[str] = None
+    save_metrics_to_hub: bool = True
+
+    def to_dict(self) -> dict:
+        """Return a serialisable representation used by the web UI."""
+
+        return {
+            "model_name": self.model_name,
+            "output_dir": self.output_dir,
+            "batch_size": self.batch_size,
+            "num_epochs": self.num_epochs,
+            "gradient_accumulation_steps": self.gradient_accumulation_steps,
+            "max_length": self.max_length,
+            "mixed_precision": self.mixed_precision,
+            "log_interval": self.log_interval,
+            "save_interval": self.save_interval,
+            "push_to_hub": self.push_to_hub,
+            "hub_model_id": self.hub_model_id,
+            "hub_private": self.hub_private,
+            "evaluation_split": self.evaluation_split,
+            "save_checkpoints_to_hub": self.save_checkpoints_to_hub,
+            "resume_from_checkpoint": self.resume_from_checkpoint,
+            "metrics_output_path": self.metrics_output_path,
+            "save_metrics_to_hub": self.save_metrics_to_hub,
+        }
 
 
 __all__ = ["TrainerConfig", "OptimizerConfig"]

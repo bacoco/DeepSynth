@@ -535,9 +535,14 @@
                 <div class="form-section">
                     <h3>Dataset</h3>
                     <div class="form-group">
-                        <label for="dataset_repo">HuggingFace Dataset Repo*</label>
-                        <input type="text" id="dataset_repo" name="dataset_repo"
-                               placeholder="username/dataset-name" required>
+                        <label for="dataset_repo">Generated Dataset*</label>
+                        <select id="dataset_repo" name="dataset_repo" required>
+                            <option value="" disabled selected>Select a generated dataset</option>
+                        </select>
+                        <small style="display:block;margin-top:8px;color:#6c757d;">
+                            Only datasets built through the generator are available. Refresh if you just created one.
+                        </small>
+                        <button type="button" class="btn btn-secondary" style="margin-top:10px;" onclick="loadGeneratedDatasets(true)">↻ Refresh datasets</button>
                     </div>
                 </div>
 
@@ -597,6 +602,24 @@
                                    name="gradient_accumulation_steps" value="8">
                         </div>
                     </div>
+                    <div class="form-group">
+                        <label for="evaluation_split">Evaluation Split (optional)</label>
+                        <input type="text" id="evaluation_split" name="evaluation_split" placeholder="validation or test">
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Resume Training</h3>
+                    <div class="form-group">
+                        <label for="resume_job_id">Resume from checkpoint</label>
+                        <select id="resume_job_id" name="resume_job_id">
+                            <option value="">Start a new run</option>
+                        </select>
+                        <small style="display:block;margin-top:8px;color:#6c757d;">
+                            Completed training runs automatically save checkpoints that can be resumed from here.
+                        </small>
+                        <button type="button" class="btn btn-secondary" style="margin-top:10px;" onclick="loadTrainingCheckpoints(true)">↻ Refresh checkpoints</button>
+                    </div>
                 </div>
 
                 <div class="form-section">
@@ -611,6 +634,26 @@
                         <label for="hub_model_id">Model ID (username/model-name)</label>
                         <input type="text" id="hub_model_id" name="hub_model_id"
                                placeholder="username/model-name">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="hub_private" name="hub_private">
+                            Make model private on HuggingFace
+                        </label>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="save_checkpoints_to_hub" name="save_checkpoints_to_hub" checked>
+                                Upload checkpoints to HuggingFace
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="save_metrics_to_hub" name="save_metrics_to_hub" checked>
+                                Upload metrics.json to HuggingFace
+                            </label>
+                        </div>
                     </div>
                 </div>
 
@@ -638,6 +681,80 @@
         // Global state
         let selectedBenchmark = null;
         let selectedPreset = 'default';
+
+        async function loadGeneratedDatasets(forceToast = false) {
+            const select = document.getElementById('dataset_repo');
+            if (!select) return;
+
+            const previousValue = select.value;
+            select.innerHTML = '<option value="" disabled selected>Loading datasets...</option>';
+
+            try {
+                const response = await fetch('/api/datasets/generated');
+                const data = await response.json();
+
+                if (!data.datasets || data.datasets.length === 0) {
+                    select.innerHTML = '<option value="" disabled selected>No generated datasets found</option>';
+                    if (forceToast) {
+                        showToast('No generated datasets available yet', 'warning');
+                    }
+                    return;
+                }
+
+                select.innerHTML = '<option value="" disabled>Select a generated dataset</option>';
+                for (const dataset of data.datasets) {
+                    const option = document.createElement('option');
+                    option.value = dataset.repo;
+                    option.textContent = `${dataset.dataset_name || dataset.repo} (${dataset.repo})`;
+                    if (dataset.repo === previousValue) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                }
+            } catch (error) {
+                select.innerHTML = '<option value="" disabled selected>Failed to load datasets</option>';
+                showToast('Failed to load datasets: ' + error.message, 'error');
+            }
+        }
+
+        async function loadTrainingCheckpoints(forceToast = false) {
+            const select = document.getElementById('resume_job_id');
+            if (!select) return;
+
+            const previousValue = select.value;
+            select.innerHTML = '<option value="">Loading checkpoints...</option>';
+
+            try {
+                const response = await fetch('/api/training/checkpoints');
+                const data = await response.json();
+
+                select.innerHTML = '<option value="">Start a new run</option>';
+
+                if (!data.checkpoints || data.checkpoints.length === 0) {
+                    if (forceToast) {
+                        showToast('No checkpoints available yet', 'warning');
+                    }
+                    return;
+                }
+
+                for (const checkpoint of data.checkpoints) {
+                    if (!checkpoint.checkpoint) continue;
+                    const option = document.createElement('option');
+                    option.value = checkpoint.job_id;
+                    const label = checkpoint.hub_model_id
+                        ? `${checkpoint.job_id} → ${checkpoint.hub_model_id}`
+                        : `${checkpoint.job_id} (${checkpoint.checkpoint})`;
+                    option.textContent = label;
+                    if (checkpoint.job_id === previousValue) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                }
+            } catch (error) {
+                select.innerHTML = '<option value="">Failed to load checkpoints</option>';
+                showToast('Failed to load checkpoints: ' + error.message, 'error');
+            }
+        }
         let benchmarkDatasets = {};
         let trainingPresets = {};
 
@@ -820,6 +937,7 @@
                     showToast(`Dataset generation started! Job ID: ${data.job_id}`, 'success');
                     switchTab('jobs');
                     setTimeout(refreshJobs, 500);
+                    setTimeout(() => loadGeneratedDatasets(true), 1000);
                 } else {
                     showToast(data.error || 'Error generating dataset', 'error');
                 }
@@ -842,8 +960,13 @@
                 max_length: document.getElementById('max_length').value,
                 mixed_precision: document.getElementById('mixed_precision').value,
                 gradient_accumulation_steps: document.getElementById('gradient_accumulation_steps').value,
+                evaluation_split: document.getElementById('evaluation_split').value || null,
+                resume_job_id: document.getElementById('resume_job_id').value || null,
                 push_to_hub: document.getElementById('push_to_hub').checked,
-                hub_model_id: document.getElementById('hub_model_id').value
+                hub_model_id: document.getElementById('hub_model_id').value,
+                hub_private: document.getElementById('hub_private').checked,
+                save_checkpoints_to_hub: document.getElementById('save_checkpoints_to_hub').checked,
+                save_metrics_to_hub: document.getElementById('save_metrics_to_hub').checked
             };
 
             try {
@@ -859,6 +982,7 @@
                     showToast(`Model training started! Job ID: ${data.job_id}`, 'success');
                     switchTab('jobs');
                     setTimeout(refreshJobs, 500);
+                    setTimeout(() => loadTrainingCheckpoints(true), 1000);
                 } else {
                     showToast(data.error || 'Error starting training', 'error');
                 }
@@ -888,6 +1012,29 @@
 
                     const progress = job.progress || {};
                     const percentage = progress.percentage || 0;
+                    const metrics = job.metrics || {};
+
+                    const detailLines = [];
+                    if (job.hf_dataset_repo) {
+                        detailLines.push(`Dataset: ${job.hf_dataset_repo}`);
+                    }
+                    if (job.model_output_path) {
+                        detailLines.push(`Output: ${job.model_output_path}`);
+                    }
+
+                    const metricLines = [];
+                    if (typeof metrics.train_loss !== 'undefined') {
+                        metricLines.push(`Train loss: ${Number(metrics.train_loss).toFixed(4)}`);
+                    }
+                    if (typeof metrics.eval_loss !== 'undefined') {
+                        metricLines.push(`Eval loss: ${Number(metrics.eval_loss).toFixed(4)}`);
+                    }
+                    if (typeof metrics.eval_perplexity !== 'undefined' && Number.isFinite(Number(metrics.eval_perplexity))) {
+                        metricLines.push(`Perplexity: ${Number(metrics.eval_perplexity).toFixed(2)}`);
+                    }
+
+                    const detailsHtml = detailLines.length ? `<div style="font-size:0.85em;color:#495057;margin-top:10px;">${detailLines.join('<br>')}</div>` : '';
+                    const metricsHtml = metricLines.length ? `<div style="font-size:0.85em;color:#212529;margin-top:6px;">${metricLines.join(' • ')}</div>` : '';
 
                     card.innerHTML = `
                         <div class="job-header">
@@ -903,6 +1050,8 @@
                         <div style="font-size: 0.9em; color: #6c757d; margin-top: 10px;">
                             ${progress.current || 0} / ${progress.total || 0} - ${progress.message || 'Processing...'}
                         </div>
+                        ${detailsHtml}
+                        ${metricsHtml}
                     `;
 
                     container.appendChild(card);
@@ -920,6 +1069,8 @@
         document.addEventListener('DOMContentLoaded', () => {
             loadBenchmarkDatasets();
             loadTrainingPresets();
+            loadGeneratedDatasets();
+            loadTrainingCheckpoints();
             refreshJobs();
 
             // Auto-refresh jobs every 5 seconds

@@ -36,6 +36,10 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip3 install --no-cache-dir -r requirements.txt
 
+# Ensure CUDA-enabled PyTorch packages are installed
+RUN pip3 install --no-cache-dir --index-url https://download.pytorch.org/whl/cu121 \
+    torch torchvision torchaudio
+
 # Install Flask for web UI
 RUN pip3 install --no-cache-dir flask flask-cors gunicorn
 
