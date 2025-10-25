@@ -1,0 +1,224 @@
+{
+  "analysis_timestamp": 1761414350.5947301,
+  "repository": ".",
+  "prd_files_analyzed": [
+    "deepseek-ocr-resume-prd.md",
+    "todo-first.md"
+  ],
+  "total_tasks": 91,
+  "summary": {
+    "total_patterns_detected": 9,
+    "skills_recommended": 7,
+    "high_priority_skills": 4,
+    "task_coverage": 54
+  },
+  "task_patterns": {
+    "general": {
+      "frequency": 48,
+      "example_tasks": [
+        "Clone repo DeepSeek-OCR",
+        "Installation environnement Python",
+        "Impl\u00e9mentation text_to_image()"
+      ]
+    },
+    "data_processing": {
+      "frequency": 10,
+      "example_tasks": [
+        "Login Hugging Face + t\u00e9l\u00e9chargement datasets",
+        "Cr\u00e9ation SummarizationDataset",
+        "Transformers: https://huggingface.co/docs/transformers/"
+      ]
+    },
+    "testing": {
+      "frequency": 8,
+      "example_tasks": [
+        "Test mod\u00e8le de base sur exemple",
+        "Split train/val/test",
+        "Calcul ROUGE sur test set"
+      ]
+    },
+    "api": {
+      "frequency": 20,
+      "example_tasks": [
+        "Documentation API",
+        "**Repo GitHub Principal** : https://github.com/deepseek-ai/DeepSeek-OCR",
+        "**HuggingFace Model** : https://huggingface.co/deepseek-ai/DeepSeek-OCR"
+      ]
+    },
+    "documentation": {
+      "frequency": 7,
+      "example_tasks": [
+        "Documentation API",
+        "**Guide Complet 2025** : https://skywork.ai/blog/ai-agent/how-to-install-run-deepseek-ocr-2025-guide/",
+        "**vLLM Integration** : https://docs.vllm.ai/projects/recipes/en/latest/DeepSeek/DeepSeek-OCR.html"
+      ]
+    },
+    "database": {
+      "frequency": 3,
+      "example_tasks": [
+        "Tests performance GPU",
+        "**Ratio Information** : 1 token visuel \u2248 20 tokens texte",
+        "Transformers: https://huggingface.co/docs/transformers/"
+      ]
+    },
+    "performance": {
+      "frequency": 2,
+      "example_tasks": [
+        "Tests performance GPU",
+        "\u2705 **SOLUTION**: Added DejaVu Sans Unicode font to `OptimizedConverter`"
+      ]
+    },
+    "deployment": {
+      "frequency": 4,
+      "example_tasks": [
+        "D\u00e9ploiement containeris\u00e9",
+        "**Space Management**: Pipeline now uploads every batch to prevent disk full",
+        "Complete user-friendly pipeline launcher"
+      ]
+    },
+    "frontend": {
+      "frequency": 5,
+      "example_tasks": [
+        "**OOM (Out of Memory)** : R\u00e9duire batch_size, activer gradient_checkpointing",
+        "**Guide Complet 2025** : https://skywork.ai/blog/ai-agent/how-to-install-run-deepseek-ocr-2025-guide/",
+        "**vLLM Integration** : https://docs.vllm.ai/projects/recipes/en/latest/DeepSeek/DeepSeek-OCR.html"
+      ]
+    }
+  },
+  "skill_recommendations": [
+    {
+      "domain": "api",
+      "skill_name": "api-master",
+      "priority": "critical",
+      "task_count": 20,
+      "example_tasks": [
+        "Documentation API",
+        "**Repo GitHub Principal** : https://github.com/deepseek-ai/DeepSeek-OCR",
+        "**HuggingFace Model** : https://huggingface.co/deepseek-ai/DeepSeek-OCR",
+        "**Paper ArXiv** : https://arxiv.org/abs/2510.18234",
+        "**Code Modeling** : https://huggingface.co/deepseek-ai/DeepSeek-OCR/blob/main/modeling_deepseekocr.py"
+      ],
+      "reason": "Detected 20 tasks related to api",
+      "recommended_capabilities": [
+        "Rate limiting and retry logic",
+        "Error handling patterns",
+        "Response caching",
+        "API client generation"
+      ]
+    },
+    {
+      "domain": "data_processing",
+      "skill_name": "data-wizard",
+      "priority": "critical",
+      "task_count": 10,
+      "example_tasks": [
+        "Login Hugging Face + t\u00e9l\u00e9chargement datasets",
+        "Cr\u00e9ation SummarizationDataset",
+        "Transformers: https://huggingface.co/docs/transformers/",
+        "Datasets: https://huggingface.co/docs/datasets/",
+        "**Data Location**: All data goes to HuggingFace, not GitHub"
+      ],
+      "reason": "Detected 10 tasks related to data_processing",
+      "recommended_capabilities": [
+        "ETL pipeline automation",
+        "Data validation",
+        "Format conversion",
+        "Transformation helpers"
+      ]
+    },
+    {
+      "domain": "testing",
+      "skill_name": "test-guardian",
+      "priority": "critical",
+      "task_count": 8,
+      "example_tasks": [
+        "Test mod\u00e8le de base sur exemple",
+        "Split train/val/test",
+        "Calcul ROUGE sur test set",
+        "Tests edge cases",
+        "Tests performance GPU"
+      ],
+      "reason": "Detected 8 tasks related to testing",
+      "recommended_capabilities": [
+        "Test case generation",
+        "Coverage analysis",
+        "Test fixture creation",
+        "Assertion helpers"
+      ]
+    },
+    {
+      "domain": "documentation",
+      "skill_name": "doc-genius",
+      "priority": "high",
+      "task_count": 7,
+      "example_tasks": [
+        "Documentation API",
+        "**Guide Complet 2025** : https://skywork.ai/blog/ai-agent/how-to-install-run-deepseek-ocr-2025-guide/",
+        "**vLLM Integration** : https://docs.vllm.ai/projects/recipes/en/latest/DeepSeek/DeepSeek-OCR.html",
+        "Transformers: https://huggingface.co/docs/transformers/",
+        "Datasets: https://huggingface.co/docs/datasets/"
+      ],
+      "reason": "Detected 7 tasks related to documentation",
+      "recommended_capabilities": [
+        "README generation",
+        "API documentation",
+        "Code commenting",
+        "Usage examples"
+      ]
+    },
+    {
+      "domain": "deployment",
+      "skill_name": "deploy-sage",
+      "priority": "medium",
+      "task_count": 4,
+      "example_tasks": [
+        "D\u00e9ploiement containeris\u00e9",
+        "**Space Management**: Pipeline now uploads every batch to prevent disk full",
+        "Complete user-friendly pipeline launcher",
+        "Pipeline configured for immediate cleanup"
+      ],
+      "reason": "Detected 4 tasks related to deployment",
+      "recommended_capabilities": [
+        "Docker optimization",
+        "CI/CD pipeline generation",
+        "Environment management",
+        "Deployment automation"
+      ]
+    },
+    {
+      "domain": "database",
+      "skill_name": "db-wizard",
+      "priority": "medium",
+      "task_count": 3,
+      "example_tasks": [
+        "Tests performance GPU",
+        "**Ratio Information** : 1 token visuel \u2248 20 tokens texte",
+        "Transformers: https://huggingface.co/docs/transformers/"
+      ],
+      "reason": "Detected 3 tasks related to database",
+      "recommended_capabilities": [
+        "Query optimization",
+        "Migration generation",
+        "Schema validation",
+        "ORM helpers"
+      ]
+    },
+    {
+      "domain": "performance",
+      "skill_name": "perf-optimizer",
+      "priority": "low",
+      "task_count": 2,
+      "example_tasks": [
+        "Tests performance GPU",
+        "\u2705 **SOLUTION**: Added DejaVu Sans Unicode font to `OptimizedConverter`"
+      ],
+      "reason": "Detected 2 tasks related to performance",
+      "recommended_capabilities": [
+        "Bottleneck detection",
+        "Caching strategies",
+        "Profiling tools",
+        "Optimization suggestions"
+      ]
+    }
+  ]
+}
