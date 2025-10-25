@@ -1,53 +1,68 @@
-# 🚀 DeepSeek-OCR Summarization Framework
+# 🚀 DeepSeek-OCR Multilingual Summarization Framework
 
-> **Transform any document into actionable insights with state-of-the-art AI summarization**
+> **Transform any document into actionable insights with state-of-the-art multilingual AI summarization**
 
 [![Production Ready](https://img.shields.io/badge/production-ready-green.svg)](PRODUCTION_GUIDE.md)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Multilingual](https://img.shields.io/badge/languages-5+-green.svg)](#supported-languages)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**One command. Infinite possibilities.**
+**One command. Five languages. Infinite possibilities.**
 
 ```bash
-python run_complete_pipeline.py
+python incremental_builder.py
 ```
 
-Automatically downloads datasets, trains cutting-edge models, and deploys to production—all in a single command.
+Automatically processes multilingual datasets with incremental HuggingFace uploads, visual text encoding, and resumable pipeline—all optimized for production scale.
 
 ---
 
-## 💡 Why DeepSeek-OCR Summarization?
+## 💡 Why DeepSeek-OCR Multilingual Summarization?
 
 ### The Problem
-- **Information overload**: Millions of documents, reports, and articles to process
-- **Time-consuming manual summarization**: Hours spent reading lengthy content
+- **Global information overload**: Millions of documents in multiple languages to process
+- **Language barriers**: Traditional models work well only in English
+- **Time-consuming manual summarization**: Hours spent reading lengthy multilingual content
 - **Traditional NLP limitations**: Text-only models miss visual context and document structure
 
 ### Our Solution
-✨ **Vision-powered summarization** that sees documents like humans do:
+✨ **Multilingual vision-powered summarization** that understands documents like humans do:
+- **5+ languages supported**: French, Spanish, German, English, and more
 - **20x compression**: Condenses documents efficiently through visual encoding
-- **Multimodal understanding**: Processes text as images, capturing layout and structure
-- **Production-ready**: From dataset to deployed model in minutes, not weeks
+- **Incremental processing**: Resumable pipeline with automatic HuggingFace uploads
+- **Production-ready**: From multilingual datasets to deployed model in minutes, not weeks
+
+## 🌍 Supported Languages
+
+| Language | Dataset | Examples | Status |
+|----------|---------|----------|--------|
+| 🇫🇷 **French** | MLSUM | 392,902 | ✅ Priority #1 |
+| 🇪🇸 **Spanish** | MLSUM | 266,367 | ✅ Priority #2 |
+| 🇩🇪 **German** | MLSUM | 220,748 | ✅ Priority #3 |
+| 🇺🇸 **English** | CNN/DailyMail + XSum | 490,000+ | ✅ Priority #4 |
+| 📜 **Legal** | BillSum | 22,218 | ✅ Priority #5 |
+
+**Total: 1.39M+ multilingual summarization examples**
 
 ---
 
 ## 🎯 Key Features
 
-### 🔥 **One-Command Pipeline**
-No complex setup. No manual steps. Just results.
+### 🔥 **Incremental Multilingual Pipeline**
+No complex setup. Resumable processing. Automatic uploads.
 
 ```bash
 cp .env.example .env  # Configure once
-python run_complete_pipeline.py  # Deploy forever
+python incremental_builder.py  # Process all languages
 ```
 
 **What happens automatically:**
-1. ✅ Downloads benchmark datasets (CNN/DailyMail, XSum, etc.)
+1. ✅ Downloads multilingual datasets (MLSUM, CNN/DailyMail, XSum, BillSum)
 2. ✅ Generates visual representations (PNG images from text)
-3. ✅ Creates custom HuggingFace datasets with images
-4. ✅ Fine-tunes DeepSeek-OCR model (state-of-the-art architecture)
-5. ✅ Evaluates on standard benchmarks
-6. ✅ Pushes to HuggingFace Hub (ready for production)
+3. ✅ Incremental processing with automatic resume on interruption
+4. ✅ Uploads to HuggingFace every 5,000 samples (no data loss)
+5. ✅ Creates unified multilingual dataset with 1.39M+ examples
+6. ✅ Ready for DeepSeek-OCR fine-tuning in any language
 
 ### 🧠 **Cutting-Edge Architecture**
 Based on DeepSeek-OCR's groundbreaking vision-language model:

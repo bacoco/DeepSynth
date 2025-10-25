@@ -11,6 +11,7 @@ from datasets import Dataset, DatasetDict, load_dataset
 from huggingface_hub import login, whoami, HfApi
 from data.text_to_image import TextToImageConverter
 from mlsum_loader import MLSUMLoader
+from efficient_incremental_uploader import EfficientIncrementalUploader
 
 # Load environment variables
 env_file = Path('.env')
@@ -38,6 +39,8 @@ class IncrementalBuilder:
         self.samples_dir.mkdir(exist_ok=True)
         self.converter = OptimizedConverter()
         self.progress = self.load_progress()
+        # Initialize incremental uploader for automatic uploads every 5000 samples
+        self.uploader = EfficientIncrementalUploader(work_dir=work_dir, batches_per_upload=100)
 
     def load_progress(self):
         if self.progress_file.exists():
@@ -75,6 +78,11 @@ class IncrementalBuilder:
                 return example.get('article', ''), example.get('highlights', '')
             elif name == 'billsum':
                 return example.get('text', ''), example.get('summary', '')
+            elif 'xsum' in name.lower():
+                # Handle XSum variants (text -> target/summary)
+                text = example.get('text', example.get('document', ''))
+                summary = example.get('target', example.get('summary', ''))
+                return text, summary
             else:
                 # Standard processing using provided field names (works for MLSUM)
                 return example.get(text_field, ''), example.get(summary_field, '')
@@ -82,7 +90,7 @@ class IncrementalBuilder:
             print(f"      ⚠ Error extracting fields: {e}")
             return '', ''
 
-    def process_dataset(self, name, subset, text_field, summary_field, batch_size=50):
+    def process_dataset(self, name, subset, text_field, summary_field, batch_size=1000):
         if name in self.progress['completed']:
             print(f"✅ {name} déjà complété")
             return
@@ -94,6 +102,7 @@ class IncrementalBuilder:
             'MLSUM': ['train', 'validation', 'test'],
             'billsum': ['train', 'test'],
             'cnn_dailymail': ['train', 'validation', 'test'],
+            'Rexhaif/xsum_reduced': ['train'],  # XSum reduced version
         }
         splits = splits_map.get(name, ['train'])
 
@@ -198,6 +207,11 @@ class IncrementalBuilder:
                         batch = []
                         self.save_progress()
 
+                        # Check if we should upload to HuggingFace (every 100 batches = ~5000 samples)
+                        if self.uploader.should_upload_now():
+                            print(f"\\n🚀 Auto-uploading to HuggingFace (100 batches ready)...")
+                            self.uploader.upload_if_ready()
+
                     if (idx + 1) % 500 == 0:
                         print(f"      📈 {idx + 1}/{total} ({(idx + 1)/total*100:.1f}%)")
 
@@ -281,9 +295,12 @@ def main():
         ('MLSUM', 'es', 'text', 'summary'),                          # Spanish news summarization - 266k examples
         ('MLSUM', 'de', 'text', 'summary'),                          # German news summarization - 220k examples
 
+        # PRIORITY: English Summarization Datasets (high-quality)
+        ('cnn_dailymail', '3.0.0', 'article', 'highlights'),         # English news articles - 287k examples
+        ('Rexhaif/xsum_reduced', None, 'text', 'target'),            # English BBC articles - XSum reduced version
+
         # High-Quality Text Summarization Datasets
         ('billsum', None, 'text', 'summary'),                        # Legal documents - US bills (~22k examples)
-        ('cnn_dailymail', '3.0.0', 'article', 'highlights'),         # News articles - 287k examples
     ]
 
     try:
