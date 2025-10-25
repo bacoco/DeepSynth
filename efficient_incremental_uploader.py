@@ -123,29 +123,52 @@ class EfficientIncrementalUploader:
 
         print(f"  📊 Total samples in chunk: {len(samples)}")
 
-        # Create dataset
-        dataset_dict = self.create_dataset_from_samples(samples)
-        if not dataset_dict:
+        # Create dataset from new samples
+        new_dataset_dict = self.create_dataset_from_samples(samples)
+        if not new_dataset_dict:
             print("  ✗ Failed to create dataset")
             return False
 
         try:
             print(f"  🚀 Uploading to: {self.dataset_name}")
 
-            # For first upload, delete existing dataset
+            # For first upload, create new dataset
             if not self.upload_progress['dataset_created']:
                 try:
                     self.api.delete_repo(repo_id=self.dataset_name, repo_type='dataset')
                     print("  🗑️ Deleted existing dataset")
                 except:
                     print("  ℹ️ No existing dataset to delete")
+                
+                # Upload new dataset
+                final_dataset = new_dataset_dict
+                print("  📝 Creating new dataset")
+            else:
+                # APPEND to existing dataset
+                print("  📝 Loading existing dataset to append...")
+                try:
+                    from datasets import load_dataset
+                    existing_dataset = load_dataset(self.dataset_name, token=self.hf_token)
+                    
+                    # Combine existing and new data
+                    from datasets import concatenate_datasets
+                    combined_train = concatenate_datasets([
+                        existing_dataset['train'], 
+                        new_dataset_dict['train']
+                    ])
+                    final_dataset = DatasetDict({'train': combined_train})
+                    print(f"  ✅ Combined: {len(existing_dataset['train'])} + {len(new_dataset_dict['train'])} = {len(combined_train)} samples")
+                    
+                except Exception as e:
+                    print(f"  ⚠ Failed to load existing dataset, creating new: {e}")
+                    final_dataset = new_dataset_dict
 
-            # Upload
-            dataset_dict.push_to_hub(
+            # Upload combined dataset
+            final_dataset.push_to_hub(
                 self.dataset_name,
                 private=False,
                 token=self.hf_token,
-                commit_message=f"Incremental update: {len(samples)} samples (upload #{self.upload_progress['upload_count'] + 1})"
+                commit_message=f"Incremental update: +{len(samples)} samples (upload #{self.upload_progress['upload_count'] + 1})"
             )
 
             print(f"  ✅ Upload successful: https://huggingface.co/datasets/{self.dataset_name}")
