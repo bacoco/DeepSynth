@@ -199,10 +199,17 @@ Wednesday: Gemini reads SOUL → adds to both previous agents' work
 
 **For Other LLMs:**
 ```bash
-cd skills/soul
+cd .claude/skills/soul
 ./install.sh --model gpt       # For GPT/ChatGPT
 ./install.sh --model gemini    # For Google Gemini
 ./install.sh --model universal # For any LLM via API
+```
+
+**Or download the universal package:**
+```bash
+# Download and extract SOUL
+unzip soul.zip
+cd soul && ./install.sh --model your-llm
 ```
 
 ### 🌍 Universal Compatibility
