@@ -76,7 +76,7 @@ class TextToImageConverter:
 
     # ------------------------------------------------------------------
     # Text processing helpers
-    def wrap_text(self, text: str, chars_per_line: int = 85) -> List[str]:
+    def wrap_text(self, text: str, chars_per_line: int = 100) -> List[str]:
         """Wrap ``text`` so that each line contains ``chars_per_line`` characters."""
 
         lines: List[str] = []
@@ -108,11 +108,11 @@ class TextToImageConverter:
         # Add margins on both sides.
         total_width = min(int(width) + 2 * self.margin, self.max_width)
 
-        # Calculate the required height and clip it to the maximum allowed.
-        total_height = min(
-            int(len(lines) * self.line_height) + 2 * self.margin,
-            self.max_height,
-        )
+        # Calculate the required height - ENSURE ALL TEXT FITS by extending height if needed
+        required_height = int(len(lines) * self.line_height) + 2 * self.margin
+        # Allow height to exceed max_height if necessary to fit all text
+        total_height = max(required_height, self.max_height) if required_height > self.max_height else min(required_height, self.max_height)
+
         return TextLayout(lines=lines, width=total_width, height=total_height)
 
     # ------------------------------------------------------------------
@@ -126,8 +126,7 @@ class TextToImageConverter:
         for line in layout.lines:
             draw.text((self.margin, y), line, font=self.font, fill=self.text_color)
             y += self.line_height
-            if y >= layout.height - self.margin:
-                break
+            # REMOVED: Text clipping - now ALL text will be included in the image
         return image
 
     def save(self, text: str, output_path: str, **save_kwargs: object) -> str:
