@@ -25,7 +25,10 @@ if env_file.exists():
 
 class OptimizedConverter(TextToImageConverter):
     def __init__(self):
+        # Use DejaVu Sans font for proper French character support
+        unicode_font_path = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
         super().__init__(
+            font_path=unicode_font_path,
             font_size=16, max_width=800, max_height=600, margin=30,
             background_color=(255, 255, 255), text_color=(0, 0, 0)
         )
@@ -39,8 +42,8 @@ class IncrementalBuilder:
         self.samples_dir.mkdir(exist_ok=True)
         self.converter = OptimizedConverter()
         self.progress = self.load_progress()
-        # Initialize incremental uploader for automatic uploads every 5000 samples
-        self.uploader = EfficientIncrementalUploader(work_dir=work_dir, batches_per_upload=100)
+        # Initialize incremental uploader for automatic uploads every 1000 samples (space-saving)
+        self.uploader = EfficientIncrementalUploader(work_dir=work_dir, batches_per_upload=1)
 
     def load_progress(self):
         if self.progress_file.exists():
@@ -90,7 +93,7 @@ class IncrementalBuilder:
             print(f"      ⚠ Error extracting fields: {e}")
             return '', ''
 
-    def process_dataset(self, name, subset, text_field, summary_field, batch_size=1000):
+    def process_dataset(self, name, subset, text_field, summary_field, batch_size=500):
         if name in self.progress['completed']:
             print(f"✅ {name} déjà complété")
             return
@@ -207,9 +210,9 @@ class IncrementalBuilder:
                         batch = []
                         self.save_progress()
 
-                        # Check if we should upload to HuggingFace (every 100 batches = ~5000 samples)
+                        # Check if we should upload to HuggingFace (every 1 batch = ~1000 samples)
                         if self.uploader.should_upload_now():
-                            print(f"\\n🚀 Auto-uploading to HuggingFace (100 batches ready)...")
+                            print(f"\\n🚀 Auto-uploading to HuggingFace (1 batch ready)...")
                             self.uploader.upload_if_ready()
 
                     if (idx + 1) % 500 == 0:
