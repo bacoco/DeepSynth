@@ -1,84 +1,74 @@
-"""Production-ready DeepSeek-OCR trainer with actual model API.
+"""Production-ready DeepSeek-OCR trainer with Hugging Face integration."""
 
-This implements real training with DeepSeek-OCR model using its actual API.
-No mocks, no placeholders - production code that works.
-"""
 from __future__ import annotations
 
+import json
 import logging
-import os
+import math
+from dataclasses import asdict
 from pathlib import Path
-from typing import Iterable, Optional, Union
+from typing import Dict, Iterable, Optional, Tuple, Union
 
 import torch
+from datasets import DatasetDict, load_dataset
+from huggingface_hub import HfApi, create_repo
 from PIL import Image
 from tqdm import tqdm
 
-try:
+from .config import TrainerConfig
+
+try:  # pragma: no cover - import validated at runtime
     from transformers import AutoModel, AutoTokenizer
-except ImportError:
-    raise ImportError("transformers required: pip install transformers>=4.46.0")
+except ImportError as exc:  # pragma: no cover
+    raise ImportError("transformers required: pip install transformers>=4.46.0") from exc
 
 LOGGER = logging.getLogger(__name__)
 
 
 class ProductionDeepSeekTrainer:
-    """Production trainer for DeepSeek-OCR fine-tuning.
+    """Trainer that fine-tunes DeepSeek-OCR and syncs artefacts to the Hub."""
 
-    This uses the actual DeepSeek-OCR model API - no placeholders.
-    """
+    def __init__(self, config: TrainerConfig):
+        if not isinstance(config, TrainerConfig):  # pragma: no cover - guardrail
+            raise TypeError("config must be an instance of TrainerConfig")
 
-    def __init__(
-        self,
-        model_name: str = "deepseek-ai/DeepSeek-OCR",
-        output_dir: str = "./trained_model",
-        batch_size: int = 2,
-        learning_rate: float = 2e-5,
-        num_epochs: int = 1,
-        max_length: int = 128,
-        gradient_accumulation_steps: int = 4,
-        mixed_precision: str = "bf16",
-        device: Optional[str] = None,
-    ):
-        self.model_name = model_name
-        self.output_dir = output_dir
-        self.batch_size = batch_size
-        self.learning_rate = learning_rate
-        self.num_epochs = num_epochs
-        self.max_length = max_length
-        self.gradient_accumulation_steps = gradient_accumulation_steps
-        self.mixed_precision = mixed_precision
+        self.config = config
+        self.output_dir = Path(config.output_dir)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
 
         # Setup device
-        if device:
-            self.device = torch.device(device)
-        else:
-            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        LOGGER.info("Using device: %s", self.device)
 
-        LOGGER.info(f"Using device: {self.device}")
+        # Determine model source (fresh vs checkpoint resume)
+        model_source = config.resume_from_checkpoint or config.model_name
+        if config.resume_from_checkpoint:
+            LOGGER.info("Resuming training from checkpoint: %s", config.resume_from_checkpoint)
 
-        # Load model and tokenizer
-        LOGGER.info(f"Loading model: {model_name}")
-
-        dtype = torch.bfloat16 if mixed_precision == "bf16" else torch.float16
+        dtype = torch.bfloat16 if config.mixed_precision == "bf16" else torch.float16
 
         self.model = AutoModel.from_pretrained(
-            model_name,
+            model_source,
             trust_remote_code=True,
             torch_dtype=dtype,
             device_map="auto" if torch.cuda.is_available() else None,
         )
 
         self.tokenizer = AutoTokenizer.from_pretrained(
-            model_name,
-            trust_remote_code=True
+            model_source,
+            trust_remote_code=True,
         )
 
-        # Freeze vision encoder (as per PRD)
         self._freeze_vision_encoder()
-
-        # Log parameter counts
         self._log_parameters()
+
+        self.optimizer = torch.optim.AdamW(
+            [p for p in self.model.parameters() if p.requires_grad],
+            lr=config.optimizer.learning_rate,
+            weight_decay=config.optimizer.weight_decay,
+        )
+
+        self.api = HfApi()
 
     def _freeze_vision_encoder(self):
         """Freeze vision encoder parameters."""
@@ -114,161 +104,267 @@ class ProductionDeepSeekTrainer:
         else:
             raise ValueError(f"Unsupported image type: {type(image_input)}")
 
+    def _prepare_batch(self, batch: Iterable[dict]) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Convert a batch of samples into tensors."""
+
+        images = []
+        summaries = []
+        for item in batch:
+            img = item.get("image") or item.get("image_path")
+            summary = item.get("summary")
+            if not img or not summary:
+                continue
+
+            images.append(self._load_image(img))
+            summaries.append(summary)
+
+        if not summaries:
+            raise ValueError("Batch contains no valid samples")
+
+        tokens = self.tokenizer(
+            summaries,
+            max_length=self.config.max_length,
+            truncation=True,
+            padding="max_length",
+            return_tensors="pt",
+        )
+
+        input_ids = tokens["input_ids"].to(self.device)
+        attention_mask = tokens["attention_mask"].to(self.device)
+        labels = input_ids.clone()
+        labels[labels == self.tokenizer.pad_token_id] = -100
+
+        return input_ids, attention_mask, labels
+
     def train(
         self,
         dataset: Iterable[dict],
         eval_dataset: Optional[Iterable[dict]] = None,
-    ):
-        """Train the model on dataset.
+        progress_callback: Optional[callable] = None,
+    ) -> Tuple[Dict[str, object], Dict[str, str]]:
+        total_samples = len(dataset)
+        LOGGER.info("Starting training run with %d samples", total_samples)
 
-        Args:
-            dataset: Training data with 'image'/'image_path' and 'summary' fields
-            eval_dataset: Optional validation data
-        """
-        LOGGER.info("Starting training...")
-
-        # Convert to list if needed
-        train_data = list(dataset)
-        LOGGER.info(f"Training samples: {len(train_data)}")
-
-        # Setup optimizer
-        trainable_params = [p for p in self.model.parameters() if p.requires_grad]
-        optimizer = torch.optim.AdamW(
-            trainable_params,
-            lr=self.learning_rate,
-            weight_decay=0.01,
-        )
-
-        # Training loop
-        self.model.train()
+        train_losses = []
         global_step = 0
+        processed_samples = 0
 
-        for epoch in range(self.num_epochs):
-            LOGGER.info(f"Epoch {epoch + 1}/{self.num_epochs}")
+        self.model.train()
 
+        for epoch in range(self.config.num_epochs):
+            LOGGER.info("Epoch %d/%d", epoch + 1, self.config.num_epochs)
             epoch_loss = 0.0
             num_batches = 0
 
-            # Use tqdm for progress
-            pbar = tqdm(range(0, len(train_data), self.batch_size), desc=f"Epoch {epoch+1}")
+            pbar = tqdm(
+                range(0, total_samples, self.config.batch_size),
+                desc=f"Epoch {epoch + 1}",
+            )
 
-            for batch_idx in pbar:
-                batch_end = min(batch_idx + self.batch_size, len(train_data))
-                batch = train_data[batch_idx:batch_end]
+            for start_idx in pbar:
+                end_idx = min(start_idx + self.config.batch_size, total_samples)
+                batch = dataset[start_idx:end_idx]
 
                 try:
-                    # Prepare batch
-                    images = []
-                    summaries = []
-
-                    for item in batch:
-                        # Get image (handle both 'image' and 'image_path')
-                        img = item.get('image') or item.get('image_path')
-                        if not img:
-                            continue
-
-                        summary = item.get('summary', '')
-                        if not summary:
-                            continue
-
-                        images.append(self._load_image(img))
-                        summaries.append(summary)
-
-                    if not images:
-                        continue
-
-                    # Tokenize summaries
-                    summary_tokens = self.tokenizer(
-                        summaries,
-                        max_length=self.max_length,
-                        truncation=True,
-                        padding='max_length',
-                        return_tensors='pt'
-                    )
-
-                    # Move to device
-                    input_ids = summary_tokens['input_ids'].to(self.device)
-                    attention_mask = summary_tokens['attention_mask'].to(self.device)
-
-                    # Create labels (shift for language modeling)
-                    labels = input_ids.clone()
-                    labels[labels == self.tokenizer.pad_token_id] = -100
-
-                    # Forward pass
-                    # Note: DeepSeek-OCR uses a specific API for training
-                    # This is a working implementation based on the model's architecture
-                    outputs = self.model(
-                        input_ids=input_ids,
-                        attention_mask=attention_mask,
-                        labels=labels,
-                        return_dict=True,
-                    )
-
-                    loss = outputs.loss if hasattr(outputs, 'loss') else outputs[0]
-                    loss = loss / self.gradient_accumulation_steps
-
-                    # Backward pass
-                    loss.backward()
-
-                    # Update weights
-                    if (global_step + 1) % self.gradient_accumulation_steps == 0:
-                        optimizer.step()
-                        optimizer.zero_grad()
-
-                    # Track loss
-                    epoch_loss += loss.item() * self.gradient_accumulation_steps
-                    num_batches += 1
-                    global_step += 1
-
-                    # Update progress bar
-                    pbar.set_postfix({'loss': f'{loss.item():.4f}'})
-
-                except Exception as e:
-                    LOGGER.error(f"Error processing batch {batch_idx}: {e}")
+                    input_ids, attention_mask, labels = self._prepare_batch(batch)
+                except ValueError:
                     continue
 
-            # Log epoch stats
-            avg_loss = epoch_loss / num_batches if num_batches > 0 else 0
-            LOGGER.info(f"Epoch {epoch + 1} avg loss: {avg_loss:.4f}")
+                outputs = self.model(
+                    input_ids=input_ids,
+                    attention_mask=attention_mask,
+                    labels=labels,
+                    return_dict=True,
+                )
 
-            # Save checkpoint
-            checkpoint_dir = Path(self.output_dir) / f"epoch_{epoch + 1}"
-            self.save_model(str(checkpoint_dir))
+                loss = outputs.loss if hasattr(outputs, "loss") else outputs[0]
+                loss = loss / self.config.gradient_accumulation_steps
+                loss.backward()
 
-        # Save final model
+                if (global_step + 1) % self.config.gradient_accumulation_steps == 0:
+                    self.optimizer.step()
+                    self.optimizer.zero_grad()
+
+                processed_samples += len(batch)
+                epoch_loss += loss.item() * self.config.gradient_accumulation_steps
+                num_batches += 1
+                global_step += 1
+
+                pbar.set_postfix({"loss": f"{loss.item():.4f}"})
+
+                if progress_callback:
+                    progress_callback(processed_samples, total_samples)
+
+            avg_loss = epoch_loss / num_batches if num_batches > 0 else 0.0
+            train_losses.append(avg_loss)
+            LOGGER.info("Epoch %d average loss: %.4f", epoch + 1, avg_loss)
+
+            checkpoint_dir = self.output_dir / f"epoch_{epoch + 1}"
+            self.save_model(checkpoint_dir)
+            self.last_checkpoint = str(checkpoint_dir)
+
+            if (
+                self.config.save_checkpoints_to_hub
+                and self.config.push_to_hub
+                and self.config.hub_model_id
+            ):
+                self.push_checkpoint_to_hub(checkpoint_dir)
+
+        metrics: Dict[str, object] = {
+            "train_loss": train_losses[-1] if train_losses else 0.0,
+            "train_loss_per_epoch": train_losses,
+            "epochs": self.config.num_epochs,
+        }
+
+        if eval_dataset:
+            eval_loss = self.evaluate(eval_dataset)
+            metrics.update(
+                {
+                    "eval_loss": eval_loss,
+                    "eval_perplexity": math.exp(eval_loss) if eval_loss < 50 else float("inf"),
+                }
+            )
+
         self.save_model(self.output_dir)
-        LOGGER.info(f"Training complete! Model saved to {self.output_dir}")
+        metrics_path = self.output_dir / "metrics.json"
+        with metrics_path.open("w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "config": asdict(self.config),
+                    "metrics": metrics,
+                },
+                f,
+                indent=2,
+            )
 
-    def save_model(self, output_dir: str):
+        LOGGER.info("Training complete. Artefacts stored in %s", self.output_dir)
+
+        return metrics, {"last_checkpoint": getattr(self, "last_checkpoint", str(self.output_dir))}
+
+    def train_from_hf_dataset(
+        self,
+        repo_id: str,
+        progress_callback: Optional[callable] = None,
+    ) -> Tuple[Dict[str, object], Dict[str, str]]:
+        LOGGER.info("Loading dataset %s from Hugging Face", repo_id)
+        dataset_dict = load_dataset(repo_id)
+
+        if not isinstance(dataset_dict, DatasetDict):
+            raise ValueError("Expected a dataset with train split")
+
+        train_split = dataset_dict["train"]
+        eval_split = None
+        if self.config.evaluation_split and self.config.evaluation_split in dataset_dict:
+            eval_split = dataset_dict[self.config.evaluation_split]
+
+        train_samples = train_split.to_list()
+        eval_samples = eval_split.to_list() if eval_split else None
+
+        metrics, checkpoints = self.train(
+            train_samples,
+            eval_samples,
+            progress_callback=progress_callback,
+        )
+
+        if self.config.push_to_hub and self.config.hub_model_id:
+            self.push_to_hub(self.config.hub_model_id)
+            if self.config.save_metrics_to_hub:
+                self._upload_metrics(self.config.hub_model_id)
+
+        return metrics, checkpoints
+
+    def evaluate(self, dataset: Iterable[dict]) -> float:
+        LOGGER.info("Running evaluation on %d samples", len(dataset))
+        self.model.eval()
+        losses = []
+
+        with torch.no_grad():
+            for start_idx in range(0, len(dataset), self.config.batch_size):
+                end_idx = min(start_idx + self.config.batch_size, len(dataset))
+                batch = dataset[start_idx:end_idx]
+
+                try:
+                    input_ids, attention_mask, labels = self._prepare_batch(batch)
+                except ValueError:
+                    continue
+
+                outputs = self.model(
+                    input_ids=input_ids,
+                    attention_mask=attention_mask,
+                    labels=labels,
+                    return_dict=True,
+                )
+
+                loss = outputs.loss if hasattr(outputs, "loss") else outputs[0]
+                losses.append(loss.item())
+
+        self.model.train()
+        return sum(losses) / len(losses) if losses else 0.0
+
+    def save_model(self, output_dir: Union[str, Path]):
         """Save model and tokenizer."""
-        os.makedirs(output_dir, exist_ok=True)
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
 
         self.model.save_pretrained(output_dir)
         self.tokenizer.save_pretrained(output_dir)
 
-        LOGGER.info(f"Model saved to {output_dir}")
+        LOGGER.info("Model saved to %s", output_dir)
 
-    def push_to_hub(
-        self,
-        repo_id: str,
-        private: bool = False,
-        token: Optional[str] = None,
-    ):
-        """Push model to HuggingFace Hub."""
-        LOGGER.info(f"Pushing model to {repo_id}")
-
-        self.model.push_to_hub(
+    def push_to_hub(self, repo_id: str):
+        LOGGER.info("Pushing final model to %s", repo_id)
+        create_repo(
             repo_id,
-            private=private,
-            use_auth_token=token,
+            exist_ok=True,
+            repo_type="model",
+            private=self.config.hub_private,
+            token=self.config.hub_token,
+        )
+        self.model.push_to_hub(repo_id, private=self.config.hub_private, use_auth_token=self.config.hub_token)
+        self.tokenizer.push_to_hub(repo_id, use_auth_token=self.config.hub_token)
+
+    def push_checkpoint_to_hub(self, checkpoint_dir: Union[str, Path]):
+        repo_id = self.config.hub_model_id
+        if not repo_id:
+            return
+
+        checkpoint_dir = Path(checkpoint_dir)
+        LOGGER.info("Uploading checkpoint %s to %s", checkpoint_dir, repo_id)
+        create_repo(
+            repo_id,
+            exist_ok=True,
+            repo_type="model",
+            private=self.config.hub_private,
+            token=self.config.hub_token,
+        )
+        self.api.upload_folder(
+            folder_path=str(checkpoint_dir),
+            repo_id=repo_id,
+            repo_type="model",
+            path_in_repo=f"checkpoints/{checkpoint_dir.name}",
+            token=self.config.hub_token,
         )
 
-        self.tokenizer.push_to_hub(
-            repo_id,
-            use_auth_token=token,
-        )
+    def _upload_metrics(self, repo_id: str):
+        metrics_path = self.output_dir / "metrics.json"
+        if not metrics_path.exists():
+            return
 
-        LOGGER.info(f"✓ Model pushed to https://huggingface.co/{repo_id}")
+        LOGGER.info("Uploading metrics to %s", repo_id)
+        create_repo(
+            repo_id,
+            exist_ok=True,
+            repo_type="model",
+            private=self.config.hub_private,
+            token=self.config.hub_token,
+        )
+        self.api.upload_file(
+            path_or_fileobj=str(metrics_path),
+            path_in_repo="metrics.json",
+            repo_id=repo_id,
+            repo_type="model",
+            token=self.config.hub_token,
+        )
 
 
 if __name__ == "__main__":
@@ -278,13 +374,11 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     try:
-        trainer = ProductionDeepSeekTrainer(
-            model_name="deepseek-ai/DeepSeek-OCR",
-            batch_size=1,
-        )
+        demo_config = TrainerConfig(batch_size=1)
+        trainer = ProductionDeepSeekTrainer(demo_config)
         print("✓ Trainer initialized successfully")
         print(f"  Device: {trainer.device}")
-        print(f"  Model: {trainer.model_name}")
+        print(f"  Model: {trainer.config.model_name}")
     except Exception as e:
         print(f"✗ Trainer initialization failed: {e}")
         sys.exit(1)
