@@ -99,43 +99,40 @@ python run_benchmark.py --model ./your-model --benchmark cnn_dailymail
 
 ---
 
-## ⚡ Quick Start (60 seconds)
+## ⚡ Quick Start (30 seconds)
 
-### Prerequisites
-- Python 3.9+
-- CUDA 11.8+ (for GPU acceleration)
-- HuggingFace account (free)
+### 🌍 Global Cross-Computer Pipeline (NEW!)
 
-### Step 1: Clone & Configure
+**Works from any computer - automatically resumes where you left off:**
 
 ```bash
 git clone https://github.com/bacoco/deepseek-synthesia
 cd deepseek-synthesia
-
-# Configure secrets
 cp .env.example .env
-nano .env  # Add your HF_TOKEN from https://huggingface.co/settings/tokens
+# Add your HF_TOKEN to .env
+./run_global_pipeline.sh
 ```
 
-### Step 2: Install Dependencies
+**Features:**
+- ✅ **Cross-computer resumable** - Continue from any machine
+- ✅ **Zero duplicates** - Global state tracking via HuggingFace
+- ✅ **Large batches** - 10,000 samples per upload for efficiency
+- ✅ **Auto-detection** - Finds existing progress automatically
+
+### Prerequisites
+- Python 3.9+ with datasets, huggingface_hub, pillow
+- HuggingFace account (free)
+- 10GB+ free disk space
+
+### Legacy Single-Computer Pipeline
 
 ```bash
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+# Traditional approach (local progress only)
+python test_setup.py                    # Verify setup
+python run_complete_multilingual_pipeline.py  # Run pipeline
 ```
 
-### Step 3: Run Pipeline
-
-```bash
-# Test setup first (optional)
-python test_setup.py
-
-# Run complete pipeline
-python run_complete_pipeline.py
-```
-
-**That's it!** Your model will be training in minutes.
+**That's it!** Your multilingual dataset will be ready on HuggingFace.
 
 ---
 
@@ -217,6 +214,45 @@ python run_benchmark.py \
 ```
 
 ---
+
+## 🌍 Global Cross-Computer Pipeline
+
+### Why Global Pipeline?
+The new global pipeline solves critical issues with the traditional approach:
+
+- **❌ Old Problem**: Local progress files - can't resume from different computers
+- **✅ New Solution**: Progress stored in HuggingFace dataset metadata
+- **❌ Old Problem**: Risk of duplicate processing when switching machines
+- **✅ New Solution**: Global state tracking prevents any duplicates
+- **❌ Old Problem**: Small batches (500 samples) - inefficient uploads
+- **✅ New Solution**: Large batches (10,000 samples) - 20x more efficient
+
+### Cross-Computer Usage Example
+
+**Computer A:**
+```bash
+./run_global_pipeline.sh
+# Processes 50,000 samples, then stops
+```
+
+**Computer B (different machine):**
+```bash
+git clone https://github.com/bacoco/deepseek-synthesia
+cd deepseek-synthesia
+cp .env.example .env  # Add same HF_TOKEN
+./run_global_pipeline.sh
+# Automatically detects existing 50,000 samples
+# Continues from sample 50,001 - no duplicates!
+```
+
+### Technical Details
+- **Progress Storage**: HuggingFace dataset README.md metadata
+- **Duplicate Prevention**: Tracks exact sample indices processed
+- **Batch Size**: 10,000 samples per upload (configurable)
+- **Memory Efficiency**: Automatic cleanup after successful uploads
+- **Error Recovery**: Graceful handling of interruptions
+
+See **[DATASET.md](DATASET.md)** for complete documentation.
 
 ## 🔧 Advanced Usage
 
