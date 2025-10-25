@@ -1,105 +1,94 @@
-# SOUL API Reference
+# SOUL Technical Reference
 
-## Scripts
+## Claude's Automatic Behavior
 
-### trace_session.py
+### Memory Activation Triggers
 
-Main session analysis script.
+Claude automatically activates SOUL when:
+- Detecting existing `.agent_*` files in project
+- Working on multi-session projects
+- User mentions "continue", "previous work", or similar
+- Complex problem-solving requiring context tracking
+- Significant development milestones reached
 
-**Usage**: `python scripts/trace_session.py [options]`
+### Memory Files Claude Creates
 
-**Options**:
-- `--verbose` - Detailed output during analysis
-- `--quiet` - Minimal output
-- `--append` - Append to existing logs instead of overwriting
-- `--focus-problems` - Emphasize problem-solving analysis
-- `--universal-format` - Generate cross-model compatible logs
-- `--config FILE` - Use custom configuration file
+#### .agent_log.md
+**Purpose**: Complete session history and context
+**Content**:
+- Work accomplished in each session
+- Problems encountered and solutions
+- Architectural decisions and rationale
+- Code changes with context
+- Learning and insights gained
 
-**Output files**:
-- `.agent_log.md` - Comprehensive work log
-- `.agent_status.json` - Machine-readable status
-
-### handoff_generator.py
-
-Generates handoff notes for future agents.
-
-**Usage**: `python scripts/handoff_generator.py [options]`
-
-**Options**:
-- `--quick` - Generate brief handoff notes
-- `--detailed` - Generate comprehensive handoff
-- `--both` - Generate both quick and detailed versions
-- `--cross-model` - Format for different AI models
-
-**Output files**:
-- `.agent_handoff.md` - Handoff notes for next agent
-
-### install.sh
-
-Universal installation script for different environments.
-
-**Usage**: `bash scripts/install.sh [environment]`
-
-**Environments**:
-- `claude` - Claude-specific setup
-- `gpt` - GPT-specific setup  
-- `universal` - Cross-platform setup
-
-## Configuration
-
-### .soul_config.json
-
+#### .agent_status.json
+**Purpose**: Machine-readable project state
+**Structure**:
 ```json
 {
-  "log_level": "basic|detailed|verbose",
-  "include_git_diffs": boolean,
-  "max_log_entries": number,
-  "custom_templates": boolean,
-  "output_format": "markdown|json|both",
-  "git_analysis": {
+  "session_id": "unique-identifier",
+  "timestamp": "2024-10-25T13:30:00Z",
+  "project_status": "active|paused|completed",
+  "current_focus": "authentication system",
+  "files_modified": ["auth.py", "login.js"],
+  "problems_solved": ["OAuth integration", "session persistence"],
+  "next_priorities": ["password reset", "2FA implementation"],
+  "context_summary": "Building user authentication system..."
+}
+```
+
+#### .agent_handoff.md
+**Purpose**: Immediate context for next session
+**Content**:
+- Current session summary
+- Immediate next steps
+- Important context to remember
+- Known issues or blockers
+- Quick reference information
+
+### Configuration Options
+
+#### .soul_config.json (Optional)
+```json
+{
+  "memory_depth": "basic|detailed|deep",
+  "project_type": "web_development|data_science|general|research",
+  "session_continuity": "minimal|standard|enhanced",
+  "code_analysis": {
     "include_diffs": boolean,
-    "max_diff_lines": number,
-    "ignore_patterns": ["*.log", "*.tmp"]
+    "focus_problems": boolean,
+    "track_decisions": boolean,
+    "monitor_architecture": boolean
   },
-  "handoff_settings": {
+  "output_preferences": {
+    "detail_level": "concise|comprehensive|verbose",
     "include_context": boolean,
-    "max_context_lines": number,
-    "priority_keywords": ["TODO", "FIXME", "BUG"]
+    "max_history_entries": number
   }
 }
 ```
 
-## Output Files
+## Cross-Model Compatibility
 
-### .agent_log.md
+### Supported AI Models
+- **Claude** (Sonnet, Haiku, Opus)
+- **GPT** (3.5, 4, 4-turbo)
+- **Codex** (GitHub Copilot integration)
+- **Gemini** (Pro, Ultra)
 
-Comprehensive session log with:
-- Git change analysis
-- Problems solved
-- Decisions made
-- Code modifications
-- Next steps identified
+### Universal Format
+All memory files use markdown and JSON formats that work across different AI models, ensuring seamless handoffs between different AI systems.
 
-### .agent_status.json
+## Internal Scripts (Claude manages automatically)
 
-Machine-readable status:
-```json
-{
-  "session_id": "uuid",
-  "timestamp": "iso-date",
-  "git_status": "clean|dirty",
-  "files_modified": ["file1.py", "file2.js"],
-  "problems_solved": ["issue1", "issue2"],
-  "next_steps": ["step1", "step2"],
-  "completion_status": "in-progress|completed|blocked"
-}
-```
+### trace_session.py
+Analyzes git changes, extracts work patterns, creates comprehensive logs
 
-### .agent_handoff.md
+### handoff_generator.py
+Generates structured handoff notes optimized for AI consumption
 
-Structured handoff notes:
-- Current session summary
-- Immediate next steps
-- Context for continuation
-- Known issues or blockers
+### install.sh
+Sets up SOUL in different AI environments
+
+**Note**: Users never need to run these scripts manually - Claude handles everything automatically.
