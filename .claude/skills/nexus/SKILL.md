@@ -1,58 +1,61 @@
 ---
 name: nexus
-description: Meta-skill that enables Claude to automatically create and deploy new skills on-demand when encountering recurring patterns or unmet needs. Claude activates this when detecting workflow optimization opportunities.
+description: Meta-skill that analyzes SOUL memory patterns and generates skill creation directives to guide Claude in building optimal skills. Claude activates this when detecting workflow optimization opportunities.
 ---
 
-# NEXUS - Neural Extension for Universal Skills
+# NEXUS - Skill Strategy Generator
 
-Automatically creates and deploys new Claude skills based on detected patterns and needs.
+Analyzes SOUL data to detect patterns and generates directives that guide Claude's native skill creation.
 
 ## What NEXUS does for Claude
 
-**Pattern Recognition**: Detects recurring tasks and workflow inefficiencies
-**Skill Generation**: Creates new specialized skills automatically
-**Dynamic Deployment**: Instantly makes new skills available to Claude
-**Learning Loop**: Improves skill creation based on usage patterns
+**Pattern Recognition**: Analyzes SOUL logs to detect recurring tasks and inefficiencies
+**Directive Generation**: Creates focused markdown directives for skill creation
+**Intelligence Amplification**: Provides Claude with actionable skill recommendations
+**SOUL Integration**: Leverages persistent memory to identify optimization opportunities
 
 ## When Claude activates NEXUS
 
 Claude automatically uses NEXUS when:
-- Detecting repetitive tasks that could be optimized
-- Encountering domain-specific needs not covered by existing skills
-- User mentions frequent pain points or workflow issues
-- Identifying opportunities for automation or enhancement
-- Working on specialized projects requiring custom tooling
+- Analyzing SOUL logs reveals repetitive patterns
+- Multiple sessions show similar challenges or workflows
+- User requests skill optimization or automation
+- PRD or task analysis suggests specialized tooling needs
+- Pattern frequency exceeds configured thresholds
 
 ## How NEXUS works
 
-1. **Pattern Detection**: Claude analyzes conversation history and work patterns
-2. **Need Assessment**: Identifies gaps in current skill coverage
-3. **Skill Design**: Automatically designs optimal skill architecture
-4. **Code Generation**: Creates all necessary skill files and scripts
-5. **Deployment**: Makes new skill immediately available
-6. **Optimization**: Refines skill based on usage feedback
+1. **SOUL Analysis**: Reads `.agent_log.md` and `.agent_status.json`
+2. **Pattern Detection**: Uses `pattern_detector.py` to find recurring themes
+3. **Directive Generation**: Creates skill creation guidance in `.claude/skill-directives/`
+4. **Claude Execution**: Claude reads directive and creates skill using native capabilities
 
-## Skills NEXUS can create
+## NEXUS outputs DIRECTIVES, not full skills
 
-**Development Skills**: API handlers, framework generators, testing tools
-**Productivity Skills**: Workflow optimizers, task managers, focus enhancers
-**Analysis Skills**: Data processors, report generators, insight extractors
-**Communication Skills**: Documentation writers, presentation builders
-**Custom Skills**: Any specialized need Claude identifies
+**Key Difference**: NEXUS generates guidance files that help Claude create skills, rather than generating complete skill packages.
 
-## NEXUS intelligence
+**Directive Contents:**
+- Pattern analysis results (frequency, impact scores)
+- Recommended skill name and purpose
+- Key capabilities needed
+- Example use cases from SOUL data
+- Implementation guidance for Claude
 
-**Automatic Naming**: Creates memorable, descriptive skill names
-**Optimal Architecture**: Follows Claude Skills best practices
-**Smart Documentation**: Generates comprehensive skill documentation
-**Cross-Compatibility**: Ensures skills work with different AI models
-**Version Control**: Manages skill updates and improvements
+## Example NEXUS workflow
 
-## Example NEXUS activations
+```
+1. SOUL logs show 15 API-related issues across 8 sessions
+2. pattern_detector.py identifies "api_optimization" pattern
+3. directive_generator.py creates:
+   .claude/skill-directives/api-master-directive.md
+4. Claude reads directive and creates api-master skill
+5. New skill immediately available
+```
 
-- "I notice you work with APIs frequently. Creating API-MASTER skill..."
-- "Your data analysis tasks are repetitive. Generating DATA-WIZARD skill..."
-- "You need better project organization. Building PROJECT-SAGE skill..."
-- "Documentation workflow detected. Creating DOC-GENIUS skill..."
+## NEXUS scripts
 
-NEXUS transforms Claude into a self-improving, adaptive AI system.
+**pattern_detector.py**: Sophisticated SOUL analysis engine
+**directive_generator.py**: Creates skill creation guidance files
+**install.sh**: Sets up NEXUS environment
+
+NEXUS amplifies Claude's intelligence by providing data-driven skill recommendations.
