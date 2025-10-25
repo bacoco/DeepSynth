@@ -10,7 +10,8 @@ echo "🌍 DEEPSEEK MULTILINGUAL PIPELINE - GLOBAL LAUNCHER"
 echo "============================================================"
 echo "🔄 Cross-computer resumable pipeline"
 echo "🚫 Duplicate-proof with HuggingFace state tracking"
-echo "📊 Processes 1.24M+ multilingual examples across 6 datasets"
+echo "📊 Processes 1.29M+ multilingual examples across 7 datasets"
+echo "🎯 ArXiv sampling limit: ${ARXIV_IMAGE_SAMPLES} articles converted to images"
 echo ""
 
 # Check if we're in the right directory
@@ -34,6 +35,9 @@ echo "🔧 Loading environment variables..."
 set -a  # Automatically export all variables
 source .env
 set +a
+
+# Default sampling limit for ArXiv if not provided in the environment
+export ARXIV_IMAGE_SAMPLES=${ARXIV_IMAGE_SAMPLES:-50000}
 
 # Validate HF_TOKEN
 if [[ -z "$HF_TOKEN" ]]; then
@@ -116,9 +120,10 @@ try:
         print(f'📊 Current samples: {total_samples:,}')
         
         # Estimate progress
-        total_expected = 392902 + 266367 + 220748 + 287113 + 50000 + 22218  # ~1.24M
+        arxiv_limit = int(os.getenv('ARXIV_IMAGE_SAMPLES', '50000'))
+        total_expected = 392902 + 266367 + 220748 + 287113 + arxiv_limit + 50000 + 22218  # ~1.29M
         progress_pct = (total_samples / total_expected) * 100
-        print(f'📊 Progress: {progress_pct:.1f}% of expected 1.24M samples')
+        print(f'📊 Progress: {progress_pct:.1f}% of expected 1.29M samples')
         
         if total_samples > 0:
             print('🔄 Pipeline will resume from current state')
@@ -127,7 +132,8 @@ try:
             
     except Exception as e:
         print(f'🆕 No existing dataset found - will create new one')
-        print(f'📊 Expected final size: ~1.24M multilingual samples')
+        arxiv_limit = int(os.getenv('ARXIV_IMAGE_SAMPLES', '50000'))
+        print(f'📊 Expected final size: ~1.29M multilingual samples (including {arxiv_limit:,} arXiv abstracts)')
         
 except Exception as e:
     print(f'❌ Error checking HuggingFace status: {e}')

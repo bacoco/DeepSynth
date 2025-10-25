@@ -145,7 +145,8 @@ BENCHMARK_DATASETS = {
         'text_field': 'article',
         'summary_field': 'highlights',
         'description': 'News articles with bullet-point summaries',
-        'size': 'train: 287k, val: 13k, test: 11k',
+        'size': 'train: 287k, val: 13k, test: 11k (convert 10K-50K to images)',
+        'recommended_samples': 'Start with the first 10K–50K articles converted to images.',
     },
     'xsum': {
         'name': 'EdinburghNLP/xsum',
@@ -156,12 +157,13 @@ BENCHMARK_DATASETS = {
         'size': 'train: 204k, val: 11k, test: 11k',
     },
     'arxiv': {
-        'name': 'scientific_papers',
-        'subset': 'arxiv',
+        'name': 'ccdv/arxiv-summarization',
+        'subset': None,
         'text_field': 'article',
         'summary_field': 'abstract',
         'description': 'Scientific papers with abstracts',
-        'size': 'train: 203k, val: 6.4k, test: 6.4k',
+        'size': 'full: 203k (sample 10K-50K for image conversion)',
+        'recommended_samples': 'Convert the first 10K–50K abstracts into images for fine-tuning.',
     },
     'gigaword': {
         'name': 'gigaword',
