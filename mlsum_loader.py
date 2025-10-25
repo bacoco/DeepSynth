@@ -5,22 +5,81 @@ Works with the actual MLSUM dataset files.
 """
 
 import os
+import requests
+import zipfile
 from pathlib import Path
 from datasets import Dataset, DatasetDict
 from typing import Dict, List, Any
+from tqdm import tqdm
 
 class MLSUMLoader:
     """Custom loader for MLSUM dataset using downloaded data files."""
 
-    def __init__(self, data_dir="./mlsum_data/MLSUM"):
-        self.data_dir = Path(data_dir)
+    def __init__(self, data_dir="./mlsum_data"):
+        self.base_dir = Path(data_dir)
+        self.data_dir = self.base_dir / "MLSUM"
 
         # Available languages in the dataset (fr, es, de order as requested, removed ru, tu)
         self.languages = ['fr', 'es', 'de']  # French, Spanish, German
 
-        # Check if data directory exists
+        # Auto-download if data doesn't exist
         if not self.data_dir.exists():
-            raise FileNotFoundError(f"MLSUM data directory not found: {self.data_dir}")
+            print(f"📥 MLSUM data not found, downloading automatically...")
+            self._download_mlsum_data()
+
+        print(f"✅ MLSUM data ready at: {self.data_dir}")
+
+    def _download_mlsum_data(self):
+        """Download MLSUM dataset from Google Drive if not exists."""
+        print("🌐 Downloading MLSUM dataset from Google Drive (3.2GB)...")
+        print("⏳ This may take several minutes...")
+
+        # Create base directory
+        self.base_dir.mkdir(exist_ok=True)
+
+        # Working GitLab URL for MLSUM (3.3GB)
+        working_url = "https://gitlab.lip6.fr/scialom/mlsum_data/-/raw/master/MLSUM.zip"
+
+        try:
+            # Download with progress bar
+            response = requests.get(working_url, stream=True)
+
+            if response.status_code == 200:
+                zip_file = self.base_dir / "mlsum.zip"
+
+                # Get file size for progress bar
+                total_size = int(response.headers.get('content-length', 0))
+
+                with open(zip_file, 'wb') as f:
+                    with tqdm(total=total_size, unit='B', unit_scale=True, desc="Downloading") as pbar:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            if chunk:
+                                f.write(chunk)
+                                pbar.update(len(chunk))
+
+                print(f"✅ Downloaded to: {zip_file}")
+
+                # Extract the zip file
+                print("📦 Extracting MLSUM data...")
+                with zipfile.ZipFile(zip_file, 'r') as zip_ref:
+                    zip_ref.extractall(self.base_dir)
+
+                print("✅ MLSUM data extracted successfully!")
+
+                # Clean up zip file
+                zip_file.unlink()
+                print("🧹 Cleaned up zip file")
+
+            else:
+                raise Exception(f"Download failed with status: {response.status_code}")
+
+        except Exception as e:
+            print(f"❌ Auto-download failed: {e}")
+            print("\n💡 Manual download required:")
+            print("1. Go to: https://gitlab.lip6.fr/scialom/mlsum_data/-/raw/master/MLSUM.zip")
+            print("2. Download the MLSUM.zip file (3.3GB)")
+            print(f"3. Extract to {self.base_dir} directory")
+            raise FileNotFoundError(f"MLSUM data not available at {self.data_dir}")
 
     def get_available_splits(self, language: str) -> List[str]:
         """Get available splits for a language."""

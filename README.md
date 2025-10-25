@@ -7,13 +7,13 @@
 [![Multilingual](https://img.shields.io/badge/languages-5+-green.svg)](#supported-languages)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**One command. Five languages. Infinite possibilities.**
+**One command. Six datasets. Infinite possibilities.**
 
 ```bash
-python incremental_builder.py
+python run_complete_multilingual_pipeline.py
 ```
 
-Automatically processes multilingual datasets with incremental HuggingFace uploads, visual text encoding, and resumable pipeline—all optimized for production scale.
+Automatically downloads MLSUM data (3.3GB), processes 1.24M+ multilingual examples with incremental HuggingFace uploads, visual text encoding, and resumable pipeline—all optimized for production scale.
 
 ---
 
@@ -32,17 +32,20 @@ Automatically processes multilingual datasets with incremental HuggingFace uploa
 - **Incremental processing**: Resumable pipeline with automatic HuggingFace uploads
 - **Production-ready**: From multilingual datasets to deployed model in minutes, not weeks
 
-## 🌍 Supported Languages
+## 🌍 Supported Languages & Datasets
 
 | Language | Dataset | Examples | Status |
 |----------|---------|----------|--------|
-| 🇫🇷 **French** | MLSUM | 392,902 | ✅ Priority #1 |
-| 🇪🇸 **Spanish** | MLSUM | 266,367 | ✅ Priority #2 |
-| 🇩🇪 **German** | MLSUM | 220,748 | ✅ Priority #3 |
-| 🇺🇸 **English** | CNN/DailyMail + XSum | 490,000+ | ✅ Priority #4 |
-| 📜 **Legal** | BillSum | 22,218 | ✅ Priority #5 |
+| 🇫🇷 **French** | MLSUM French | 392,902 | ✅ Priority #1 |
+| 🇪🇸 **Spanish** | MLSUM Spanish | 266,367 | ✅ Priority #2 |
+| 🇩🇪 **German** | MLSUM German | 220,748 | ✅ Priority #3 |
+| 🇺🇸 **English News** | CNN/DailyMail | 287,113 | ✅ Priority #4 |
+| 🇺🇸 **English BBC** | XSum Reduced | ~50,000 | ✅ Priority #5 |
+| 📜 **Legal English** | BillSum | 22,218 | ✅ Priority #6 |
 
-**Total: 1.39M+ multilingual summarization examples**
+**Total: ~1.24M+ multilingual summarization examples**
+
+> **Note**: MLSUM English and Chinese are not available in the original dataset. English coverage is provided through CNN/DailyMail and XSum alternatives.
 
 ---
 
