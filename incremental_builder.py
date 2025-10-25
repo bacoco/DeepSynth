@@ -29,7 +29,7 @@ class OptimizedConverter(TextToImageConverter):
         unicode_font_path = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
         super().__init__(
             font_path=unicode_font_path,
-            font_size=16, max_width=800, max_height=600, margin=30,
+            font_size=12, max_width=1600, max_height=2400, margin=40,
             background_color=(255, 255, 255), text_color=(0, 0, 0)
         )
 
