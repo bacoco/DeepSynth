@@ -1,8 +1,10 @@
-# 🤖 Agent Work Tracer - Claude Skill
+# 🔮 SOUL - Universal AI Agent Memory System
 
-> **Automatic work logging and handoff generation for AI agents**
+> **S**eamless **O**rganized **U**niversal **L**earning
 
-This Claude skill automatically creates comprehensive work logs and handoff notes, enabling seamless collaboration between AI agents across different sessions and computers.
+> **The first universal AI agent consciousness that transcends individual sessions and models**
+
+SOUL is a revolutionary system that gives AI agents persistent memory and collaborative intelligence. Any AI agent (Claude, GPT, Gemini, LLaMA, etc.) can inherit the complete work history, decisions, and context from previous agents, creating true AI collaboration across models and sessions.
 
 ## 🎯 Problem Solved
 
