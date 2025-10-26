@@ -34,13 +34,54 @@ DATASET_NAMING = {
 
 class OptimizedConverter(TextToImageConverter):
     def __init__(self):
-        # Use DejaVu Sans font for proper French character support
-        unicode_font_path = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
+        # Auto-detect Unicode font for multilingual support (French, Spanish, German accents)
+        unicode_font_path = self._find_unicode_font()
         super().__init__(
             font_path=unicode_font_path,
             font_size=12, max_width=1600, max_height=2400, margin=40,
             background_color=(255, 255, 255), text_color=(0, 0, 0)
         )
+
+    @staticmethod
+    def _find_unicode_font():
+        """Find a Unicode-capable font on the system for multilingual text (French, Spanish, German)."""
+        import os
+        import platform
+
+        # Priority order: fonts with best Unicode/multilingual support
+        font_paths = []
+
+        system = platform.system()
+
+        if system == 'Darwin':  # macOS
+            font_paths = [
+                '/Library/Fonts/DejaVuSans.ttf',                    # Installed by setup.sh
+                '/System/Library/Fonts/Helvetica.ttc',              # Native macOS (good Unicode)
+                '/System/Library/Fonts/SFNSText.ttf',               # San Francisco
+                '/System/Library/Fonts/Supplemental/Arial Unicode.ttf',
+            ]
+        elif system == 'Linux':
+            font_paths = [
+                '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',  # Ubuntu/Debian
+                '/usr/share/fonts/dejavu/DejaVuSans.ttf',           # Fedora/CentOS
+                '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+                '/usr/share/fonts/liberation/LiberationSans-Regular.ttf',
+            ]
+        elif system == 'Windows':
+            font_paths = [
+                'C:\\Windows\\Fonts\\arial.ttf',
+                'C:\\Windows\\Fonts\\calibri.ttf',
+            ]
+
+        # Find first available font
+        for path in font_paths:
+            if os.path.exists(path):
+                print(f"    ✅ Using Unicode font: {os.path.basename(path)}")
+                return path
+
+        # Fallback: no font path (PIL will use default bitmap font)
+        print("    ⚠️  No Unicode font found, using PIL default (accents may not render correctly)")
+        return None
 
 class SeparateDatasetsPipeline:
     def __init__(self, work_dir="./work_separate"):

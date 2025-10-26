@@ -21,6 +21,35 @@ set -e  # Arrêt en cas d'erreur
 echo "🌍 DEEPSYNTH - Génération de tous les datasets en parallèle"
 echo "============================================================="
 
+# Vérifier et installer les dépendances si nécessaire
+if [ ! -d "venv" ] || [ ! -f "/Library/Fonts/DejaVuSans.ttf" ]; then
+    echo "⚙️  Installation des dépendances et fonts Unicode..."
+    echo "   (Première exécution uniquement - peut demander sudo)"
+    echo ""
+
+    if [ ! -x "./setup.sh" ]; then
+        chmod +x setup.sh
+    fi
+
+    ./setup.sh
+
+    echo ""
+    echo "✅ Installation terminée"
+    echo "============================================================="
+    echo ""
+fi
+
+# Activer l'environnement virtuel
+if [ -f "venv/bin/activate" ]; then
+    source venv/bin/activate
+    echo "✅ Environnement virtuel activé"
+else
+    echo "⚠️  Pas d'environnement virtuel détecté"
+    echo "   Utilisation de Python système"
+fi
+
+echo ""
+
 # Vérifier que le fichier .env existe
 if [ ! -f .env ]; then
     echo "❌ Erreur: Fichier .env introuvable"
