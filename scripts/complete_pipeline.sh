@@ -49,7 +49,7 @@ echo ""
 echo -e "${BLUE}[Step 1/3] Preparing dataset with images...${NC}"
 echo ""
 
-PREPARE_CMD="python -m data.prepare_and_publish \
+PREPARE_CMD="python -m deepsynth.data.prepare_and_publish \
     --dataset $DATASET_NAME \
     --hub-repo $TARGET_REPO"
 

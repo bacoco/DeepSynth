@@ -15,7 +15,7 @@ from huggingface_hub import HfApi, create_repo
 # Add parent directory to path to import project modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from data.text_to_image import TextToImageConverter
+from deepsynth.data.transforms import TextToImageConverter
 from web_ui.state_manager import StateManager, JobStatus
 from training.config import OptimizerConfig, TrainerConfig
 
