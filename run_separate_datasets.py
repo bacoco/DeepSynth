@@ -10,7 +10,14 @@ Usage:
 import os
 import sys
 from pathlib import Path
-from separate_datasets_builder import main as run_separate_builder
+
+ROOT = Path(__file__).resolve().parent
+SRC_DIR = ROOT / "src"
+
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+from deepsynth.pipelines import run_separate_datasets_pipeline
 
 def check_environment():
     """Check if environment is properly configured."""
@@ -93,7 +100,7 @@ def main():
 
     try:
         # Run the separate datasets builder
-        run_separate_builder()
+        run_separate_datasets_pipeline()
 
         print("\\n🎉 TOUS LES DATASETS CRÉÉS AVEC SUCCÈS!")
         print("🔗 Vos datasets sont maintenant disponibles sur HuggingFace")
