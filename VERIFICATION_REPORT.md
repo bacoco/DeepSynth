@@ -15,7 +15,7 @@ The bundled setup verification script was executed inside the prepared environme
 | Imports | ✅ | All critical libraries (torch, transformers, datasets, etc.) imported successfully. |
 | CUDA | ⚠️ | No GPU detected in this environment; the pipeline will run on CPU. |
 | Configuration | ⚠️ | `.env` not configured in this workspace; copy `.env.example` when running the pipeline. |
-| Local Modules | ✅ | Core packages (`data.text_to_image`, `data.prepare_and_publish`, `training.deepsynth_trainer_v2`) import without errors. |
+| Local Modules | ✅ | Core packages (`data.text_to_image`, `data.prepare_and_publish`, `deepsynth.training.deepsynth_trainer_v2`) import without errors. |
 
 Full command output: `python test_setup.py`.【f5f799†L1-L32】
 

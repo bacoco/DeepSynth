@@ -240,7 +240,7 @@ SOUL represents the first step toward **Universal AI Intelligence** - where know
 ### 📰 **News Aggregation**
 Summarize hundreds of news articles daily:
 ```python
-from inference import DeepSynthSummarizer
+from deepsynth.inference import DeepSynthSummarizer
 
 summarizer = DeepSynthSummarizer("your-username/model")
 summary = summarizer.summarize_text(long_article)
@@ -358,7 +358,7 @@ See **[DATASET.md](DATASET.md)** for complete documentation.
 ### Custom Dataset Training
 
 ```python
-from config import Config
+from deepsynth.config import Config
 from data.prepare_and_publish import DatasetPipeline
 
 # Configure for your domain
@@ -395,7 +395,7 @@ GRADIENT_ACCUMULATION_STEPS=2
 
 **1. REST API Server**
 ```bash
-MODEL_PATH=./deepsynth-ocr-summarizer python -m inference.api_server
+MODEL_PATH=./deepsynth-ocr-summarizer python -m deepsynth.inference.api_server
 
 # Test endpoint
 curl -X POST http://localhost:5000/summarize/text \
@@ -593,7 +593,7 @@ python run_complete_pipeline.py
 python run_benchmark.py --model ./deepsynth-ocr-summarizer --benchmark cnn_dailymail
 
 # 3. Production deployment
-MODEL_PATH=./deepsynth-ocr-summarizer python -m inference.api_server
+MODEL_PATH=./deepsynth-ocr-summarizer python -m deepsynth.inference.api_server
 ```
 
 **Your AI-powered summarization system is just minutes away.** 🎉
