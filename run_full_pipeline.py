@@ -30,11 +30,12 @@ def main():
     # Configuration pour production COMPLÈTE
     print("\n📊 CONFIGURATION PRODUCTION")
     print("-" * 70)
-    print("⚙️  Nombre de workers: 3 (recommandé pour stabilité)")
+    print("⚙️  Nombre de workers: 7 (1 par dataset, parallélisme maximal)")
     print("📦 Mode: Production complète (tous les échantillons disponibles)")
     print("🔄 Reprise automatique si dataset existant détecté")
+    print("📤 Upload automatique tous les 5000 échantillons")
 
-    pipeline = ParallelDatasetsPipeline(max_workers=3)
+    pipeline = ParallelDatasetsPipeline(max_workers=7)
 
     # Afficher les datasets à traiter
     print(f"\n📋 DATASETS À TRAITER ({len(pipeline.datasets_config)} au total)")
