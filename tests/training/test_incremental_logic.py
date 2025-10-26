@@ -4,13 +4,17 @@ Test de la logique incrémentale avec un petit échantillon
 """
 
 import os
-
-import pytest
+import sys
+from pathlib import Path
 from huggingface_hub import login, whoami
 
-from deepsynth.pipelines.separate import SeparateDatasetBuilder
+PROJECT_ROOT = Path(__file__).resolve().parent
+SRC_DIR = PROJECT_ROOT / "src"
 
-pytestmark = pytest.mark.skip(reason="requires Hugging Face access and live datasets")
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+from deepsynth.pipelines import SeparateDatasetsPipeline
 
 def test_incremental_logic():
     """Test avec un petit échantillon pour vérifier la logique"""
@@ -21,7 +25,7 @@ def test_incremental_logic():
     login(token=os.getenv('HF_TOKEN'))
     username = whoami()['name']
     
-    builder = SeparateDatasetBuilder()
+    builder = SeparateDatasetsPipeline()
     
     # Test avec CNN/DailyMail - seulement 10 échantillons pour le test
     print("\\n🔬 Test avec CNN/DailyMail (10 échantillons)")
