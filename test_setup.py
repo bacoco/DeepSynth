@@ -82,7 +82,7 @@ def test_config():
             print(f"    Copy .env.example to .env and configure it")
             return True  # Not a failure, just a warning
 
-        from config import Config
+        from deepsynth.config import Config
         config = Config.from_env()
         print(f"  ✓ Configuration loaded")
         print(f"    HF Username: {config.hf_username}")
@@ -99,17 +99,17 @@ def test_modules():
     print("\nTesting local modules...")
 
     try:
-        from data.text_to_image import TextToImageConverter
-        print(f"  ✓ data.text_to_image")
+        from deepsynth.data.transforms import TextToImageConverter
+        print(f"  ✓ deepsynth.data.transforms.text_to_image")
     except Exception as e:
-        print(f"  ✗ data.text_to_image: {e}")
+        print(f"  ✗ deepsynth.data.transforms.text_to_image: {e}")
         return False
 
     try:
-        from data.prepare_and_publish import DatasetPipeline
-        print(f"  ✓ data.prepare_and_publish")
+        from deepsynth.data import DatasetPipeline
+        print(f"  ✓ deepsynth.data.prepare_and_publish")
     except Exception as e:
-        print(f"  ✗ data.prepare_and_publish: {e}")
+        print(f"  ✗ deepsynth.data.prepare_and_publish: {e}")
         return False
 
     try:

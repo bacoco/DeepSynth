@@ -4,26 +4,64 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
+
+_ENV_CACHE: Dict[Path, bool] = {}
 
 
-def load_env(env_file: str = ".env") -> None:
-    """Load environment variables from .env file."""
-    env_path = Path(env_file)
-    if not env_path.exists():
-        raise FileNotFoundError(
-            f"{env_file} not found. Copy .env.example to .env and configure it."
-        )
+def load_env(env_file: str = ".env", *, strict: bool = True) -> bool:
+    """Load environment variables from ``env_file``.
 
-    with open(env_path) as f:
-        for line in f:
+    Parameters
+    ----------
+    env_file:
+        Path to the ``.env`` file to read.
+    strict:
+        When ``True`` (default) a missing file raises :class:`FileNotFoundError`.
+        Data preparation scripts set ``strict`` to ``False`` so the absence of a
+        configuration file does not stop ad-hoc explorations.
+
+    Returns
+    -------
+    bool
+        ``True`` when variables were loaded, ``False`` otherwise.
+    """
+
+    path = Path(env_file).resolve()
+    if path in _ENV_CACHE:
+        return _ENV_CACHE[path]
+
+    if not path.exists():
+        if strict:
+            raise FileNotFoundError(
+                f"{env_file} not found. Copy .env.example to .env and configure it."
+            )
+        _ENV_CACHE[path] = False
+        return False
+
+    with open(path, encoding="utf-8") as handle:
+        for line in handle:
             line = line.strip()
-            if line and not line.startswith("#"):
+            if line and not line.startswith("#") and "=" in line:
                 key, _, value = line.partition("=")
                 key = key.strip()
                 value = value.strip()
-                if key and value:
+                if key:
                     os.environ[key] = value
+
+    _ENV_CACHE[path] = True
+    return True
+
+
+def load_shared_env(env_file: str = ".env") -> bool:
+    """Load ``env_file`` without failing when it is missing.
+
+    The helper is used by scripts that want to opportunistically source
+    credentials while remaining runnable in development environments that have
+    not been fully configured.
+    """
+
+    return load_env(env_file, strict=False)
 
 
 @dataclass
