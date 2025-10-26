@@ -13,6 +13,8 @@ from data.text_to_image import TextToImageConverter
 from mlsum_loader import MLSUMLoader
 from hf_shard_uploader import HubShardManager
 
+__all__ = ["GlobalIncrementalPipeline", "run_global_incremental_pipeline"]
+
 # Load environment variables
 env_file = Path('.env')
 if env_file.exists():
@@ -23,7 +25,7 @@ if env_file.exists():
                 key, value = line.split('=', 1)
                 os.environ[key] = value
 
-class GlobalIncrementalBuilder:
+class GlobalIncrementalPipeline:
     def __init__(self):
         self.hf_token = os.getenv('HF_TOKEN')
         login(token=self.hf_token)
@@ -451,9 +453,9 @@ for shard in index["shards"]:
         print(f"📊 Final dataset: https://huggingface.co/datasets/{self.dataset_name}")
         return True
 
-def main():
-    builder = GlobalIncrementalBuilder()
+def run_global_incremental_pipeline():
+    builder = GlobalIncrementalPipeline()
     builder.run_complete_pipeline()
 
 if __name__ == "__main__":
-    main()
+    run_global_incremental_pipeline()
