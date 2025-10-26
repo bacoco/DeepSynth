@@ -64,7 +64,10 @@ if [ -d "venv" ]; then
 
     # Utiliser le bon fichier requirements selon l'OS
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        echo "  🍎 macOS - Mise à jour requirements-base.txt"
+        echo "  🍎 macOS - Nettoyage de xformers (ne compile pas sur Mac)"
+        pip uninstall -y xformers 2>/dev/null || true
+
+        echo "  🍎 macOS - Installation requirements-base.txt"
         pip install -r requirements-base.txt -q
     elif command -v nvidia-smi >/dev/null 2>&1; then
         echo "  🐧 Linux GPU - Mise à jour requirements complets"
