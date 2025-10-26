@@ -12,7 +12,9 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from multiprocessing import Manager
 import threading
 from datetime import datetime
-from separate_datasets_builder import SeparateDatasetBuilder
+from deepsynth.pipelines.separate import SeparateDatasetsPipeline
+
+__all__ = ["ParallelDatasetsPipeline"]
 
 # Configuration du logging
 logging.basicConfig(
@@ -25,7 +27,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-class ParallelDatasetsBuilder:
+class ParallelDatasetsPipeline:
     def __init__(self, max_workers=3):
         """
         Initialise le builder parallèle
@@ -142,7 +144,7 @@ class ParallelDatasetsBuilder:
 
             # Créer le builder avec un work_dir unique pour ce dataset
             work_dir = f"./work_separate_{dataset_config['output_name']}"
-            builder = SeparateDatasetBuilder(work_dir=work_dir)
+            builder = SeparateDatasetsPipeline(work_dir=work_dir)
 
             # Traitement du dataset
             start_time = time.time()
@@ -328,57 +330,7 @@ class ParallelDatasetsBuilder:
 
         logger.info("="*80)
 
-def main():
-    """Point d'entrée principal"""
-    print("🚀 Parallel Dataset Builder")
-    print("="*50)
-
-    # Configuration
-    max_workers = int(input("Nombre de processus parallèles (défaut: 3): ") or "3")
-
-    print("\nOptions de traitement:")
-    print("1. Traiter tous les datasets")
-    print("2. Traiter des datasets spécifiques")
-    print("3. Mode test (quelques échantillons)")
-
-    choice = input("\nVotre choix (1-3): ").strip()
-
-    builder = ParallelDatasetsBuilder(max_workers=max_workers)
-
-    if choice == "1":
-        # Tous les datasets
-        results = builder.run_parallel_processing()
-
-    elif choice == "2":
-        # Datasets spécifiques
-        print("\nDatasets disponibles:")
-        for i, dataset in enumerate(builder.datasets_config, 1):
-            print(f"{i}. {dataset['name']} ({dataset['output_name']})")
-
-        selected_indices = input("\nIndices des datasets à traiter (ex: 1,2,3): ").strip()
-        try:
-            indices = [int(x.strip()) - 1 for x in selected_indices.split(",")]
-            selected_datasets = [builder.datasets_config[i]['name'] for i in indices if 0 <= i < len(builder.datasets_config)]
-
-            if selected_datasets:
-                results = builder.run_parallel_processing(selected_datasets=selected_datasets)
-            else:
-                print("❌ Aucun dataset valide sélectionné")
-                return
-        except ValueError:
-            print("❌ Format invalide")
-            return
-
-    elif choice == "3":
-        # Mode test
-        print("🧪 Mode test activé - traitement de quelques échantillons seulement")
-        results = builder.run_parallel_processing(test_mode=True)
-
-    else:
-        print("❌ Choix invalide")
-        return
-
-    print(f"\n✅ Traitement terminé! Consultez 'parallel_datasets.log' pour les détails.")
-
 if __name__ == "__main__":
-    main()
+    from .run_parallel_datasets import run_parallel_datasets_cli
+
+    run_parallel_datasets_cli()

@@ -6,7 +6,15 @@ Test script for incremental HuggingFace processing with proper batch sizes.
 import os
 import shutil
 from pathlib import Path
-from incremental_builder import IncrementalBuilder
+import sys
+
+PROJECT_ROOT = Path(__file__).resolve().parent
+SRC_DIR = PROJECT_ROOT / "src"
+
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+from deepsynth.pipelines import IncrementalPipeline
 from huggingface_hub import login
 
 def test_incremental_processing():
@@ -36,7 +44,7 @@ def test_incremental_processing():
         print("🧹 Cleaned up previous test data")
     
     # Create builder with proper batch size (1000 samples per batch)
-    builder = IncrementalBuilder(work_dir="./test_work")
+    builder = IncrementalPipeline(work_dir="./test_work")
     
     print(f"📁 Work directory: {builder.work_dir}")
     print(f"📊 Initial progress: {builder.progress}")
