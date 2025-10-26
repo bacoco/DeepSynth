@@ -90,6 +90,30 @@ class Config:
     mixed_precision: str
     gradient_accumulation_steps: int
 
+    @staticmethod
+    def _parse_optional_int(key: str, default: str | None) -> Optional[int]:
+        """Read an optional integer from the environment.
+
+        Parameters
+        ----------
+        key:
+            Environment variable name to read.
+        default:
+            Default value used when the variable is missing. ``None`` propagates
+            the absence of the variable.
+        """
+
+        value = os.getenv(key)
+        if value is None or value == "":
+            if default is None or default == "":
+                return None
+            value = default
+
+        try:
+            return int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Invalid integer for {key}: {value!r}") from exc
+
     @classmethod
     def from_env(cls, env_file: str = ".env") -> Config:
         """Load configuration from .env file."""
@@ -107,7 +131,9 @@ class Config:
             source_dataset=get_env("SOURCE_DATASET"),
             source_subset=get_env("SOURCE_SUBSET", None, required=False),
             target_dataset_name=get_env("TARGET_DATASET_NAME"),
-            max_samples_per_split=self._parse_optional_int("MAX_SAMPLES_PER_SPLIT", "1000"),
+            max_samples_per_split=cls._parse_optional_int(
+                "MAX_SAMPLES_PER_SPLIT", "1000"
+            ),
             model_name=get_env("MODEL_NAME"),
             output_model_name=get_env("OUTPUT_MODEL_NAME"),
             batch_size=int(get_env("BATCH_SIZE", "2")),
