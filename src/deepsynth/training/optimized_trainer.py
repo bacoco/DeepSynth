@@ -12,8 +12,10 @@ import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+from collections.abc import Iterable as IterableCollection
 from typing import Any, Dict, Iterable, Optional, Union
 
+import numpy as np
 import torch
 import torch.nn as nn
 from accelerate import Accelerator
@@ -94,26 +96,80 @@ class DeepSynthDataset(Dataset):
         data: Iterable[Dict[str, Any]],
         tokenizer: AutoTokenizer,
         max_length: int = 512,
-        cache_encodings: bool = True,
+        cache_encodings: bool = False,
+        *,
+        preprocessing_batch_size: int = 64,
+        max_cache_size: Optional[int] = 5000,
     ):
         """Initialize dataset with optional encoding cache."""
         self.tokenizer = tokenizer
         self.max_length = max_length
         self.cache_encodings = cache_encodings
+        self._preprocess_batch_size = max(1, preprocessing_batch_size)
+        self._max_cache_size = max_cache_size
 
-        # Convert to list if needed
-        self.data = list(data) if not isinstance(data, list) else data
+        self.data = self._prepare_data(data)
 
-        # Pre-encode if caching is enabled
-        self._encoding_cache = {}
-        if cache_encodings:
+        self._encoding_cache: Dict[int, Dict[str, torch.Tensor]] = {}
+        if self.cache_encodings and self._should_preprocess():
             logger.info("Pre-encoding dataset for faster training...")
             self._preprocess_all()
 
+    def _prepare_data(self, data: Iterable[Dict[str, Any]]) -> Any:
+        """Return an indexable data structure for the dataset."""
+        if hasattr(data, "__len__") and hasattr(data, "__getitem__"):
+            return data
+
+        if isinstance(data, IterableCollection):
+            materialized = list(data)
+            if not hasattr(materialized, "__getitem__"):
+                raise TypeError("Provided data iterable must support indexing after materialization.")
+            return materialized
+
+        raise TypeError("Unsupported data type for DeepSynthDataset. Expected Iterable with __len__ and __getitem__.")
+
+    def _should_preprocess(self) -> bool:
+        """Determine whether preprocessing should be executed."""
+        if not hasattr(self.data, "__len__"):
+            logger.warning("Cannot cache encodings because dataset length is unavailable.")
+            return False
+
+        dataset_size = len(self.data)
+        if self._max_cache_size is not None and dataset_size > self._max_cache_size:
+            logger.warning(
+                "Skipping pre-encoding because dataset size (%d) exceeds max_cache_size (%d).",
+                dataset_size,
+                self._max_cache_size,
+            )
+            return False
+
+        return True
+
     def _preprocess_all(self) -> None:
         """Pre-encode all samples for faster iteration."""
-        for idx in tqdm(range(len(self.data)), desc="Pre-encoding"):
-            self._encoding_cache[idx] = self._encode_sample(self.data[idx])
+        if not hasattr(self.data, "__len__"):
+            raise TypeError("Cannot preprocess data without __len__ support.")
+
+        class _IndexableDataset(Dataset):
+            def __init__(self, data_source: Any):
+                self._data_source = data_source
+
+            def __len__(self) -> int:
+                return len(self._data_source)
+
+            def __getitem__(self, index: int) -> Any:
+                return index, self._data_source[index]
+
+        dataloader = DataLoader(
+            _IndexableDataset(self.data),
+            batch_size=self._preprocess_batch_size,
+            shuffle=False,
+            collate_fn=lambda batch: batch,
+        )
+
+        for batch in tqdm(dataloader, desc="Pre-encoding"):
+            for idx, sample in batch:
+                self._encoding_cache[idx] = self._encode_sample(sample)
 
     def _encode_sample(self, sample: Dict[str, Any]) -> Dict[str, torch.Tensor]:
         """Encode a single sample."""
@@ -143,9 +199,8 @@ class DeepSynthDataset(Dataset):
         if image is not None:
             # Convert PIL Image to tensor if needed
             if hasattr(image, "convert"):
-                import torchvision.transforms as transforms
-                transform = transforms.ToTensor()
-                image = transform(image.convert("RGB"))
+                image_array = np.array(image.convert("RGB"))
+                image = torch.from_numpy(image_array).permute(2, 0, 1).float() / 255.0
             else:
                 image = torch.tensor(image)
 
@@ -328,14 +383,14 @@ class OptimizedDeepSynthTrainer:
             train_dataset = DeepSynthDataset(
                 train_dataset,
                 self.tokenizer,
-                cache_encodings=True,
+                cache_encodings=False,
             )
 
         if eval_dataset and not isinstance(eval_dataset, Dataset):
             eval_dataset = DeepSynthDataset(
                 eval_dataset,
                 self.tokenizer,
-                cache_encodings=True,
+                cache_encodings=False,
             )
 
         # Create dataloaders
