@@ -88,7 +88,7 @@ Tests before running:
 - Configuration validity
 - Local modules working
 
-### 6. **PRODUCTION_GUIDE.md** - Complete Documentation
+### 6. **[PRODUCTION_GUIDE.md](PRODUCTION_GUIDE.md)** - Complete Documentation
 
 Step-by-step production guide:
 - Setup instructions
@@ -307,11 +307,11 @@ python training/deepsynth_trainer_v2.py
 
 ## 📚 Documentation
 
-- **PRODUCTION_GUIDE.md** - Complete setup guide
-- **README.md** - General documentation
+- **[PRODUCTION_GUIDE.md](PRODUCTION_GUIDE.md)** - Complete setup guide
+- **[README.md](../README.md)** - General documentation
 - **.env.example** - Configuration template
-- **IMAGE_PIPELINE.md** - Dataset preparation details
-- **deepseek-ocr-resume-prd.md** - Original requirements
+- **[IMAGE_PIPELINE.md](IMAGE_PIPELINE.md)** - Dataset preparation details
+- **[deepseek-ocr-resume-prd.md](deepseek-ocr-resume-prd.md)** - Original requirements
 
 ## ✅ Verification
 

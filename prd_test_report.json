@@ -2,8 +2,8 @@
   "analysis_timestamp": 1761414350.5947301,
   "repository": ".",
   "prd_files_analyzed": [
-    "deepseek-ocr-resume-prd.md",
-    "todo-first.md"
+    "docs/deepseek-ocr-resume-prd.md",
+    "docs/todo-first.md"
   ],
   "total_tasks": 91,
   "summary": {
