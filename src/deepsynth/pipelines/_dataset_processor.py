@@ -89,7 +89,7 @@ class OptimizedDatasetPipeline:
     - Nettoyage automatique des fichiers locaux
     """
 
-    def __init__(self, work_dir="./work_separate", batch_size=5000):
+    def __init__(self, work_dir="./work_separate", batch_size=5000, auto_upload=True):
         self.work_dir = Path(work_dir)
         self.work_dir.mkdir(exist_ok=True)
 
@@ -103,6 +103,14 @@ class OptimizedDatasetPipeline:
         self.batch_size = batch_size  # Samples per local batch file (5000 = 1 upload batch)
         self.current_batch = []
         self.batch_counter = 0
+
+        # Auto-upload: Upload immediately when batch is full
+        self.auto_upload = auto_upload
+        if self.auto_upload:
+            self.uploader = EfficientIncrementalUploader(
+                work_dir=str(self.work_dir),
+                batches_per_upload=1  # Upload IMMEDIATELY when 1 batch ready (5000 samples)
+            )
 
     def load_progress(self):
         if self.progress_file.exists():
@@ -168,7 +176,7 @@ class OptimizedDatasetPipeline:
             return set()
 
     def save_batch_to_disk(self):
-        """Save current batch to disk as pickle file"""
+        """Save current batch to disk as pickle file and optionally upload immediately"""
         if not self.current_batch:
             return
 
@@ -177,6 +185,16 @@ class OptimizedDatasetPipeline:
             pickle.dump(self.current_batch, f)
 
         print(f"      💾 Saved batch {self.batch_counter} ({len(self.current_batch)} samples)")
+
+        # Auto-upload immediately if enabled
+        if self.auto_upload:
+            print(f"      📤 Uploading batch {self.batch_counter} to HuggingFace...")
+            try:
+                self.uploader.upload_if_ready()
+                print(f"      ✅ Batch {self.batch_counter} uploaded")
+            except Exception as e:
+                print(f"      ⚠️  Upload warning: {e} (will retry later)")
+
         self.batch_counter += 1
         self.current_batch = []
 
@@ -294,9 +312,18 @@ class OptimizedDatasetPipeline:
         if self.current_batch:
             self.save_batch_to_disk()
 
+        # Final upload of any pending batches
+        if self.auto_upload and self.batch_counter > 0:
+            print(f"\n  📤 Final upload of remaining batches...")
+            try:
+                self.uploader.upload_all_pending()
+                print(f"  ✅ All batches uploaded to HuggingFace")
+            except Exception as e:
+                print(f"  ⚠️  Upload error: {e}")
+
         if total_new > 0:
-            print(f"\n  ✅ Total new samples batched: {total_new}")
-            print(f"  📦 Batches saved: {self.batch_counter}")
+            print(f"\n  ✅ Total new samples processed: {total_new}")
+            print(f"  📦 Batches created: {self.batch_counter}")
         else:
             print(f"\n  ℹ️  No new samples to process")
 
