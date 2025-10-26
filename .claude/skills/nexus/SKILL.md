@@ -1,302 +1,231 @@
 ---
 name: nexus
-description: Unified analyzer that monitors SOUL memory, PRD files, tasks, and code to automatically recommend skills for generation. The brain of the skill ecosystem.
+description: Unified analyzer that monitors SOUL memory, PRD files, and tasks to automatically generate skills based on detected patterns. The brain of the self-improving skills system.
 ---
 
-# NEXUS - Universal Skill Recommendation Engine
+# NEXUS - Automatic Skill Generator
 
-**Analyzes everything and tells Claude which skills to generate.**
+**Analyzes your work patterns and automatically generates the skills you need.**
 
-NEXUS is the brain of the skill ecosystem. It watches SOUL, reads your PRD, analyzes your tasks, and recommends exactly which skills you need.
+NEXUS is the brain of the skill ecosystem. It watches SOUL memory, reads your PRD files, analyzes your tasks, and automatically creates new skills when patterns emerge.
 
----
-
-## What NEXUS does
+## What NEXUS Does
 
 NEXUS performs unified analysis from multiple sources:
 
-### 1. **SOUL Memory Analysis**
+### 1. SOUL Memory Analysis
 - Reads `.agent_log.md` and `.agent_status.json`
-- Detects recurring patterns (API calls, data processing, etc.)
-- Identifies patterns that appear 5+ times
+- Detects recurring patterns (API calls, data processing, errors, etc.)
+- Identifies patterns that appear ≥ threshold (default: 5 times)
 - Calculates priority based on frequency
 
-### 2. **PRD Analysis**
+### 2. PRD Analysis
 - Scans for PRD files (`*PRD*.md`, `*REQUIREMENTS*.md`, `*ROADMAP*.md`)
 - Extracts tasks and requirements
 - Classifies by domain (api, testing, deployment, etc.)
-- Counts tasks per domain
+- Counts tasks per domain to identify skill needs
 
-### 3. **Task Analysis**
+### 3. Task Analysis
 - Reads TODO files and task lists
 - Parses checkboxes, numbered lists, bullets
 - Groups related tasks
-- Identifies skill needs
+- Identifies skill opportunities
 
-### 4. **Code Analysis** (future)
-- Analyzes existing codebase structure
-- Detects missing test coverage
-- Identifies documentation gaps
+## Automatic Skill Generation
 
----
+**NEXUS runs automatically and generates skills without user intervention:**
 
-## Output: NEXUS_RECOMMENDATIONS.md
+- **Periodically**: Every 30 minutes via cron (optional)
+- **On git commit**: Via post-commit hook (optional)
+- **When critical patterns detected**: Immediate generation
 
-NEXUS generates a markdown file with prioritized skill recommendations:
+**Skills are auto-generated when:**
+- Pattern appears ≥ threshold (default: 5 times)
+- Priority is high or critical
+- Skill doesn't already exist
+
+## How It Works
+
+```
+You work normally
+        ↓
+SOUL traces everything
+        ↓
+NEXUS monitors automatically:
+  - SOUL memory (patterns)
+  - PRD files (requirements)
+  - Task lists (TODO)
+        ↓
+Detects patterns >= threshold
+        ↓
+Auto-generates skills if priority >= high:
+  - Creates .claude/skills/[skill-name]/
+  - Generates SKILL.md with progressive disclosure
+  - Creates scripts with SOUL API integration
+  - Records in SOUL memory
+        ↓
+New skill ready immediately!
+        ↓
+Claude uses it automatically
+```
+
+**No user intervention needed.**
+
+## Priority Levels
+
+NEXUS assigns priorities based on frequency and task count:
+
+- **🔴 CRITICAL**: Pattern appears 2+ times/day → Auto-generate immediately
+- **🟠 HIGH**: Pattern appears 1+ times/day → Auto-generate
+- **🟡 MEDIUM**: Pattern appears 3-7 times/week → Monitor
+- **🟢 LOW**: Pattern appears <3 times/week → Monitor
+
+Only HIGH and CRITICAL priorities trigger automatic generation.
+
+## Output
+
+NEXUS generates `NEXUS_RECOMMENDATIONS.md` with prioritized skill recommendations:
 
 ```markdown
 # NEXUS Skill Recommendations
 
 ## Summary
-- Total recommendations: 5
+- Total recommendations: 3
 - High priority: 2
-- Medium priority: 2
-- Low priority: 1
+- Medium priority: 1
 
 ## Recommended Skills
 
 ### 1. 🔴 api-optimizer (CRITICAL)
 **Pattern:** api_call
-**Frequency:** 3.5 times/day (24 total)
-**Reason:** Detected 24 API operations in 7 days
-**Capabilities:**
-- Rate limiting and retry logic
-- Error handling patterns
-- Response caching
-
-### 2. 🟠 test-guardian (HIGH)
-**Pattern:** testing
-**Tasks:** 12 test-related tasks in PRD
-**Reason:** Large testing requirements
+**Frequency:** 3.5 times/day (24 total in 7 days)
+**Reason:** Frequent API operations detected
 ...
 ```
 
----
+See [OUTPUT_FORMAT.md](references/OUTPUT_FORMAT.md) for complete output specification.
 
-## When Claude activates NEXUS
+## Quick Start
 
-NEXUS runs:
-- **Automatically**: Every 24 hours (configurable)
-- **On demand**: When you ask "What skills should I generate?"
-- **After PRD changes**: When you update requirements
-- **When SOUL detects high-frequency patterns**
+### Automatic Mode (Recommended)
 
----
+Run auto-generator to analyze and generate skills automatically:
 
-## Workflow
-
-```
-User works on project
-        ↓
-SOUL traces everything
-        ↓
-NEXUS analyzes periodically:
-  - SOUL memory (patterns)
-  - PRD files (requirements)
-  - Task lists (TODO)
-  - Code (optional)
-        ↓
-Generates NEXUS_RECOMMENDATIONS.md
-        ↓
-Claude reads recommendations
-        ↓
-You: "Generate the api-optimizer skill"
-        ↓
-skill-generator creates it
-        ↓
-New skill ready!
+```bash
+python .claude/skills/nexus/scripts/auto_skill_generator.py
 ```
 
----
+Skills with HIGH or CRITICAL priority will be generated automatically.
+
+### Analysis Only
+
+Generate recommendations without auto-creating skills:
+
+```bash
+python .claude/skills/nexus/scripts/nexus_analyzer.py
+```
+
+This creates `NEXUS_RECOMMENDATIONS.md` for manual review.
+
+### Setup Monitoring
+
+Add to crontab for automatic periodic checks:
+
+```bash
+# Every 30 minutes
+*/30 * * * * /path/to/.claude/skills/scripts/nexus_auto_watch.sh
+```
+
+Or use as git hook (see [INSTALLATION.md](references/INSTALLATION.md)).
+
+## Integration with SOUL
+
+NEXUS and SOUL work together seamlessly:
+
+1. **SOUL traces** your work and records events
+2. **NEXUS analyzes** SOUL memory for patterns
+3. **NEXUS generates** skills when patterns reach threshold
+4. **New skills use** SOUL API to record their own events
+5. **Pattern detection improves** as more skills contribute data
+
+This creates a self-improving system where skills emerge from actual usage patterns.
+
+## Generated Skill Structure
+
+NEXUS creates skills following best practices:
+
+```
+generated-skill/
+├── SKILL.md (with YAML frontmatter)
+├── scripts/
+│   └── main.py (with SOUL API integration)
+└── references/ (if needed)
+```
+
+All generated skills:
+- ✅ Follow progressive disclosure principles
+- ✅ Include SOUL API integration
+- ✅ Have concise SKILL.md (<200 lines)
+- ✅ Record their own events for future pattern detection
+- ✅ Work with Claude Code, GPT, and Gemini
+
+## Multi-LLM Support
+
+NEXUS works with any CLI-based LLM:
+- ✅ **Claude Code**: Native integration
+- ✅ **GPT/Codex**: Reads `NEXUS_RECOMMENDATIONS.md`
+- ✅ **Gemini CLI**: Reads `NEXUS_RECOMMENDATIONS.md`
+
+See [MULTI_LLM.md](references/MULTI_LLM.md) for LLM-specific guides.
+
+## Advanced Features
+
+- **Pattern merging**: Combines SOUL + PRD patterns for higher priority
+- **Duplicate detection**: Never generates skills that already exist
+- **Context preservation**: Recommendations include example usage
+- **Custom thresholds**: Configure sensitivity via command-line args
+
+See [ADVANCED.md](references/ADVANCED.md) for detailed documentation.
 
 ## Configuration
 
-Create `.nexus_config.json`:
+Create `.nexus_config.json` for custom settings:
 
 ```json
 {
   "analysis": {
     "threshold": 5,
-    "window_days": 7,
-    "auto_run": false,
-    "auto_run_interval_hours": 24
+    "window_days": 7
   },
   "sources": {
     "soul_memory": true,
     "prd_files": true,
-    "task_lists": true,
-    "code_analysis": false
-  },
-  "output": {
-    "file": "NEXUS_RECOMMENDATIONS.md",
-    "format": "markdown",
-    "include_examples": true
+    "task_lists": true
   }
 }
 ```
 
----
+See [CONFIGURATION.md](references/CONFIGURATION.md) for all options.
 
-## Manual execution
+## References
 
-```bash
-# Run full analysis
-python .claude/skills/nexus/scripts/nexus_analyzer.py
+- **[INSTALLATION.md](references/INSTALLATION.md)** - Setup and git hooks
+- **[MANUAL_USAGE.md](references/MANUAL_USAGE.md)** - Command-line options
+- **[OUTPUT_FORMAT.md](references/OUTPUT_FORMAT.md)** - Recommendation file format
+- **[EXAMPLES.md](references/EXAMPLES.md)** - Real-world skill generation examples
+- **[ADVANCED.md](references/ADVANCED.md)** - Pattern merging, customization
+- **[CONFIGURATION.md](references/CONFIGURATION.md)** - Complete config reference
+- **[MULTI_LLM.md](references/MULTI_LLM.md)** - Using with GPT, Gemini, etc.
 
-# Custom parameters
-python .claude/skills/nexus/scripts/nexus_analyzer.py \
-  --threshold 3 \
-  --days 14 \
-  --output MY_RECOMMENDATIONS.md
+## Part of the Ecosystem
 
-# Specific repository
-python .claude/skills/nexus/scripts/nexus_analyzer.py \
-  --repo /path/to/project
-```
+**SOUL** → Remembers everything
+**NEXUS** → Analyzes and generates
+**Generated skills** → Solve specific problems
+**Skills use SOUL** → Pattern detection improves
 
----
-
-## Integration with other skills
-
-**SOUL → NEXUS:**
-- NEXUS reads SOUL memory files
-- Detects patterns from traced events
-- Uses `soul_api.py` for pattern analysis
-
-**NEXUS → skill-generator:**
-- NEXUS writes recommendations
-- skill-generator reads recommendations
-- Creates skills automatically
-
-**Complete flow:**
-```
-SOUL (traces) → NEXUS (analyzes) → skill-generator (creates) → New Skills → SOUL (uses)
-```
+NEXUS makes the system intelligent and self-improving.
 
 ---
 
-## Priority levels
-
-NEXUS assigns priorities based on:
-
-**CRITICAL** 🔴
-- Pattern appears 3+ times/day
-- OR 20+ task items in PRD
-- Immediate action recommended
-
-**HIGH** 🟠
-- Pattern appears 1-3 times/day
-- OR 10-20 task items in PRD
-- Should generate soon
-
-**MEDIUM** 🟡
-- Pattern appears 3-7 times/week
-- OR 5-10 task items in PRD
-- Generate when convenient
-
-**LOW** 🟢
-- Pattern appears <3 times/week
-- OR <5 task items in PRD
-- Optional, monitor for increase
-
----
-
-## Example recommendations
-
-### From SOUL patterns:
-```
-Detected 24 API calls in 7 days
-→ Recommend "api-optimizer" skill (HIGH)
-  Capabilities: rate limiting, retry logic, caching
-```
-
-### From PRD analysis:
-```
-Found 15 testing tasks in PRD
-→ Recommend "test-guardian" skill (HIGH)
-  Capabilities: test generation, coverage analysis
-```
-
-### From task lists:
-```
-Found 8 deployment-related TODOs
-→ Recommend "deploy-sage" skill (MEDIUM)
-  Capabilities: CI/CD, Docker, environment management
-```
-
-### Combined (SOUL + PRD):
-```
-Detected 10 data transformations (SOUL)
-+ 7 ETL tasks (PRD)
-= Recommend "data-wizard" skill (CRITICAL)
-  Capabilities: CSV/JSON parsing, validation, transformations
-```
-
----
-
-## Multi-LLM support
-
-NEXUS works with:
-- ✅ **Claude Code**: Native integration
-- ✅ **GPT/Codex**: Reads NEXUS_RECOMMENDATIONS.md
-- ✅ **Gemini CLI**: Reads NEXUS_RECOMMENDATIONS.md
-
-The output file is universal - any LLM can read and understand it.
-
----
-
-## Advanced features
-
-### Pattern merging
-If SOUL detects "api_call" pattern AND PRD has "API tasks", NEXUS merges them:
-```
-SOUL: 12 API calls
-PRD:  8 API tasks
-= Combined priority CRITICAL (instead of separate HIGH)
-```
-
-### Duplicate detection
-NEXUS won't recommend skills that already exist:
-```
-Detected "testing" pattern
-→ Check: does "test-guardian" exist?
-→ Yes? Skip recommendation
-→ No? Add to recommendations
-```
-
-### Context preservation
-Recommendations include example contexts:
-```
-Example API calls from SOUL:
-- GET /users (called 8 times)
-- POST /auth (called 6 times)
-- GET /data (called 10 times)
-```
-
----
-
-## Why NEXUS is generic
-
-Unlike specific skills (api-master, db-handler, etc.), NEXUS:
-- ✅ Doesn't solve ONE problem
-- ✅ Solves the meta-problem: "what skills do you need?"
-- ✅ Adapts to ANY project type
-- ✅ Learns from YOUR specific patterns
-- ✅ Never becomes obsolete
-
----
-
-## Part of the ecosystem
-
-**SOUL** = Remembers everything
-**NEXUS** = Analyzes and recommends
-**skill-generator** = Creates skills
-**Generated skills** = Solve specific problems
-
-NEXUS is the connector that makes the whole system intelligent and self-improving.
-
----
-
-*Generated: 2025-10-26*
-*Part of the SOUL-NEXUS-skill-generator ecosystem*
-*Universal skill recommendation engine*
+*NEXUS - The universal skill recommendation and generation engine*
