@@ -29,12 +29,7 @@ class GlobalIncrementalBuilder:
         login(token=self.hf_token)
         self.username = whoami()['name']
         self.api = HfApi()
-        self.dataset_name = f"{self.username}/deepseek-vision-complete"
-        self.shard_manager = HubShardManager(
-            repo_id=self.dataset_name,
-            token=self.hf_token,
-            api=self.api,
-        )
+        self.dataset_name = f"{self.username}/deepsynth-vision-complete"
 
         # Text-to-image converter
         unicode_font_path = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
@@ -102,11 +97,15 @@ class GlobalIncrementalBuilder:
     def save_global_progress(self, progress):
         """Save progress to HuggingFace dataset metadata"""
         try:
-            # Persist progress metadata inside the shard index for cross-machine resume support
-            self.shard_manager.update_metadata({'global_progress': progress})
+            # Create metadata description with progress
+            metadata = {
+                'global_progress': progress,
+                'description': 'DeepSynth multilingual summarization dataset with text-image pairs',
+                'total_expected': sum(entry[4] for entry in self.sources)
+            }
 
-            # Update dataset card with storage and loading instructions
-            card_content = f"""# DeepSeek Multilingual Summarization Dataset
+            # Update dataset card with progress
+            card_content = f"""# DeepSynth Multilingual Summarization Dataset
 
 ## Storage Layout
 - Data is stored as independent shards under `data/`.

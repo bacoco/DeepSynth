@@ -1,4 +1,4 @@
-"""Inference utilities for DeepSeek-OCR summarization."""
-from .infer import DeepSeekSummarizer, GenerationParams
+"""Inference utilities for DeepSynth summarization (powered by DeepSeek-OCR)."""
+from .infer import DeepSynthSummarizer, GenerationParams
 
-__all__ = ["DeepSeekSummarizer", "GenerationParams"]
+__all__ = ["DeepSynthSummarizer", "GenerationParams"]

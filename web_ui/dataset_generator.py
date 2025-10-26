@@ -260,7 +260,7 @@ class ModelTrainer:
             job_id: Job identifier
             progress_callback: Optional callback for progress updates
         """
-        from training.deepseek_trainer_v2 import ProductionDeepSeekTrainer
+        from training.deepsynth_trainer_v2 import ProductionDeepSynthTrainer
 
         job = self.state_manager.get_job(job_id)
         if not job:
@@ -307,7 +307,7 @@ class ModelTrainer:
             logger.info(f"Loading training dataset from {dataset_repo}")
 
             # Create trainer
-            trainer = ProductionDeepSeekTrainer(trainer_config)
+            trainer = ProductionDeepSynthTrainer(trainer_config)
 
             # Train
             logger.info("Starting training...")

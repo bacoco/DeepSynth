@@ -283,8 +283,8 @@ def publish(
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Publish DeepSeek OCR training datasets to the Hugging Face Hub")
-    parser.add_argument("--repo-prefix", default="deepseek-summaries", help="Organisation or user prefix for the Hub repo")
+    parser = argparse.ArgumentParser(description="Publish DeepSynth OCR training datasets to the Hugging Face Hub")
+    parser.add_argument("--repo-prefix", default="deepsynth-summaries", help="Organisation or user prefix for the Hub repo")
     parser.add_argument("--token", help="Hugging Face token (falls back to cached login)")
     parser.add_argument("--private", action="store_true", help="Create private repositories")
     parser.add_argument(

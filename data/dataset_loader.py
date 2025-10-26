@@ -1,4 +1,4 @@
-"""Dataset utilities for the DeepSeek summarisation project."""
+"""Dataset utilities for the DeepSynth summarisation project."""
 from __future__ import annotations
 
 import json

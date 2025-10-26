@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DeepSeek Dataset Generator & Trainer - Enhanced</title>
+    <title>DeepSynth Dataset Generator & Trainer - Enhanced</title>
     <style>
         * {
             margin: 0;
@@ -444,7 +444,7 @@
 <body>
     <div class="container">
         <header>
-            <h1>🚀 DeepSeek Dataset Generator & Trainer</h1>
+            <h1>🚀 DeepSynth Dataset Generator & Trainer</h1>
             <p class="subtitle">Production-grade fine-tuning with MoE dropout regularization</p>
         </header>
 
@@ -635,7 +635,7 @@
                     <div class="success-box">
                         <strong>💡 Trainer Comparison:</strong><br>
                         <strong>Production</strong>: Frozen encoder (380M) + Fine-tuned MoE decoder (570M) + Dropout regularization<br>
-                        <strong>DeepSeek</strong>: Same frozen architecture without advanced dropout<br>
+                        <strong>DeepSynth</strong>: Same frozen architecture without advanced dropout<br>
                         <strong>Generic</strong>: Standard seq2seq for text-only datasets
                     </div>
                     <div class="preset-selector">
@@ -645,8 +645,8 @@
                             <p>MoE dropout enabled</p>
                             <p style="font-size: 0.8em; color: #28a745;"><strong>✅ Recommended</strong></p>
                         </div>
-                        <div class="preset-card" onclick="selectTrainer('deepseek')">
-                            <h4>🎯 DeepSeek Trainer</h4>
+                        <div class="preset-card" onclick="selectTrainer('deepsynth')">
+                            <h4>🎯 DeepSynth Trainer</h4>
                             <p>570M params trainable</p>
                             <p>Basic configuration</p>
                             <p style="font-size: 0.8em; color: #999;">For experiments</p>
@@ -888,7 +888,7 @@
             document.querySelectorAll('.preset-selector .preset-card').forEach((card, index) => {
                 card.classList.remove('selected');
                 if ((type === 'production' && index === 0) ||
-                    (type === 'deepseek' && index === 1) ||
+                    (type === 'deepsynth' && index === 1) ||
                     (type === 'generic' && index === 2)) {
                     card.classList.add('selected');
                 }

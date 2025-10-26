@@ -4,7 +4,7 @@ This script implements the full PRD workflow:
 1. Download dataset from HuggingFace
 2. Generate images from text documents
 3. Upload dataset WITH images to HuggingFace Hub
-4. Dataset is ready for training with DeepSeekOCRTrainer
+4. Dataset is ready for training with DeepSynthOCRTrainer
 
 Usage:
     python -m data.prepare_and_publish \

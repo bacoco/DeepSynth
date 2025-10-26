@@ -317,16 +317,16 @@ class ModelTrainer:
 
             # Create trainer based on type
             if trainer_type == 'production':
-                from training.deepseek_trainer_v2 import ProductionDeepSeekTrainer
-                trainer = ProductionDeepSeekTrainer(trainer_config)
-                logger.info(f"Using ProductionDeepSeekTrainer with MoE dropout support")
+                from training.deepsynth_trainer_v2 import ProductionDeepSynthTrainer
+                trainer = ProductionDeepSynthTrainer(trainer_config)
+                logger.info(f"Using ProductionDeepSynthTrainer with MoE dropout support")
                 logger.info(f"  - Expert dropout: {trainer_config.expert_dropout_rate}")
                 logger.info(f"  - Gate dropout: {trainer_config.gate_dropout_rate}")
                 logger.info(f"  - Bi-Drop passes: {trainer_config.bidrop_passes}")
-            elif trainer_type == 'deepseek':
-                from training.deepseek_trainer import DeepSeekOCRTrainer
-                trainer = DeepSeekOCRTrainer(trainer_config)
-                logger.info("Using DeepSeekOCRTrainer (basic frozen encoder)")
+            elif trainer_type == 'deepsynth':
+                from training.deepsynth_trainer import DeepSynthOCRTrainer
+                trainer = DeepSynthOCRTrainer(trainer_config)
+                logger.info("Using DeepSynthOCRTrainer (basic frozen encoder)")
             elif trainer_type == 'generic':
                 from training.trainer import SummarizationTrainer
                 trainer = SummarizationTrainer(trainer_config)

@@ -190,7 +190,7 @@ def train_model():
         if data.get('push_to_hub') and not hub_model_id:
             hf_username = os.environ.get('HF_USERNAME')
             if hf_username:
-                hub_model_id = f"{hf_username}/deepseek-ocr-finetuned"
+                hub_model_id = f"{hf_username}/deepsynth-ocr-finetuned"
             else:
                 return jsonify({'error': 'hub_model_id required when pushing to HuggingFace'}), 400
 

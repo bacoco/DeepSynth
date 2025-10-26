@@ -312,7 +312,7 @@ def main():
 
     login(token=os.getenv('HF_TOKEN'))
     username = whoami()['name']
-    repo_name = f"{username}/deepseek-vision-complete"
+    repo_name = f"{username}/deepsynth-vision-complete"
 
     print(f"Dataset: {repo_name}")
     print("🔄 Reprise automatique si interruption")
