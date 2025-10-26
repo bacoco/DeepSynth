@@ -111,27 +111,30 @@ python run_benchmark.py --model ./your-model --benchmark cnn_dailymail
 
 ### 🔮 Claude Skills System
 
-**DeepSynth inclut un système de skills avancé pour améliorer les capacités de Claude Code:**
+**Professional Claude Code skills have been moved to a dedicated repository:**
 
-**Les 3 skills principaux:**
-- 🧠 **SOUL** - Mémoire persistante multi-agents et multi-sessions
-- ⚡ **NEXUS** - Générateur automatique de skills basé sur les patterns d'utilisation
-- 📋 **PRD-TASKMASTER** - Analyseur de PRD et générateur de recommandations de skills
+**🌟 [MetaSkill Repository](https://github.com/bacoco/MetaSkill)** - Universal skills for Claude Code and other LLMs
 
-📖 **[Documentation complète des Skills](docs/SKILLS_ARCHITECTURE.md)**
-📖 **[Guide SOUL détaillé](docs/SOUL_SYSTEM.md)**
+**Available skills:**
+- 🧠 **SOUL** - Universal memory system with automatic session tracking
+- ⚡ **NEXUS** - Automatic skill generator based on usage patterns
+- 🛠️ **skill-creator** - Official guide for creating effective skills
 
-**Installation rapide (Claude):**
+**Installation:**
 ```bash
-# SOUL est automatiquement disponible dans .claude/skills/soul/
-# Aucune configuration nécessaire!
+# Clone MetaSkill repository
+git clone https://github.com/bacoco/MetaSkill.git
+cd MetaSkill
+
+# Copy skills to your project
+cp -r .claude/skills /path/to/your/project/.claude/
+
+# Install SOUL git hooks
+cd /path/to/your/project/.claude/skills/soul/scripts
+./install.sh
 ```
 
-**Pour autres LLMs (GPT, Gemini):**
-```bash
-cd .claude/skills/soul && ./install.sh --model gpt    # Pour GPT
-cd .claude/skills/soul && ./install.sh --model gemini # Pour Gemini
-```
+See the [MetaSkill README](https://github.com/bacoco/MetaSkill) for complete documentation and usage guides.
 
 ### 🌍 Global Cross-Computer Pipeline
 
