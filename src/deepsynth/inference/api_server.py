@@ -13,7 +13,7 @@ from typing import Any, Dict
 from flask import Flask, jsonify, request
 from werkzeug.utils import secure_filename
 
-from .infer import DeepSynthSummarizer
+from deepsynth.inference import DeepSynthSummarizer
 
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)

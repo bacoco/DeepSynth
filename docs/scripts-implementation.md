@@ -8,17 +8,21 @@ deepsynth-summarizer/
 │   ├── prepare_datasets.py
 │   ├── text_to_image.py
 │   └── dataset_loader.py
-├── training/
-│   ├── train.py
-│   ├── trainer.py
-│   └── config.py
 ├── evaluation/
 │   ├── evaluate.py
 │   ├── metrics.py
 │   └── generate.py
-├── inference/
-│   ├── infer.py
-│   └── api_server.py
+├── src/
+│   └── deepsynth/
+│       ├── config/
+│       │   └── env.py
+│       ├── training/
+│       │   ├── train.py
+│       │   ├── trainer.py
+│       │   └── config.py
+│       └── inference/
+│           ├── infer.py
+│           └── api_server.py
 ├── requirements.txt
 ├── setup.sh
 └── README.md
@@ -616,7 +620,7 @@ if __name__ == "__main__":
     main()
 ```
 
-### 5. Inference Script (`inference/infer.py`)
+### 5. Inference Script (`deepsynth.inference.infer`)
 
 ```python
 """
@@ -810,9 +814,9 @@ if __name__ == "__main__":
     main()
 
 # Usage examples:
-# python inference/infer.py --model_path ./deepsynth-summarizer --input_text "Long article text here..."
-# python inference/infer.py --model_path ./deepsynth-summarizer --input_file article.txt --output_file summary.txt
-# python inference/infer.py --model_path ./deepsynth-summarizer --image_path document.png
+# python -m deepsynth.inference.infer --model_path ./deepsynth-summarizer --input_text "Long article text here..."
+# python -m deepsynth.inference.infer --model_path ./deepsynth-summarizer --input_file article.txt --output_file summary.txt
+# python -m deepsynth.inference.infer --model_path ./deepsynth-summarizer --image_path document.png
 ```
 
 ### 6. Requirements (`requirements.txt`)
@@ -851,7 +855,7 @@ chmod +x setup.sh
 source venv/bin/activate
 
 # 2. Entraînement
-python training/train.py \
+python -m deepsynth.training.train \
     --model_name deepseek-ai/DeepSeek-OCR \
     --dataset_name ccdv/cnn_dailymail \
     --output_dir ./deepsynth-summarizer \
@@ -860,7 +864,7 @@ python training/train.py \
     --learning_rate 2e-5
 
 # 3. Inférence
-python inference/infer.py \
+python -m deepsynth.inference.infer \
     --model_path ./deepsynth-summarizer \
     --input_file document.txt \
     --output_file summary.txt \

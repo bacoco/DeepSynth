@@ -1,9 +1,9 @@
-"""DeepSynth pipelines package."""
+"""Pipelines orchestrating DeepSynth data and training workflows."""
 
 from .incremental import IncrementalPipeline, run_incremental_pipeline
 from .global_state import GlobalIncrementalPipeline, run_global_incremental_pipeline
 from .separate import SeparateDatasetsPipeline, run_separate_datasets_pipeline
-from .parallel import ParallelDatasetsPipeline
+from .parallel import ParallelDatasetsPipeline, run_parallel_datasets_pipeline
 
 __all__ = [
     "IncrementalPipeline",
@@ -13,4 +13,5 @@ __all__ = [
     "SeparateDatasetsPipeline",
     "run_separate_datasets_pipeline",
     "ParallelDatasetsPipeline",
+    "run_parallel_datasets_pipeline",
 ]

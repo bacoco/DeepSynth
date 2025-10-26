@@ -14,12 +14,18 @@ from datasets import Dataset, DatasetDict, Features, Value, load_dataset
 from datasets.features import Image as HFImage
 from huggingface_hub import HfApi, create_repo
 
-# Add parent directory to path to import project modules
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add project root and src directory to the path to import project modules
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-from data.text_to_image import TextToImageConverter
+SRC_DIR = PROJECT_ROOT / "src"
+if SRC_DIR.exists() and str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+from deepsynth.data.transforms import TextToImageConverter
 from web_ui.state_manager import StateManager, JobStatus
-from training.config import OptimizerConfig, TrainerConfig
+from deepsynth.training.config import OptimizerConfig, TrainerConfig
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -317,18 +323,18 @@ class ModelTrainer:
 
             # Create trainer based on type
             if trainer_type == 'production':
-                from training.deepsynth_trainer_v2 import ProductionDeepSynthTrainer
+                from deepsynth.training.deepsynth_trainer_v2 import ProductionDeepSynthTrainer
                 trainer = ProductionDeepSynthTrainer(trainer_config)
                 logger.info(f"Using ProductionDeepSynthTrainer with MoE dropout support")
                 logger.info(f"  - Expert dropout: {trainer_config.expert_dropout_rate}")
                 logger.info(f"  - Gate dropout: {trainer_config.gate_dropout_rate}")
                 logger.info(f"  - Bi-Drop passes: {trainer_config.bidrop_passes}")
             elif trainer_type == 'deepsynth':
-                from training.deepsynth_trainer import DeepSynthOCRTrainer
+                from deepsynth.training.deepsynth_trainer import DeepSynthOCRTrainer
                 trainer = DeepSynthOCRTrainer(trainer_config)
                 logger.info("Using DeepSynthOCRTrainer (basic frozen encoder)")
             elif trainer_type == 'generic':
-                from training.trainer import SummarizationTrainer
+                from deepsynth.training.trainer import SummarizationTrainer
                 trainer = SummarizationTrainer(trainer_config)
                 logger.info("Using SummarizationTrainer (generic seq2seq)")
             else:

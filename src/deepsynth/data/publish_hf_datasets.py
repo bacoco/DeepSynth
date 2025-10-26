@@ -25,7 +25,7 @@ from typing import Callable, Dict, Optional, Sequence
 
 from datasets import Dataset, DatasetDict, Image as ImageFeature, load_dataset
 
-from .text_to_image import TextToImageConverter
+from .transforms.text_to_image import TextToImageConverter
 
 
 LOGGER = logging.getLogger(__name__)

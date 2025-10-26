@@ -10,12 +10,18 @@ from flask import Flask, render_template, request, jsonify
 from threading import Thread
 import logging
 
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Ensure project root and src directory are on the import path so ``deepsynth`` package is available.
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+SRC_DIR = PROJECT_ROOT / "src"
+if SRC_DIR.exists() and str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
 from web_ui.state_manager import StateManager, JobStatus
 from web_ui.dataset_generator_improved import IncrementalDatasetGenerator, ModelTrainer
-from training.optimal_configs import (
+from deepsynth.training.optimal_configs import (
     list_benchmark_datasets,
     get_optimal_config,
     PRESET_CONFIGS

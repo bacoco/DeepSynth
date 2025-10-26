@@ -5,27 +5,20 @@ and cleans up batch files after successful upload to save disk space.
 Maintains the same dataset name with incremental updates.
 """
 
-import os
 import json
+import os
 import pickle
+import time
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from huggingface_hub import login, whoami, HfApi
+from huggingface_hub import HfApi, hf_hub_download, login, whoami
 
-from hf_shard_uploader import HubShardManager
+from deepsynth.config import load_shared_env
+from deepsynth.data.hub import HubShardManager
 
-import time
-
-# Load environment variables
-env_file = Path('.env')
-if env_file.exists():
-    with open(env_file) as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith('#') and '=' in line:
-                key, value = line.split('=', 1)
-                os.environ[key] = value
+# Load environment variables shared by the data pipeline
+load_shared_env()
 
 class EfficientIncrementalUploader:
     def __init__(self, work_dir="./work", batches_per_upload=100):
