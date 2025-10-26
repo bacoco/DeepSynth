@@ -12,7 +12,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from multiprocessing import Manager
 import threading
 from datetime import datetime
-from deepsynth.pipelines._dataset_processor import SeparateDatasetsPipeline
+from deepsynth.pipelines._dataset_processor import OptimizedDatasetPipeline
 
 __all__ = ["ParallelDatasetsPipeline"]
 
@@ -144,24 +144,24 @@ class ParallelDatasetsPipeline:
 
             # Créer le builder avec un work_dir unique pour ce dataset
             work_dir = f"./work_separate_{dataset_config['output_name']}"
-            builder = SeparateDatasetsPipeline(work_dir=work_dir)
+            builder = OptimizedDatasetPipeline(work_dir=work_dir)
 
             # Traitement du dataset
             start_time = time.time()
 
-            # Vérifier l'état existant sur HuggingFace
+            # Vérifier l'état existant sur HuggingFace (métadonnées seulement)
             repo_name = f"{username}/{dataset_config['output_name']}"
-            progress_info = builder.check_existing_dataset_progress(repo_name)
+            processed_keys = builder.check_processed_indices(repo_name)
 
-            if progress_info['exists']:
-                existing_count = progress_info['total_processed']
+            if processed_keys:
+                existing_count = len(processed_keys)
                 logger.info(f"📊 {dataset_config['name']}: {existing_count} échantillons déjà traités")
             else:
                 existing_count = 0
                 logger.info(f"📊 {dataset_config['name']}: Nouveau dataset à créer")
 
-            # Traiter le dataset avec la méthode existante
-            builder.process_and_upload_dataset(
+            # Traiter le dataset avec la nouvelle méthode optimisée
+            builder.process_and_batch_dataset(
                 name=dataset_config['dataset_name'],
                 subset=dataset_config['dataset_config'],
                 text_field=dataset_config['text_column'],
