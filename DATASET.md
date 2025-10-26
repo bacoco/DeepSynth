@@ -27,6 +27,36 @@ cp .env.example .env
 - ✅ Prevents any duplicate processing
 - ✅ Works from any computer with same HF token
 
+## 📦 Sharded Storage Layout
+
+The dataset is now stored as independent shards on the HuggingFace Hub to
+avoid expensive re-uploads. Each shard lives under `data/batch_xxxxxx`
+and the `data/shards.json` index keeps track of every shard alongside
+their `(source_dataset, original_index)` pairs.
+
+```python
+import json
+from pathlib import Path
+from huggingface_hub import hf_hub_download, snapshot_download
+from datasets import load_from_disk
+
+repo_id = "your-username/deepseek-vision-complete"
+index_path = hf_hub_download(repo_id, filename="data/shards.json", repo_type="dataset")
+
+with open(index_path, "r", encoding="utf-8") as handle:
+    index = json.load(handle)
+
+for shard in index["shards"]:
+    repo_dir = snapshot_download(repo_id, repo_type="dataset", allow_patterns=[f"{shard['path']}/*"])
+    dataset = load_from_disk(Path(repo_dir) / shard["path"])
+    for row in dataset["train"]:
+        ...  # consume the samples
+```
+
+> 💡 Tip: Run `python scripts/check_shards_duplicates.py --repo ${repo_id}` to
+> stream all shards locally and verify that no `(source_dataset,
+> original_index)` pair appears twice.
+
 ---
 
 ## 📊 Dataset Composition
@@ -200,6 +230,9 @@ expected = {'MLSUM', 'cnn_dailymail', 'Rexhaif/xsum_reduced', 'billsum'}
 assert expected.issubset(sources)
 print("✅ All source datasets present")
 ```
+
+The script streams every shard listed in the index, verifies duplicate
+pairs, and prints a summary of the aggregate sample count per source.
 
 ---
 
