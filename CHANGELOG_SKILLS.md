@@ -4,6 +4,19 @@ All notable changes to the Claude Skills system will be documented in this file.
 
 ---
 
+## [2.0.1] - 2025-10-26
+
+### 🔄 Replace skill-generator with official skill-creator
+
+**Changed:**
+- ❌ Removed custom `skill-generator`
+- ✅ Added official Claude `skill-creator` skill
+- Updated all references in documentation
+
+**Reason**: Claude's official skill-creator is more comprehensive and follows official best practices.
+
+---
+
 ## [2.0.0] - 2025-10-26
 
 ### 🎯 Major Restructuring - Generic Skills Architecture
@@ -15,7 +28,7 @@ Complete reimplementation of the skills system focusing on **3 universal, interc
 **Three Core Skills:**
 1. **SOUL** - Universal memory system
 2. **NEXUS** - Unified analyzer and skill recommender
-3. **skill-generator** - Meta-skill for creating new skills
+3. **skill-creator** - Official Claude meta-skill for creating new skills
 
 ### 🚀 Added
 
@@ -42,14 +55,15 @@ Complete reimplementation of the skills system focusing on **3 universal, interc
 - **`prd_analyzer.py`** - Moved from prd-taskmaster, integrated into NEXUS
 - **Complete SKILL.md** - Full documentation of NEXUS capabilities
 
-#### skill-generator - Meta-Skill
-- **New meta-skill** for generating skills automatically
-- **`generate_skill.py`** - Universal skill generator
-  - Creates complete skill structure
-  - Multi-LLM support (Claude/GPT/Gemini)
-  - Template-based generation
-  - SOUL integration built-in
-- **Complete SKILL.md** - How to use the meta-skill
+#### skill-creator - Official Claude Meta-Skill
+- **Official Claude skill** for creating new skills
+- **Complete guidance system** with proven patterns
+  - Step-by-step skill creation process
+  - Progressive disclosure design principles
+  - Best practices for scripts, references, and assets
+  - Validation and packaging tools
+- **Bundled scripts** - `init_skill.py`, `package_skill.py`
+- **Reference guides** - workflows.md, output-patterns.md
 
 #### Documentation
 - **`docs/SKILLS_ARCHITECTURE.md`** - Complete system architecture
@@ -60,7 +74,7 @@ Complete reimplementation of the skills system focusing on **3 universal, interc
 - **`scripts/build_distributions.sh`** - Build distribution zips
 - **`soul.zip`** - SOUL standalone package (14K)
 - **`nexus.zip`** - NEXUS standalone package (39K)
-- **`skill-generator.zip`** - Meta-skill package (6.5K)
+- **`skill-creator.zip`** - Official Claude meta-skill package (39K)
 
 ### 🗑️ Removed
 
