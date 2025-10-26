@@ -8,10 +8,13 @@ Maintains the same dataset name with incremental updates.
 import os
 import json
 import pickle
-import shutil
 from pathlib import Path
-from datasets import Dataset, DatasetDict
-from huggingface_hub import login, whoami, HfApi, hf_hub_download
+from typing import List, Optional, Tuple
+
+from huggingface_hub import login, whoami, HfApi
+
+from hf_shard_uploader import HubShardManager
+
 import time
 
 # Load environment variables
@@ -41,6 +44,12 @@ class EfficientIncrementalUploader:
         self.dataset_name = f"{self.username}/deepseek-vision-complete"
 
         self.upload_progress = self.load_upload_progress()
+        self.shard_manager = HubShardManager(
+            repo_id=self.dataset_name,
+            token=self.hf_token,
+            api=self.api,
+        )
+        self.upload_progress['dataset_created'] = True
 
     def load_index_registry(self):
         """Load the remote index registry tracking processed samples."""
@@ -168,143 +177,84 @@ class EfficientIncrementalUploader:
 
         return pending
 
-    def load_batch_range(self, batch_files):
-        """Load samples from a range of batch files"""
-        all_samples = []
+    def load_single_batch(self, batch_id: int, batch_file: Path) -> Tuple[Optional[List[dict]], bool]:
+        """Load samples from a single batch file."""
 
-        for batch_id, batch_file in batch_files:
-            try:
-                with open(batch_file, 'rb') as f:
-                    samples = pickle.load(f)
-                    all_samples.extend(samples)
-                    print(f"  ✓ Loaded batch {batch_id}: {len(samples)} samples")
-            except Exception as e:
-                print(f"  ✗ Failed to load batch {batch_id}: {e}")
-                return None
+        if self.shard_manager.shard_exists(self.shard_manager.format_shard_id(batch_id)):
+            print(f"  ⚠ Shard for batch {batch_id} already exists on the Hub, skipping upload")
+            return None, True
 
-        return all_samples
-
-    def create_dataset_from_samples(self, samples):
-        """Create HuggingFace dataset from samples"""
-        if not samples:
-            return None
-
-        dataset = Dataset.from_dict({
-            'text': [s['text'] for s in samples],
-            'summary': [s['summary'] for s in samples],
-            'image': [s['image'] for s in samples],
-            'source_dataset': [s['source_dataset'] for s in samples],
-            'original_split': [s['original_split'] for s in samples],
-            'original_index': [s['original_index'] for s in samples],
-        })
-
-        from datasets import Image as ImageFeature
-        dataset = dataset.cast_column("image", ImageFeature())
-
-        return DatasetDict({'train': dataset})
+        try:
+            with open(batch_file, 'rb') as f:
+                samples = pickle.load(f)
+                print(f"  ✓ Loaded batch {batch_id}: {len(samples)} samples")
+                return samples, False
+        except Exception as e:
+            print(f"  ✗ Failed to load batch {batch_id}: {e}")
+            return None, False
 
     def upload_batch_chunk(self, batch_files):
         """Upload a chunk of batches and clean up after success"""
-        print(f"\\n📤 Uploading {len(batch_files)} batches...")
+        print(f"\n📤 Uploading {len(batch_files)} batches...")
 
-        # Load samples
-        samples = self.load_batch_range(batch_files)
-        if not samples:
-            print("  ✗ Failed to load samples")
-            return False
+        total_uploaded = 0
+        total_skipped = 0
+        shards_uploaded = []
 
-        print(f"  📊 Total samples in chunk: {len(samples)}")
+        for batch_id, batch_file in batch_files:
+            samples, skipped_existing = self.load_single_batch(batch_id, batch_file)
+            if skipped_existing:
+                continue
+            if samples is None:
+                print(f"  ✗ Unable to read batch {batch_id}, aborting chunk")
+                return False
+            if not samples:
+                print(f"  ⚠ Batch {batch_id} contains no samples, skipping")
+                continue
 
-        registry = self.load_index_registry()
-        samples, registry, skipped = self.filter_duplicate_samples(samples, registry)
-
-        if skipped:
-            print(f"  ⚖️  Skipped {skipped} duplicate samples already present on HuggingFace")
-
-        if not samples:
-            print("  ℹ️ No new unique samples to upload after duplicate filtering")
-            last_batch_id = max(batch_id for batch_id, _ in batch_files)
-            self.upload_progress['last_uploaded_batch'] = last_batch_id
-            self.save_upload_progress()
-            self.cleanup_uploaded_batches(batch_files)
-            return True
-
-        # Create dataset from new samples
-        new_dataset_dict = self.create_dataset_from_samples(samples)
-        if not new_dataset_dict:
-            print("  ✗ Failed to create dataset")
-            return False
-
-        try:
-            print(f"  🚀 Uploading to: {self.dataset_name}")
-
-            # For first upload, create new dataset
-            if not self.upload_progress['dataset_created']:
-                try:
-                    self.api.delete_repo(repo_id=self.dataset_name, repo_type='dataset')
-                    print("  🗑️ Deleted existing dataset")
-                except:
-                    print("  ℹ️ No existing dataset to delete")
-
-                # Upload new dataset
-                final_dataset = new_dataset_dict
-                print("  📝 Creating new dataset")
-            else:
-                # APPEND to existing dataset
-                print("  📝 Loading existing dataset to append...")
-                try:
-                    from datasets import load_dataset
-                    existing_dataset = load_dataset(self.dataset_name, token=self.hf_token)
-
-                    # Combine existing and new data
-                    from datasets import concatenate_datasets
-                    combined_train = concatenate_datasets([
-                        existing_dataset['train'],
-                        new_dataset_dict['train']
-                    ])
-                    final_dataset = DatasetDict({'train': combined_train})
-                    print(f"  ✅ Combined: {len(existing_dataset['train'])} + {len(new_dataset_dict['train'])} = {len(combined_train)} samples")
-
-                except Exception as e:
-                    print(f"  ⚠ Failed to load existing dataset, creating new: {e}")
-                    final_dataset = new_dataset_dict
-
-            # Upload combined dataset
-            final_dataset.push_to_hub(
-                self.dataset_name,
-                private=False,
-                token=self.hf_token,
-                commit_message=f"Incremental update: +{len(samples)} samples (upload #{self.upload_progress['upload_count'] + 1})"
-            )
-
-            print(f"  ✅ Upload successful: https://huggingface.co/datasets/{self.dataset_name}")
-
-            # Persist updated registry to Hub
+            shard_id = self.shard_manager.format_shard_id(batch_id)
             try:
-                self.upload_index_registry(
-                    registry,
-                    commit_message=f"Update registry after upload #{self.upload_progress['upload_count'] + 1}"
+                result = self.shard_manager.upload_samples_as_shard(
+                    samples,
+                    shard_id=shard_id,
+                    commit_message=f"Add shard {shard_id} from efficient uploader",
                 )
-            except Exception as registry_error:
-                print(f"  ⚠ Failed to update index registry: {registry_error}")
+            except Exception as exc:
+                print(f"  ✗ Upload failed for batch {batch_id}: {exc}")
+                return False
 
-            # Update progress
-            last_batch_id = max(batch_id for batch_id, _ in batch_files)
-            self.upload_progress['last_uploaded_batch'] = last_batch_id
-            self.upload_progress['total_uploaded_samples'] += len(samples)
-            self.upload_progress['upload_count'] += 1
-            self.upload_progress['dataset_created'] = True
-            self.save_upload_progress()
+            total_uploaded += result.uploaded_samples
+            total_skipped += result.skipped_duplicates
 
-            # Clean up batch files after successful upload
-            self.cleanup_uploaded_batches(batch_files)
+            if result.uploaded_samples:
+                shards_uploaded.append(result.shard_id)
+                print(f"  ✅ Uploaded shard {result.shard_id}: {result.uploaded_samples} samples")
+            else:
+                print(f"  ℹ️ Batch {batch_id} contained only duplicates ({result.skipped_duplicates} skipped)")
 
-            print(f"  📈 Total uploaded: {self.upload_progress['total_uploaded_samples']} samples")
-            return True
+        if shards_uploaded:
+            index_commit_message = f"Update shard index ({len(shards_uploaded)} new shards via efficient uploader)"
+            try:
+                self.shard_manager.save_index(commit_message=index_commit_message)
+            except Exception as exc:
+                print(f"  ✗ Failed to update shard index: {exc}")
+                return False
 
-        except Exception as e:
-            print(f"  ✗ Upload failed: {e}")
-            return False
+        if total_uploaded == 0 and total_skipped == 0 and not shards_uploaded:
+            print("  ⚠ Nothing to upload in this chunk")
+
+        last_batch_id = max(batch_id for batch_id, _ in batch_files)
+        self.upload_progress['last_uploaded_batch'] = last_batch_id
+        self.upload_progress['total_uploaded_samples'] += total_uploaded
+        if shards_uploaded:
+            self.upload_progress['upload_count'] += len(shards_uploaded)
+        self.save_upload_progress()
+
+        self.cleanup_uploaded_batches(batch_files)
+
+        print(f"  📈 Chunk summary: uploaded {total_uploaded} new samples (skipped {total_skipped} duplicates)")
+        print(f"  ✅ Dataset: https://huggingface.co/datasets/{self.dataset_name}")
+        return True
 
     def cleanup_uploaded_batches(self, batch_files):
         """DELETE uploaded batch files to save disk space"""
