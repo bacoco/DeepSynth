@@ -61,7 +61,20 @@ if [ -d "venv" ]; then
     echo "📦 Mise à jour des dépendances Python..."
     source venv/bin/activate
     pip install --upgrade pip -q
-    pip install -r requirements.txt -q
+
+    # Utiliser le bon fichier requirements selon l'OS
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "  🍎 macOS - Mise à jour requirements-base.txt"
+        pip install -r requirements-base.txt -q
+    elif command -v nvidia-smi >/dev/null 2>&1; then
+        echo "  🐧 Linux GPU - Mise à jour requirements complets"
+        pip install -r requirements-base.txt -q
+        pip install -r requirements-training.txt -q 2>/dev/null || true
+    else
+        echo "  🐧 Linux CPU - Mise à jour requirements-base.txt"
+        pip install -r requirements-base.txt -q
+    fi
+
     echo "✅ Dépendances mises à jour"
 else
     echo "ℹ️  Pas de venv détecté - Lancez ./setup.sh pour l'installer"
