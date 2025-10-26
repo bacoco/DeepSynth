@@ -7,23 +7,19 @@ import os
 import json
 import pickle
 from pathlib import Path
+
 from datasets import Dataset, DatasetDict, load_dataset
-from huggingface_hub import login, whoami, HfApi
-from data.text_to_image import TextToImageConverter
-from mlsum_loader import MLSUMLoader
-from efficient_incremental_uploader import EfficientIncrementalUploader
+from huggingface_hub import HfApi, login, whoami
+
+from deepsynth.config import load_shared_env
+from deepsynth.data.loaders import MLSUMLoader
+from deepsynth.data.transforms import TextToImageConverter
+from deepsynth.pipelines.uploaders import EfficientIncrementalUploader
 
 __all__ = ["IncrementalPipeline", "run_incremental_pipeline"]
 
 # Load environment variables
-env_file = Path('.env')
-if env_file.exists():
-    with open(env_file) as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith('#') and '=' in line:
-                key, value = line.split('=', 1)
-                os.environ[key] = value
+load_shared_env()
 
 class OptimizedConverter(TextToImageConverter):
     def __init__(self):

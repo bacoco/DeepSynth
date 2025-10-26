@@ -8,4 +8,5 @@ __all__ = [
     "load_env",
     "DeepSynthOCRTrainer",
     "SummarizationTrainer",
+    "data",
 ]
