@@ -41,6 +41,8 @@ if ! huggingface-cli whoami &>/dev/null; then
     exit 1
 fi
 
+export PYTHONPATH="${PYTHONPATH}:$(pwd)/src"
+
 HF_USER=$(huggingface-cli whoami | head -n 1)
 echo -e "${GREEN}✓${NC} Logged in as: $HF_USER"
 echo ""
@@ -49,7 +51,7 @@ echo ""
 echo -e "${BLUE}[Step 1/3] Preparing dataset with images...${NC}"
 echo ""
 
-PREPARE_CMD="python -m data.prepare_and_publish \
+PREPARE_CMD="python -m deepsynth.data.prepare_and_publish \
     --dataset $DATASET_NAME \
     --hub-repo $TARGET_REPO"
 
@@ -127,5 +129,5 @@ echo ""
 echo "Next steps:"
 echo "  1. Evaluate: python -m evaluation.evaluate $MODEL_OUTPUT"
 echo "  2. Inference: python -m inference.infer --model_path $MODEL_OUTPUT --input_file article.txt"
-echo "  3. API: MODEL_PATH=$MODEL_OUTPUT python -m inference.api_server"
+echo "  3. API: MODEL_PATH=$MODEL_OUTPUT python -m deepsynth.inference.api_server"
 echo ""

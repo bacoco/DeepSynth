@@ -43,7 +43,7 @@ This will:
 #### Step 1: Prepare Dataset with Images
 
 ```bash
-python -m data.prepare_and_publish \
+python -m deepsynth.data.prepare_and_publish \
     --dataset ccdv/cnn_dailymail \
     --subset 3.0.0 \
     --hub-repo your-username/cnn-dailymail-images \
@@ -113,7 +113,7 @@ The trainer automatically handles:
 ### Example: XSum Dataset
 
 ```bash
-python -m data.prepare_and_publish \
+python -m deepsynth.data.prepare_and_publish \
     --dataset EdinburghNLP/xsum \
     --text-field document \
     --summary-field summary \
@@ -128,7 +128,7 @@ python -m data.prepare_and_publish \
 The `TextToImageConverter` creates PNG images from text:
 
 ```python
-from data import TextToImageConverter
+from deepsynth.data import TextToImageConverter
 
 converter = TextToImageConverter(
     font_size=18,
@@ -213,7 +213,7 @@ print(f"Image dimensions: {np.mean([s[0] for s in image_sizes]):.0f} x {np.mean(
 ### Custom Text-to-Image Conversion
 
 ```python
-from data import TextToImageConverter, DatasetPipeline
+from deepsynth.data import TextToImageConverter, DatasetPipeline
 from datasets import load_dataset
 
 # Custom converter with different settings
@@ -243,7 +243,7 @@ For large datasets, process in batches:
 ```bash
 # Process in chunks
 for i in {0..9}; do
-    python -m data.prepare_and_publish \
+    python -m deepsynth.data.prepare_and_publish \
         --dataset ccdv/cnn_dailymail \
         --subset 3.0.0 \
         --max-samples 10000 \
@@ -257,7 +257,7 @@ wait
 ### Debugging Image Generation
 
 ```python
-from data import TextToImageConverter
+from deepsynth.data import TextToImageConverter
 
 converter = TextToImageConverter()
 
@@ -282,7 +282,7 @@ image.show()
 **Solution:** Process in smaller batches
 
 ```bash
-python -m data.prepare_and_publish \
+python -m deepsynth.data.prepare_and_publish \
     --dataset ccdv/cnn_dailymail \
     --subset 3.0.0 \
     --max-samples 100 \

@@ -46,17 +46,20 @@ RUN pip3 install --no-cache-dir flask flask-cors gunicorn
 # Copy project files
 COPY . .
 
+# Ensure application packages are discoverable
+ENV PYTHONPATH="/app/src:${PYTHONPATH}"
+
 # Create necessary directories
 RUN mkdir -p \
-    /app/web_ui/state \
-    /app/web_ui/templates \
-    /app/web_ui/static \
+    /app/apps/web/state/hashes \
+    /app/apps/web/ui/templates \
+    /app/apps/web/ui/static \
     /app/generated_images \
     /app/trained_model \
     /app/logs
 
 # Set permissions
-RUN chmod +x /app/web_ui/app.py
+RUN chmod +x /app/start_docker_ui.sh || true
 
 # Expose port for web UI
 EXPOSE 5000
@@ -66,4 +69,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:5000/api/health || exit 1
 
 # Run the web UI
-CMD ["python3", "-m", "web_ui.app"]
+CMD ["python3", "-m", "apps.web"]

@@ -99,24 +99,24 @@ def test_modules():
     print("\nTesting local modules...")
 
     try:
-        from data.text_to_image import TextToImageConverter
-        print(f"  ✓ data.text_to_image")
+        from deepsynth.data.text_to_image import TextToImageConverter
+        print(f"  ✓ deepsynth.data.text_to_image")
     except Exception as e:
-        print(f"  ✗ data.text_to_image: {e}")
+        print(f"  ✗ deepsynth.data.text_to_image: {e}")
         return False
 
     try:
-        from data.prepare_and_publish import DatasetPipeline
-        print(f"  ✓ data.prepare_and_publish")
+        from deepsynth.data.prepare_and_publish import DatasetPipeline
+        print(f"  ✓ deepsynth.data.prepare_and_publish")
     except Exception as e:
-        print(f"  ✗ data.prepare_and_publish: {e}")
+        print(f"  ✗ deepsynth.data.prepare_and_publish: {e}")
         return False
 
     try:
-        from training.deepsynth_trainer_v2 import ProductionDeepSynthTrainer
-        print(f"  ✓ training.deepsynth_trainer_v2")
+        from deepsynth.training.deepsynth_trainer_v2 import ProductionDeepSynthTrainer
+        print(f"  ✓ deepsynth.training.deepsynth_trainer_v2")
     except Exception as e:
-        print(f"  ✗ training.deepsynth_trainer_v2: {e}")
+        print(f"  ✗ deepsynth.training.deepsynth_trainer_v2: {e}")
         return False
 
     return True

@@ -19,7 +19,7 @@ I've implemented a comprehensive enhancement to the DeepSynth Dataset Generator 
 
 ### 2. ✅ Enhanced Web UI
 
-**File:** `web_ui/templates/index.html` (completely redesigned)
+**File:** `apps/web/ui/templates/index.html` (completely redesigned)
 
 **New Features:**
 - 📊 **Benchmark Datasets Tab** - Pre-configured datasets with one-click setup
@@ -37,7 +37,7 @@ I've implemented a comprehensive enhancement to the DeepSynth Dataset Generator 
 
 ### 3. ✅ Optimal Hyperparameters for Image-to-Text
 
-**File:** `training/optimal_configs.py`
+**File:** `src/deepsynth/training/optimal_configs.py`
 
 **Presets:**
 - **Default**: Balanced (batch=2, lr=5e-5, grad_accum=8) - Best for 24GB GPU
@@ -70,7 +70,7 @@ I've implemented a comprehensive enhancement to the DeepSynth Dataset Generator 
 
 ### 5. ✅ Comprehensive Metrics Tracking
 
-**File:** `evaluation/training_metrics.py`
+**File:** `src/deepsynth/evaluation/training_metrics.py`
 
 **Metrics Tracked:**
 - **Loss**: Train loss, eval loss, best eval loss
@@ -210,17 +210,24 @@ deepseek-synthesia/
 ├── start-all.sh                    # Launch both (NEW)
 ├── ENHANCED_UI_GUIDE.md            # User guide (NEW)
 ├── IMPLEMENTATION_SUMMARY.md       # This file (NEW)
-├── web_ui/
-│   ├── app.py                      # Flask app (ENHANCED)
-│   └── templates/
-│       ├── index.html              # Main UI (REPLACED)
-│       └── index_enhanced.html     # Enhanced UI (NEW)
-├── training/
-│   ├── config.py                   # Existing config
-│   └── optimal_configs.py          # Optimal hyperparameters (NEW)
-└── evaluation/
-    ├── metrics.py                  # Existing ROUGE metrics
-    └── training_metrics.py         # Comprehensive tracking (NEW)
+├── apps/
+│   └── web/
+│       ├── __init__.py
+│       ├── __main__.py
+│       ├── config.py               # Flask & job manager config
+│       └── ui/
+│           ├── app.py              # Flask app (ENHANCED)
+│           └── templates/
+│               ├── index.html      # Main UI (REPLACED)
+│               └── index_enhanced.html # Enhanced UI (NEW)
+└── src/
+    └── deepsynth/
+        ├── training/
+        │   ├── config.py               # Existing config
+        │   └── optimal_configs.py      # Optimal hyperparameters (NEW)
+        └── evaluation/
+            ├── metrics.py              # Existing ROUGE metrics
+            └── training_metrics.py     # Comprehensive tracking (NEW)
 ```
 
 ---

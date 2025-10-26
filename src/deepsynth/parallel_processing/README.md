@@ -5,7 +5,7 @@ Ce module permet le traitement parallèle des datasets DeepSynth pour accélére
 ## Structure
 
 ```
-parallel_processing/
+src/deepsynth/parallel_processing/
 ├── __init__.py                    # Module Python
 ├── parallel_datasets_builder.py  # Logique principale de parallélisation
 ├── run_parallel_datasets.py      # Interface utilisateur
@@ -21,12 +21,12 @@ python run_parallel_processing.py
 
 ### Depuis ce répertoire
 ```bash
-python -m parallel_processing.run_parallel_datasets
+PYTHONPATH=src python -m deepsynth.parallel_processing.run_parallel_datasets
 ```
 
 ### En tant que module Python
 ```python
-from parallel_processing import ParallelDatasetsBuilder
+from deepsynth.parallel_processing import ParallelDatasetsBuilder
 
 builder = ParallelDatasetsBuilder(max_workers=3)
 results = builder.run_parallel_processing()

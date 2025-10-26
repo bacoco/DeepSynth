@@ -263,7 +263,7 @@ model.push_to_hub(
 
 ```python
 # Real image creation
-from data.text_to_image import TextToImageConverter
+from deepsynth.data.text_to_image import TextToImageConverter
 
 converter = TextToImageConverter()
 image = converter.convert(article_text)

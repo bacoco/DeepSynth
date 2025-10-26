@@ -10,7 +10,7 @@ services:
       - "5000:5000"
     volumes:
       # Mount state directory for persistence
-      - ./web_ui/state:/app/web_ui/state
+      - ./apps/web/state:/app/apps/web/state
       # Mount output directories
       - ./generated_images:/app/generated_images
       - ./datasets:/app/datasets
@@ -36,7 +36,7 @@ services:
 
     restart: unless-stopped
 
-    command: python3 -m web_ui.app --mode=dataset
+    command: python3 -m apps.web --mode=dataset
 
 networks:
   default:

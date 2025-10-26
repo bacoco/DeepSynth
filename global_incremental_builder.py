@@ -9,7 +9,12 @@ import os
 from pathlib import Path
 from datasets import load_dataset
 from huggingface_hub import login, whoami, HfApi
-from data.text_to_image import TextToImageConverter
+try:
+    from deepsynth.data.text_to_image import TextToImageConverter
+except ModuleNotFoundError as exc:  # pragma: no cover - environment guard
+    raise RuntimeError(
+        "deepsynth package not found. Set PYTHONPATH=src or install the project."
+    ) from exc
 from mlsum_loader import MLSUMLoader
 from hf_shard_uploader import HubShardManager
 

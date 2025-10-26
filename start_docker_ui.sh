@@ -52,10 +52,12 @@ fi
 
 echo ""
 echo "Creating necessary directories..."
-mkdir -p web_ui/state web_ui/state/hashes
+mkdir -p apps/web/state apps/web/state/hashes
 mkdir -p generated_images
 mkdir -p trained_model
 mkdir -p logs
+
+export PYTHONPATH="${PYTHONPATH}:$(pwd)/src"
 
 echo ""
 echo "Building Docker image..."

@@ -244,7 +244,7 @@ Comparison to SOTA:
 ### Compare Against Baselines
 
 ```python
-from evaluation.benchmarks import BENCHMARKS
+from deepsynth.evaluation.benchmarks import BENCHMARKS
 
 # Get baseline scores
 baseline = BENCHMARKS["cnn_dailymail"].typical_scores
@@ -269,7 +269,7 @@ for metric, score in your_scores.items():
 predictions, references = model_evaluator.evaluate_dataset(dataset)
 
 # Find worst examples
-from evaluation.benchmarks import SummarizationEvaluator
+from deepsynth.evaluation.benchmarks import SummarizationEvaluator
 evaluator = SummarizationEvaluator()
 
 errors = []

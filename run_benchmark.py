@@ -22,7 +22,7 @@ except ImportError:
     print("Error: transformers required. Install with: pip install transformers")
     sys.exit(1)
 
-from evaluation.benchmarks import (
+from deepsynth.evaluation.benchmarks import (
     BENCHMARKS,
     SummarizationEvaluator,
     load_benchmark,

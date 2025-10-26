@@ -1,17 +1,23 @@
 #!/usr/bin/env python3
-"""
-Script de lancement principal pour le traitement parallèle des datasets
-"""
+"""Script de lancement principal pour le traitement parallèle des datasets."""
 
 import sys
-import os
+from typing import Callable
 
-# Ajouter le répertoire du projet au path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# Importer et lancer le script principal
-from parallel_processing.run_parallel_datasets import main
+def _load_entrypoint() -> Callable[[], int]:
+    """Import the parallel processing entrypoint with a helpful error message."""
+
+    try:
+        from deepsynth.parallel_processing.run_parallel_datasets import main
+    except ModuleNotFoundError as exc:  # pragma: no cover - import guard
+        raise SystemExit(
+            "Unable to import 'deepsynth.parallel_processing'. "
+            "Set PYTHONPATH=src or install the project in editable mode."
+        ) from exc
+
+    return main
+
 
 if __name__ == "__main__":
-    exit_code = main()
-    sys.exit(exit_code)
+    sys.exit(_load_entrypoint()())

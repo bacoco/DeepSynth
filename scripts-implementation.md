@@ -78,7 +78,7 @@ huggingface-cli login
 echo "✅ Setup complete! Activate environment with: source venv/bin/activate"
 ```
 
-### 2. Text-to-Image Converter (`data/text_to_image.py`)
+### 2. Text-to-Image Converter (`apps/web/ui/../??`)
 
 ```python
 """
@@ -360,7 +360,7 @@ import argparse
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-from data.dataset_loader import create_dataloaders
+from deepsynth.data.dataset_loader import create_dataloaders
 
 @dataclass
 class ModelArguments:
@@ -628,7 +628,7 @@ from transformers import AutoModel, AutoTokenizer
 from PIL import Image
 import argparse
 import os
-from data.text_to_image import TextToImageConverter
+from deepsynth.data.text_to_image import TextToImageConverter
 
 class DeepSynthSummarizer:
     def __init__(self, model_path: str, device: str = "auto"):

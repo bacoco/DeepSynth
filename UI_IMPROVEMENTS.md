@@ -11,7 +11,7 @@ The web UI has been enhanced with advanced fine-tuning controls based on the lat
 Choose between three trainer types based on your needs:
 
 #### ⭐ Production Trainer (Recommended)
-- **File**: `training/deepsynth_trainer_v2.py` - `ProductionDeepSynthTrainer`
+- **File**: `src/deepsynth/training/deepsynth_trainer_v2.py` - `ProductionDeepSynthTrainer`
 - **Architecture**: Frozen encoder (380M params) + Fine-tuned MoE decoder (570M params)
 - **Features**:
   - Expert Gradient Dropout
@@ -22,7 +22,7 @@ Choose between three trainer types based on your needs:
 - **Use Case**: Production-grade models with best quality
 
 #### 🎯 DeepSynth Trainer
-- **File**: `training/deepsynth_trainer.py` - `DeepSynthOCRTrainer`
+- **File**: `src/deepsynth/training/deepsynth_trainer.py` - `DeepSynthOCRTrainer`
 - **Architecture**: Same frozen architecture without advanced dropout
 - **Features**:
   - Basic frozen encoder setup
@@ -31,7 +31,7 @@ Choose between three trainer types based on your needs:
 - **Use Case**: Experiments and prototyping
 
 #### 📝 Generic Trainer
-- **File**: `training/trainer.py` - `SummarizationTrainer`
+- **File**: `src/deepsynth/training/trainer.py` - `SummarizationTrainer`
 - **Architecture**: Full model trainable
 - **Features**:
   - Standard seq2seq fine-tuning
@@ -205,11 +205,11 @@ The `/api/model/train` endpoint now accepts additional parameters:
 
 ## Files Modified
 
-- **web_ui/templates/index_improved.html**: Enhanced UI with trainer selection and MoE controls
-- **web_ui/dataset_generator_improved.py**: Multi-trainer support with parameter passing
-- **web_ui/app.py**: Updated to use improved components
-- **training/config.py**: Already included new dropout parameters
-- **training/deepsynth_trainer_v2.py**: Already implemented MoE dropout strategies
+- **apps/web/ui/templates/index_improved.html**: Enhanced UI with trainer selection and MoE controls
+- **apps/web/ui/dataset_generator_improved.py**: Multi-trainer support with parameter passing
+- **apps/web/ui/app.py**: Updated to use improved components
+- **src/deepsynth/training/config.py**: Already included new dropout parameters
+- **src/deepsynth/training/deepsynth_trainer_v2.py**: Already implemented MoE dropout strategies
 
 ## Troubleshooting
 
@@ -233,8 +233,8 @@ The `/api/model/train` endpoint now accepts additional parameters:
 ## References
 
 - **DeepSeek-OCR Paper**: https://arxiv.org/abs/2510.18234
-- **MoE Dropout Implementation**: `training/moe_dropout.py`
-- **Production Trainer**: `training/deepsynth_trainer_v2.py`
+- **MoE Dropout Implementation**: `src/deepsynth/training/moe_dropout.py`
+- **Production Trainer**: `src/deepsynth/training/deepsynth_trainer_v2.py`
 
 ## Support
 

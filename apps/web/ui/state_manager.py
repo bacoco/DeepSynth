@@ -8,7 +8,7 @@ import os
 import hashlib
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Union
 from dataclasses import dataclass, asdict
 from enum import Enum
 
@@ -62,8 +62,9 @@ class JobState:
 class StateManager:
     """Manages job state persistence and recovery."""
 
-    def __init__(self, state_dir: str = "./web_ui/state"):
-        self.state_dir = Path(state_dir)
+    def __init__(self, state_dir: Union[str, os.PathLike] = None):
+        default_state_dir = Path(__file__).resolve().parent / "state"
+        self.state_dir = Path(state_dir) if state_dir else default_state_dir
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self.jobs_file = self.state_dir / "jobs.json"
         self.hashes_dir = self.state_dir / "hashes"

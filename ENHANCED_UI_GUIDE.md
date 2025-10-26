@@ -304,14 +304,19 @@ deepseek-synthesia/
 ├── docker-compose.gpu.yml      # GPU (model training)
 ├── Dockerfile.cpu              # CPU-only image
 ├── Dockerfile                  # GPU image
-├── web_ui/
-│   ├── app.py                  # Flask app with new endpoints
-│   └── templates/
-│       └── index_enhanced.html # Enhanced UI
-├── training/
-│   └── optimal_configs.py      # Optimal hyperparameters
-└── evaluation/
-    └── training_metrics.py     # Comprehensive metrics
+├── apps/
+│   └── web/
+│       ├── config.py           # App + job manager config
+│       └── ui/
+│           ├── app.py          # Flask app with new endpoints
+│           └── templates/
+│               └── index_enhanced.html # Enhanced UI
+└── src/
+    └── deepsynth/
+        ├── training/
+        │   └── optimal_configs.py      # Optimal hyperparameters
+        └── evaluation/
+            └── training_metrics.py     # Comprehensive metrics
 ```
 
 ---
@@ -418,7 +423,7 @@ python -m evaluation.evaluate \
 Extend `training_metrics.py` to track custom metrics:
 
 ```python
-from evaluation.training_metrics import MetricsTracker
+from deepsynth.evaluation.training_metrics import MetricsTracker
 
 tracker = MetricsTracker(output_dir="./my_metrics")
 

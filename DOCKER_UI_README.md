@@ -58,6 +58,15 @@ docker-compose logs -f
 4. **Access the UI**:
 Open your browser to: **http://localhost:5000**
 
+### Local development (without Docker)
+
+Run the Flask application directly from the repository root:
+
+```bash
+export PYTHONPATH="$(pwd)/src:${PYTHONPATH}"
+python -m apps.web
+```
+
 ---
 
 ## Using the Web Interface
@@ -130,7 +139,7 @@ Auto-refreshes every 5 seconds when active.
 
 ### How It Works
 
-1. **State Persistence**: All job state is saved to `./web_ui/state/`
+1. **State Persistence**: All job state is saved to `./apps/web/state/`
 2. **Hash Tracking**: Each processed sample is hashed (SHA256)
 3. **Duplicate Detection**: New samples are checked against processed hashes
 4. **Incremental Upload**: Datasets are uploaded to HuggingFace every 100 samples
@@ -206,18 +215,27 @@ docker rmi deepsynth-ui
 
 ```
 deepseek-synthesia/
-├── web_ui/
-│   ├── app.py                    # Flask backend
-│   ├── state_manager.py          # Job state management
-│   ├── dataset_generator.py      # Dataset generation logic
-│   ├── templates/
-│   │   └── index.html            # Web UI
-│   ├── static/
-│   │   ├── styles.css            # Styling
-│   │   └── script.js             # Frontend logic
-│   └── state/                    # Job state (persisted)
-│       ├── jobs.json
-│       └── hashes/
+├── apps/
+│   ├── __init__.py
+│   └── web/
+│       ├── __init__.py
+│       ├── __main__.py
+│       ├── config.py             # Flask & job manager configuration
+│       ├── state/                # Job state (persisted)
+│       │   └── hashes/
+│       └── ui/
+│           ├── __init__.py
+│           ├── app.py            # Flask application factory
+│           ├── dataset_generator.py
+│           ├── dataset_generator_improved.py
+│           ├── state_manager.py
+│           ├── static/
+│           │   ├── styles.css
+│           │   └── script.js
+│           └── templates/
+│               ├── index.html
+│               ├── index_enhanced.html
+│               └── index_improved.html
 ├── generated_images/             # Generated PNG images (volume)
 ├── trained_model/                # Trained models (volume)
 ├── logs/                         # Application logs (volume)

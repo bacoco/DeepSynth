@@ -2,7 +2,7 @@
 
 ## 🚀 API Server Flask
 
-### `inference/api_server.py`
+### `src/deepsynth/inference/api_server.py`
 
 ```python
 """
@@ -331,7 +331,7 @@ RUN mkdir -p /app/models /app/temp
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV MODEL_PATH=/app/models
-ENV FLASK_APP=inference/api_server.py
+ENV FLASK_APP=deepsynth.inference.api_server
 ENV FLASK_ENV=production
 
 # Expose port
@@ -342,7 +342,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s \
     CMD curl -f http://localhost:5000/health || exit 1
 
 # Start server
-CMD ["python", "inference/api_server.py", "--host", "0.0.0.0", "--port", "5000"]
+CMD ["python", "-m", "deepsynth.inference.api_server", "--host", "0.0.0.0", "--port", "5000"]
 ```
 
 ### `docker-compose.yml`

@@ -4,15 +4,17 @@ Test de la logique de parallélisation
 Teste avec un petit nombre d'échantillons pour vérifier que tout fonctionne
 """
 
-import os
-import sys
 import time
 import logging
 
-# Ajouter le répertoire parent au path pour les imports
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from parallel_processing.parallel_datasets_builder import ParallelDatasetsBuilder
+try:
+    from deepsynth.parallel_processing.parallel_datasets_builder import (
+        ParallelDatasetsBuilder,
+    )
+except ModuleNotFoundError as exc:  # pragma: no cover - environment guard
+    raise RuntimeError(
+        "deepsynth package not found. Set PYTHONPATH=src or install the project."
+    ) from exc
 
 # Configuration du logging pour le test
 logging.basicConfig(

@@ -7,7 +7,7 @@ This script implements the full PRD workflow:
 4. Dataset is ready for training with DeepSynthOCRTrainer
 
 Usage:
-    python -m data.prepare_and_publish \
+    python -m deepsynth.data.prepare_and_publish \
         --dataset ccdv/cnn_dailymail \
         --subset 3.0.0 \
         --hub-repo username/cnn-dailymail-images \
