@@ -252,6 +252,26 @@ class IncrementalBuilder:
 
         print(f"📊 {len(samples)} échantillons total")
 
+        seen_keys = set()
+        unique_samples = []
+        duplicates = 0
+        for sample in samples:
+            key = (
+                sample.get('source_dataset'),
+                sample.get('original_split'),
+                sample.get('original_index'),
+            )
+            if key in seen_keys:
+                duplicates += 1
+                continue
+            seen_keys.add(key)
+            unique_samples.append(sample)
+
+        if duplicates:
+            print(f"⚖️  {duplicates} doublons supprimés avant la création du dataset final")
+
+        samples = unique_samples
+
         # Créer dataset
         dataset = Dataset.from_dict({
             'text': [s['text'] for s in samples],

@@ -6,12 +6,12 @@ and enable seamless continuation from any machine.
 """
 
 import os
-import json
 from pathlib import Path
-from datasets import Dataset, DatasetDict, load_dataset
+from datasets import load_dataset
 from huggingface_hub import login, whoami, HfApi
 from data.text_to_image import TextToImageConverter
 from mlsum_loader import MLSUMLoader
+from hf_shard_uploader import HubShardManager
 
 # Load environment variables
 env_file = Path('.env')
@@ -61,55 +61,38 @@ class GlobalIncrementalBuilder:
         ]
 
     def get_global_progress(self):
-        """Get progress from HuggingFace dataset metadata"""
-        try:
-            # Try to load existing dataset
-            existing_dataset = load_dataset(self.dataset_name, token=self.hf_token)
+        """Load global progress from the shard index metadata."""
 
-            # Check if progress metadata exists in dataset
-            if hasattr(existing_dataset, 'info') and existing_dataset.info.description:
-                try:
-                    progress = json.loads(existing_dataset.info.description)
-                    if 'global_progress' in progress:
-                        print(f"📊 Loaded global progress: {progress['global_progress']}")
-                        return progress['global_progress']
-                except:
-                    pass
+        metadata = self.shard_manager.index.get('metadata', {})
+        progress = metadata.get('global_progress')
 
-            # Count existing samples to determine progress
-            total_samples = len(existing_dataset['train'])
-            print(f"📊 Found {total_samples} existing samples in dataset")
+        if progress:
+            print(f"📊 Loaded global progress from shard index: {progress}")
+            return progress
 
-            # Determine which datasets are complete based on sample count
-            completed_datasets = []
-            remaining_samples = total_samples
+        total_samples = sum(entry.get('num_samples', 0) for entry in self.shard_manager.index.get('shards', []))
+        print(f"📊 No stored progress metadata found. Reconstructing from shard index ({total_samples} samples)")
 
-            for source in self.sources:
-                name, subset, _, _, expected_count, *rest = source
-                dataset_key = f"{name}_{subset}" if subset else name
-                if remaining_samples >= expected_count:
-                    completed_datasets.append(dataset_key)
-                    remaining_samples -= expected_count
-                    print(f"  ✅ {dataset_key}: Complete ({expected_count} samples)")
-                else:
-                    print(f"  🔄 {dataset_key}: Partial ({remaining_samples}/{expected_count} samples)")
-                    break
+        completed_datasets = []
+        remaining_samples = total_samples
 
-            return {
-                'completed_datasets': completed_datasets,
-                'current_dataset': None,
-                'current_index': remaining_samples,
-                'total_samples': total_samples
-            }
+        for source in self.sources:
+            name, subset, _, _, expected_count, *rest = source
+            dataset_key = f"{name}_{subset}" if subset else name
+            if remaining_samples >= expected_count:
+                completed_datasets.append(dataset_key)
+                remaining_samples -= expected_count
+                print(f"  ✅ {dataset_key}: Complete ({expected_count} samples)")
+            else:
+                print(f"  🔄 {dataset_key}: Partial ({remaining_samples}/{expected_count} samples)")
+                break
 
-        except Exception as e:
-            print(f"📝 No existing dataset found, starting fresh: {e}")
-            return {
-                'completed_datasets': [],
-                'current_dataset': None,
-                'current_index': 0,
-                'total_samples': 0
-            }
+        return {
+            'completed_datasets': completed_datasets,
+            'current_dataset': None,
+            'current_index': remaining_samples,
+            'total_samples': total_samples
+        }
 
     def save_global_progress(self, progress):
         """Save progress to HuggingFace dataset metadata"""
@@ -124,9 +107,34 @@ class GlobalIncrementalBuilder:
             # Update dataset card with progress
             card_content = f"""# DeepSynth Multilingual Summarization Dataset
 
+## Storage Layout
+- Data is stored as independent shards under `data/`.
+- The file `{self.shard_manager.index_path}` lists every shard along with the `(source_dataset, original_index)` pairs they contain.
+- Use the repository script `scripts/check_shards_duplicates.py` to stream shards locally and verify integrity.
+
+### Loading example
+```python
+import json
+from pathlib import Path
+from huggingface_hub import hf_hub_download, snapshot_download
+from datasets import load_from_disk
+
+repo_id = "{self.dataset_name}"
+index_path = hf_hub_download(repo_id, filename="{self.shard_manager.index_path}", repo_type="dataset")
+
+with open(index_path, "r", encoding="utf-8") as handle:
+    index = json.load(handle)
+
+for shard in index["shards"]:
+    repo_dir = snapshot_download(repo_id, repo_type="dataset", allow_patterns=[f"{shard['path']}/*"])
+    dataset = load_from_disk(Path(repo_dir) / shard["path"])
+    for row in dataset["train"]:
+        ...  # consume the samples
+```
+
 ## Progress Status
 - **Total Samples**: {progress['total_samples']:,}
-- **Completed Datasets**: {', '.join(progress['completed_datasets'])}
+- **Completed Datasets**: {', '.join(progress['completed_datasets']) or 'None'}
 - **Current Dataset**: {progress.get('current_dataset', 'None')}
 - **Current Index**: {progress['current_index']:,}
 
@@ -146,6 +154,9 @@ class GlobalIncrementalBuilder:
             )
 
             print(f"💾 Saved global progress: {progress['total_samples']} samples")
+
+            # Persist the shard index metadata update
+            self.shard_manager.save_index(commit_message="Update shard index metadata")
 
         except Exception as e:
             print(f"⚠ Failed to save progress metadata: {e}")
@@ -238,12 +249,12 @@ class GlobalIncrementalBuilder:
             # Upload batch when ready
             if len(batch_samples) >= batch_size:
                 print(f"🚀 Uploading batch: {len(batch_samples)} samples (Memory efficient)")
-                success = self.upload_batch_append(batch_samples)
-                if success:
+                uploaded_count = self.upload_batch_append(batch_samples)
+                if uploaded_count is not None:
                     # Update progress
                     progress['current_dataset'] = dataset_key
                     progress['current_index'] = idx + 1
-                    progress['total_samples'] += len(batch_samples)
+                    progress['total_samples'] += uploaded_count
                     self.save_global_progress(progress)
 
                     # Clear batch to free memory
@@ -257,15 +268,30 @@ class GlobalIncrementalBuilder:
                     print(f"❌ Upload failed, stopping at index {idx}")
                     return False
 
+                # Update progress
+                progress['current_dataset'] = dataset_key
+                progress['current_index'] = idx + 1
+                progress['total_samples'] += uploaded
+                self.save_global_progress(progress)
+
+                # Clear batch to free memory
+                batch_samples.clear()
+                print(f"📈 Progress: {idx + 1:,}/{target_limit:,} ({(idx + 1)/target_limit*100:.1f}%) - {progress['total_samples']:,} total samples")
+
+                # Force garbage collection for memory efficiency
+                import gc
+                gc.collect()
+
             # Progress reporting every 1000 samples
             if (idx + 1) % 1000 == 0:
                 print(f"  📊 Processed {idx + 1:,}/{target_limit:,} samples ({len(batch_samples)} in current batch)")
 
         # Upload remaining samples
         if batch_samples:
-            success = self.upload_batch_append(batch_samples)
-            if success:
-                progress['total_samples'] += len(batch_samples)
+            uploaded_count = self.upload_batch_append(batch_samples)
+            if uploaded_count is None:
+                return False
+            progress['total_samples'] += uploaded_count
 
         # Mark dataset as completed
         if dataset_key not in progress['completed_datasets']:
@@ -277,50 +303,128 @@ class GlobalIncrementalBuilder:
         print(f"✅ {dataset_key} completed!")
         return True
 
+    def load_index_registry(self):
+        if self.index_registry is not None:
+            return self.index_registry
+
+        try:
+            registry_path = hf_hub_download(
+                repo_id=self.dataset_name,
+                repo_type="dataset",
+                filename="metadata/index_registry.json",
+                token=self.hf_token,
+            )
+            with open(registry_path, 'r') as f:
+                raw_registry = json.load(f)
+
+            self.index_registry = {}
+            for source, splits in raw_registry.items():
+                self.index_registry[source] = {}
+                for split, max_index in splits.items():
+                    try:
+                        self.index_registry[source][split] = int(max_index)
+                    except (TypeError, ValueError):
+                        self.index_registry[source][split] = -1
+        except Exception:
+            self.index_registry = {}
+
+        return self.index_registry
+
+    def persist_index_registry(self, commit_message):
+        if self.index_registry is None:
+            return
+
+        metadata_dir = Path("./global_metadata")
+        metadata_dir.mkdir(exist_ok=True)
+        local_path = metadata_dir / "index_registry.json"
+        with open(local_path, 'w') as f:
+            json.dump(self.index_registry, f, indent=2, sort_keys=True)
+
+        self.api.upload_file(
+            path_or_fileobj=str(local_path),
+            path_in_repo="metadata/index_registry.json",
+            repo_id=self.dataset_name,
+            repo_type="dataset",
+            token=self.hf_token,
+            commit_message=commit_message,
+        )
+
+    def filter_duplicates(self, batch_samples):
+        registry = self.load_index_registry()
+        filtered = []
+        seen = set()
+        skipped = 0
+        updates = {}
+
+        for sample in batch_samples:
+            source = sample.get('source_dataset')
+            split = sample.get('original_split', 'train') or 'train'
+            index = sample.get('original_index')
+
+            if source is None or index is None:
+                filtered.append(sample)
+                continue
+
+            try:
+                index = int(index)
+            except (TypeError, ValueError):
+                filtered.append(sample)
+                continue
+
+            key = (source, split, index)
+            if key in seen:
+                skipped += 1
+                continue
+            seen.add(key)
+
+            existing_max = registry.get(source, {}).get(split, -1)
+            if index <= existing_max:
+                skipped += 1
+                continue
+
+            filtered.append(sample)
+            updates[(source, split)] = max(updates.get((source, split), existing_max), index)
+
+        for (source, split), max_index in updates.items():
+            registry.setdefault(source, {})
+            registry[source][split] = max(registry[source].get(split, -1), max_index)
+
+        if skipped:
+            print(f"⚖️  {skipped} duplicate samples skipped (already uploaded)")
+
+        return filtered
+
     def upload_batch_append(self, batch_samples):
-        """Upload batch and append to existing dataset"""
+        """Upload a batch as a new shard and update the shard index."""
+
         try:
             print(f"📤 Uploading batch of {len(batch_samples)} samples...")
-
-            # Create dataset from batch
-            new_dataset = Dataset.from_dict({
-                'text': [s['text'] for s in batch_samples],
-                'summary': [s['summary'] for s in batch_samples],
-                'image': [s['image'] for s in batch_samples],
-                'source_dataset': [s['source_dataset'] for s in batch_samples],
-                'original_split': [s['original_split'] for s in batch_samples],
-                'original_index': [s['original_index'] for s in batch_samples],
-            })
-
-            from datasets import Image as ImageFeature
-            new_dataset = new_dataset.cast_column("image", ImageFeature())
-
-            # Try to append to existing dataset
-            try:
-                existing_dataset = load_dataset(self.dataset_name, token=self.hf_token)
-                from datasets import concatenate_datasets
-                combined_dataset = concatenate_datasets([existing_dataset['train'], new_dataset])
-                final_dataset = DatasetDict({'train': combined_dataset})
-                print(f"✅ Appending to existing dataset: {len(existing_dataset['train'])} + {len(new_dataset)} = {len(combined_dataset)}")
-            except:
-                # First upload
-                final_dataset = DatasetDict({'train': new_dataset})
-                print(f"📝 Creating new dataset with {len(new_dataset)} samples")
-
-            # Upload
-            final_dataset.push_to_hub(
-                self.dataset_name,
-                private=False,
-                token=self.hf_token,
-                commit_message=f"Add {len(batch_samples)} samples"
+            shard_id = self.shard_manager.next_shard_id()
+            result = self.shard_manager.upload_samples_as_shard(
+                batch_samples,
+                shard_id=shard_id,
+                commit_message=f"Add shard {shard_id} from global builder",
             )
 
-            print(f"✅ Upload successful!")
-            return True
+            if result.index_updated:
+                self.shard_manager.save_index(
+                    commit_message=f"Update shard index with {shard_id}"
+                )
+
+            if result.uploaded_samples == 0:
+                print(
+                    f"ℹ️ Shard {shard_id} only contained duplicates ({result.skipped_duplicates} skipped)."
+                )
+            else:
+                print(
+                    f"✅ Upload successful: {result.uploaded_samples} new samples in {shard_id}"
+                )
+
+            return result.uploaded_samples
 
         except Exception as e:
             print(f"❌ Upload failed: {e}")
-            return False
+            return None
 
     def run_complete_pipeline(self):
         """Run the complete multilingual pipeline"""
