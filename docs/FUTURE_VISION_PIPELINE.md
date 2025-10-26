@@ -24,7 +24,7 @@ Ce document récapitule des axes d'évolution imaginés autour du pipeline DeepS
 
 ## Étapes ultérieures suggérées
 1. **Prototyper l'extraction d'embeddings** en instrumentant l'encodeur vision pour exposer les sorties intermédiaires (patch embeddings, CLS) et évaluer la compression.
-2. **Valider la pertinence retrieval** sur un corpus interne (documents longs, formulaires) en comparant rappel/precision entre la recherche texte et la recherche sur embeddings visuels.
+2. **Valider la pertinence de la recherche** sur un corpus interne (documents longs, formulaires) en comparant rappel/précision entre la recherche texte et la recherche sur embeddings visuels.
 3. **Adapter le décodeur** pour supporter la génération conditionnelle à partir d'un lot d'embeddings (concaténation contextuelle) et mesurer la latence.
 4. **Industrialiser le stockage** (FAISS, Milvus, Weaviate) avec chiffrement et politiques de rétention pour respecter les contraintes compliance.
 5. **Documenter les coûts** (CPU pour rasterisation, GPU pour indexation, stockage) afin de déterminer les cas où la solution visuelle devient plus compétitive qu'une pipeline NLP classique.
