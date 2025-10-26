@@ -9,7 +9,7 @@ import os
 import json
 from pathlib import Path
 from datasets import Dataset, DatasetDict, load_dataset
-from huggingface_hub import login, whoami, HfApi
+from huggingface_hub import login, whoami, HfApi, hf_hub_download
 from data.text_to_image import TextToImageConverter
 from mlsum_loader import MLSUMLoader
 
@@ -30,6 +30,7 @@ class GlobalIncrementalBuilder:
         self.username = whoami()['name']
         self.api = HfApi()
         self.dataset_name = f"{self.username}/deepseek-vision-complete"
+        self.index_registry = None
 
         # Text-to-image converter
         unicode_font_path = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
@@ -238,24 +239,24 @@ class GlobalIncrementalBuilder:
             # Upload batch when ready
             if len(batch_samples) >= batch_size:
                 print(f"🚀 Uploading batch: {len(batch_samples)} samples (Memory efficient)")
-                success = self.upload_batch_append(batch_samples)
-                if success:
-                    # Update progress
-                    progress['current_dataset'] = dataset_key
-                    progress['current_index'] = idx + 1
-                    progress['total_samples'] += len(batch_samples)
-                    self.save_global_progress(progress)
-
-                    # Clear batch to free memory
-                    batch_samples.clear()
-                    print(f"📈 Progress: {idx + 1:,}/{target_limit:,} ({(idx + 1)/target_limit*100:.1f}%) - {progress['total_samples']:,} total samples")
-
-                    # Force garbage collection for memory efficiency
-                    import gc
-                    gc.collect()
-                else:
+                uploaded = self.upload_batch_append(batch_samples)
+                if uploaded is None:
                     print(f"❌ Upload failed, stopping at index {idx}")
                     return False
+
+                # Update progress
+                progress['current_dataset'] = dataset_key
+                progress['current_index'] = idx + 1
+                progress['total_samples'] += uploaded
+                self.save_global_progress(progress)
+
+                # Clear batch to free memory
+                batch_samples.clear()
+                print(f"📈 Progress: {idx + 1:,}/{target_limit:,} ({(idx + 1)/target_limit*100:.1f}%) - {progress['total_samples']:,} total samples")
+
+                # Force garbage collection for memory efficiency
+                import gc
+                gc.collect()
 
             # Progress reporting every 1000 samples
             if (idx + 1) % 1000 == 0:
@@ -263,9 +264,10 @@ class GlobalIncrementalBuilder:
 
         # Upload remaining samples
         if batch_samples:
-            success = self.upload_batch_append(batch_samples)
-            if success:
-                progress['total_samples'] += len(batch_samples)
+            uploaded = self.upload_batch_append(batch_samples)
+            if uploaded is None:
+                return False
+            progress['total_samples'] += uploaded
 
         # Mark dataset as completed
         if dataset_key not in progress['completed_datasets']:
@@ -277,10 +279,107 @@ class GlobalIncrementalBuilder:
         print(f"✅ {dataset_key} completed!")
         return True
 
+    def load_index_registry(self):
+        if self.index_registry is not None:
+            return self.index_registry
+
+        try:
+            registry_path = hf_hub_download(
+                repo_id=self.dataset_name,
+                repo_type="dataset",
+                filename="metadata/index_registry.json",
+                token=self.hf_token,
+            )
+            with open(registry_path, 'r') as f:
+                raw_registry = json.load(f)
+
+            self.index_registry = {}
+            for source, splits in raw_registry.items():
+                self.index_registry[source] = {}
+                for split, max_index in splits.items():
+                    try:
+                        self.index_registry[source][split] = int(max_index)
+                    except (TypeError, ValueError):
+                        self.index_registry[source][split] = -1
+        except Exception:
+            self.index_registry = {}
+
+        return self.index_registry
+
+    def persist_index_registry(self, commit_message):
+        if self.index_registry is None:
+            return
+
+        metadata_dir = Path("./global_metadata")
+        metadata_dir.mkdir(exist_ok=True)
+        local_path = metadata_dir / "index_registry.json"
+        with open(local_path, 'w') as f:
+            json.dump(self.index_registry, f, indent=2, sort_keys=True)
+
+        self.api.upload_file(
+            path_or_fileobj=str(local_path),
+            path_in_repo="metadata/index_registry.json",
+            repo_id=self.dataset_name,
+            repo_type="dataset",
+            token=self.hf_token,
+            commit_message=commit_message,
+        )
+
+    def filter_duplicates(self, batch_samples):
+        registry = self.load_index_registry()
+        filtered = []
+        seen = set()
+        skipped = 0
+        updates = {}
+
+        for sample in batch_samples:
+            source = sample.get('source_dataset')
+            split = sample.get('original_split', 'train') or 'train'
+            index = sample.get('original_index')
+
+            if source is None or index is None:
+                filtered.append(sample)
+                continue
+
+            try:
+                index = int(index)
+            except (TypeError, ValueError):
+                filtered.append(sample)
+                continue
+
+            key = (source, split, index)
+            if key in seen:
+                skipped += 1
+                continue
+            seen.add(key)
+
+            existing_max = registry.get(source, {}).get(split, -1)
+            if index <= existing_max:
+                skipped += 1
+                continue
+
+            filtered.append(sample)
+            updates[(source, split)] = max(updates.get((source, split), existing_max), index)
+
+        for (source, split), max_index in updates.items():
+            registry.setdefault(source, {})
+            registry[source][split] = max(registry[source].get(split, -1), max_index)
+
+        if skipped:
+            print(f"⚖️  {skipped} duplicate samples skipped (already uploaded)")
+
+        return filtered
+
     def upload_batch_append(self, batch_samples):
         """Upload batch and append to existing dataset"""
         try:
             print(f"📤 Uploading batch of {len(batch_samples)} samples...")
+
+            batch_samples = self.filter_duplicates(batch_samples)
+
+            if not batch_samples:
+                print("ℹ️  Batch contained only duplicates; nothing to upload")
+                return 0
 
             # Create dataset from batch
             new_dataset = Dataset.from_dict({
@@ -302,7 +401,7 @@ class GlobalIncrementalBuilder:
                 combined_dataset = concatenate_datasets([existing_dataset['train'], new_dataset])
                 final_dataset = DatasetDict({'train': combined_dataset})
                 print(f"✅ Appending to existing dataset: {len(existing_dataset['train'])} + {len(new_dataset)} = {len(combined_dataset)}")
-            except:
+            except Exception:
                 # First upload
                 final_dataset = DatasetDict({'train': new_dataset})
                 print(f"📝 Creating new dataset with {len(new_dataset)} samples")
@@ -316,11 +415,14 @@ class GlobalIncrementalBuilder:
             )
 
             print(f"✅ Upload successful!")
-            return True
+            self.persist_index_registry(
+                commit_message=f"Update registry after adding {len(batch_samples)} samples"
+            )
+            return len(batch_samples)
 
         except Exception as e:
             print(f"❌ Upload failed: {e}")
-            return False
+            return None
 
     def run_complete_pipeline(self):
         """Run the complete multilingual pipeline"""
