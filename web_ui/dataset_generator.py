@@ -21,7 +21,7 @@ SRC_DIR = PROJECT_ROOT / "src"
 if SRC_DIR.exists() and str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from data.text_to_image import TextToImageConverter
+from deepsynth.data.transforms import TextToImageConverter
 from web_ui.state_manager import StateManager, JobStatus
 from deepsynth.training.config import OptimizerConfig, TrainerConfig
 

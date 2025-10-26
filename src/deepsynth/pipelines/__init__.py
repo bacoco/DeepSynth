@@ -1,4 +1,4 @@
-"""DeepSynth pipelines package."""
+"""Pipelines orchestrating DeepSynth data and training workflows."""
 
 from .incremental import IncrementalPipeline, run_incremental_pipeline
 from .global_state import GlobalIncrementalPipeline, run_global_incremental_pipeline
