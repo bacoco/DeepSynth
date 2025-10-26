@@ -80,6 +80,17 @@ echo "  • Vous pouvez interrompre (Ctrl+C) et reprendre plus tard"
 echo "  • Les datasets seront visibles sur HuggingFace au fur et à mesure"
 echo "  • Les logs détaillés sont dans 'parallel_datasets.log'"
 echo ""
+
+# Nettoyer les anciens work directories de test
+echo "🧹 Nettoyage des anciens work directories de test..."
+if ls work_separate* work_* 2>/dev/null | grep -q .; then
+    rm -rf work_separate* work_* 2>/dev/null || true
+    echo "✅ Anciens work directories supprimés"
+else
+    echo "✅ Aucun ancien work directory à nettoyer"
+fi
+
+echo ""
 echo "🚀 DÉMARRAGE DU TRAITEMENT..."
 echo "============================================================="
 echo ""
