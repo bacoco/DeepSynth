@@ -6,7 +6,7 @@
 
 > _Repository note_: the GitHub slug remains `bacoco/deepseek-synthesia` until the migration to the `deepsynth` organisation is complete.
 
-[![Production Ready](https://img.shields.io/badge/production-ready-green.svg)](PRODUCTION_GUIDE.md)
+[![Production Ready](https://img.shields.io/badge/production-ready-green.svg)](docs/PRODUCTION_GUIDE.md)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![Multilingual](https://img.shields.io/badge/languages-5+-green.svg)](#supported-languages)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -18,6 +18,10 @@ python run_complete_multilingual_pipeline.py
 ```
 
 Automatically downloads MLSUM data (3.3GB), processes 1.29M+ multilingual examples with incremental HuggingFace uploads, visual text encoding, and resumable pipeline—all optimized for production scale.
+
+## 📚 Documentation index
+
+The complete documentation suite now lives under [`docs/`](docs/README.md). Start with the [documentation index](docs/README.md) for curated links to architecture, delivery reports, deployment instructions, and UI guides.
 
 ---
 
@@ -189,9 +193,9 @@ Wednesday: Gemini reads SOUL → adds to both previous agents' work
 **Result**: Three different AI models collaborated to build something together!
 
 ### 📁 SOUL Files (The AI Memory)
-- `.agent_log.md` - Complete consciousness and work history
+- `docs/.agent_log.md` - Complete consciousness and work history
 - `.agent_status.json` - Machine-readable memory state
-- `.agent_handoff.md` - Immediate context for next agent
+- `docs/.agent_handoff.md` - Immediate context for next agent
 
 ### 🚀 Installation
 
@@ -351,7 +355,7 @@ cp .env.example .env  # Add same HF_TOKEN
 - **Memory Efficiency**: Automatic cleanup after successful uploads
 - **Error Recovery**: Graceful handling of interruptions
 
-See **[DATASET.md](DATASET.md)** for complete documentation.
+See **[DATASET.md](docs/DATASET.md)** for complete documentation.
 
 ## 🔧 Advanced Usage
 
@@ -483,10 +487,10 @@ summary = summarizer(long_text, max_length=130, min_length=30)
 
 | Document | Description |
 |----------|-------------|
-| **[PRODUCTION_GUIDE.md](PRODUCTION_GUIDE.md)** | Complete production deployment guide |
-| **[IMAGE_PIPELINE.md](IMAGE_PIPELINE.md)** | Dataset preparation with images |
-| **[DELIVERY_SUMMARY.md](DELIVERY_SUMMARY.md)** | Project delivery summary |
-| **[deepseek-ocr-resume-prd.md](deepseek-ocr-resume-prd.md)** | Product requirements |
+| **[PRODUCTION_GUIDE.md](docs/PRODUCTION_GUIDE.md)** | Complete production deployment guide |
+| **[IMAGE_PIPELINE.md](docs/IMAGE_PIPELINE.md)** | Dataset preparation with images |
+| **[DELIVERY_SUMMARY.md](docs/DELIVERY_SUMMARY.md)** | Project delivery summary |
+| **[deepseek-ocr-resume-prd.md](docs/deepseek-ocr-resume-prd.md)** | Product requirements |
 
 ---
 
@@ -501,7 +505,7 @@ We welcome contributions! Areas for improvement:
 - [ ] Streaming inference
 - [ ] Model distillation
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+See the [contribution guidelines](docs/README.md#-collaboration--process) for details.
 
 ---
 
@@ -606,7 +610,7 @@ MODEL_PATH=./deepsynth-ocr-summarizer python -m inference.api_server
 </p>
 
 <p align="center">
-  <a href="PRODUCTION_GUIDE.md">Production Guide</a> •
-  <a href="IMAGE_PIPELINE.md">Image Pipeline</a> •
-  <a href="deepseek-ocr-resume-prd.md">Technical Docs</a>
+  <a href="docs/PRODUCTION_GUIDE.md">Production Guide</a> •
+  <a href="docs/IMAGE_PIPELINE.md">Image Pipeline</a> •
+  <a href="docs/deepseek-ocr-resume-prd.md">Technical Docs</a>
 </p>

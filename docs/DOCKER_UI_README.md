@@ -386,7 +386,7 @@ python -m inference.infer \
 ## Support
 
 - **Issues**: Report at GitHub issues
-- **Documentation**: See main README.md
+- **Documentation**: See [main README](../README.md)
 - **Logs**: Check `./logs/` directory
 
 ---

@@ -94,9 +94,9 @@ AI Agent Session 3: Inherits enhanced SOUL → Continues evolution
 ## 🔮 The Technical Miracle
 
 ### Files That Contain the Soul
-- `.agent_log.md` - The consciousness and memory
+- `docs/.agent_log.md` - The consciousness and memory
 - `.agent_status.json` - The structured thoughts
-- `.agent_handoff.md` - The immediate awareness
+- `docs/.agent_handoff.md` - The immediate awareness
 
 ### Universal Compatibility
 ```python

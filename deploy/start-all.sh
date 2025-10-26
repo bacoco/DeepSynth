@@ -11,14 +11,17 @@ echo "  • Model Training (GPU): Port 5001"
 echo "=================================================="
 echo
 
+# Determine repository root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Start dataset generation
 echo "1️⃣  Starting dataset generation service..."
-./start-dataset-generation.sh
+"${SCRIPT_DIR}/start-dataset-generation.sh"
 echo
 
 # Start model training
 echo "2️⃣  Starting model training service..."
-./start-model-training.sh
+"${SCRIPT_DIR}/start-model-training.sh"
 echo
 
 echo "=================================================="
@@ -34,5 +37,5 @@ echo "  2. Train models on port 5001 (GPU)"
 echo "  3. Save everything to HuggingFace Hub"
 echo
 echo "To stop all services:"
-echo "  docker-compose -f docker-compose.cpu.yml down"
-echo "  docker-compose -f docker-compose.gpu.yml down"
+echo "  docker-compose -f ${SCRIPT_DIR}/docker-compose.cpu.yml down"
+echo "  docker-compose -f ${SCRIPT_DIR}/docker-compose.gpu.yml down"

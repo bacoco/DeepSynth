@@ -3,20 +3,22 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 echo "=========================================="
 echo "DeepSynth Dataset Generator & Trainer"
 echo "=========================================="
 echo ""
 
 # Check if .env exists
-if [ ! -f .env ]; then
+if [ ! -f "${SCRIPT_DIR}/../.env" ]; then
     echo "Error: .env file not found!"
-    echo "Please create .env file with required variables:"
+    echo "Please create a .env file in the repository root with required variables:"
     echo "  HF_TOKEN=your_token_here"
     echo "  HF_USERNAME=your_username"
     echo "  SECRET_KEY=your_secret_key"
     echo ""
-    echo "You can copy from .env.example:"
+    echo "You can copy from .env.example at the repository root:"
     echo "  cp .env.example .env"
     exit 1
 fi
@@ -52,18 +54,18 @@ fi
 
 echo ""
 echo "Creating necessary directories..."
-mkdir -p web_ui/state web_ui/state/hashes
-mkdir -p generated_images
-mkdir -p trained_model
-mkdir -p logs
+mkdir -p "${SCRIPT_DIR}/../web_ui/state" "${SCRIPT_DIR}/../web_ui/state/hashes"
+mkdir -p "${SCRIPT_DIR}/../generated_images"
+mkdir -p "${SCRIPT_DIR}/../trained_model"
+mkdir -p "${SCRIPT_DIR}/../logs"
 
 echo ""
 echo "Building Docker image..."
-docker-compose build
+docker-compose -f "${SCRIPT_DIR}/docker-compose.yml" build
 
 echo ""
 echo "Starting services..."
-docker-compose up -d
+docker-compose -f "${SCRIPT_DIR}/docker-compose.yml" up -d
 
 echo ""
 echo "=========================================="
@@ -74,9 +76,9 @@ echo "Web UI will be available at:"
 echo "  http://localhost:5000"
 echo ""
 echo "Useful commands:"
-echo "  View logs:    docker-compose logs -f"
-echo "  Stop:         docker-compose down"
-echo "  Restart:      docker-compose restart"
+echo "  View logs:    docker-compose -f ${SCRIPT_DIR}/docker-compose.yml logs -f"
+echo "  Stop:         docker-compose -f ${SCRIPT_DIR}/docker-compose.yml down"
+echo "  Restart:      docker-compose -f ${SCRIPT_DIR}/docker-compose.yml restart"
 echo "  Shell access: docker exec -it deepsynth-dataset-generator bash"
 echo ""
 echo "Waiting for service to be healthy..."
