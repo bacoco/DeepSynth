@@ -450,14 +450,13 @@
 
         <!-- Tabs -->
         <div class="tabs">
-            <button class="tab-btn active" onclick="switchTab('benchmark')">📊 Benchmark Datasets</button>
-            <button class="tab-btn" onclick="switchTab('dataset')">🗂️ Custom Dataset</button>
-            <button class="tab-btn" onclick="switchTab('training')">🎯 Train Model</button>
+            <button class="tab-btn active" onclick="switchTab('training')">🚀 Fine-Tune Model</button>
+            <button class="tab-btn" onclick="switchTab('benchmark')">📊 Benchmark</button>
             <button class="tab-btn" onclick="switchTab('jobs')">📈 Monitor Jobs</button>
         </div>
 
-        <!-- Benchmark Dataset Tab -->
-        <div id="benchmark-tab" class="tab-content active">
+        <!-- OLD Benchmark Dataset Tab - TO BE REPLACED -->
+        <div id="old-benchmark-tab" class="tab-content" style="display:none;">
             <h2>Create Benchmark Dataset</h2>
             <div class="info-box">
                 <strong>ℹ️ No GPU Required:</strong> Dataset generation runs on CPU only. GPU is only needed for model training.
@@ -513,7 +512,8 @@
         </div>
 
         <!-- Custom Dataset Generation Tab -->
-        <div id="dataset-tab" class="tab-content">
+        <!-- OLD Custom Dataset Tab - TO BE REMOVED -->
+        <div id="old-dataset-tab" class="tab-content" style="display:none;">
             <h2>Custom Dataset Generation</h2>
             <div class="info-box">
                 <strong>ℹ️ No GPU Required:</strong> This process converts text to images on CPU.
@@ -601,7 +601,7 @@
         </div>
 
         <!-- Training Tab -->
-        <div id="training-tab" class="tab-content">
+        <div id="training-tab" class="tab-content active">
             <h2>Model Training</h2>
             <div class="warning-box">
                 <strong>⚠️ GPU Required:</strong> Model training requires GPU. Make sure you're using docker-compose.gpu.yml

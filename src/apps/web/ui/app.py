@@ -18,6 +18,7 @@ from deepsynth.training.optimal_configs import (
 
 from .dataset_generator_improved import IncrementalDatasetGenerator, ModelTrainer
 from .state_manager import JobStatus, StateManager
+from .benchmark_runner import BenchmarkRunner
 
 logger = logging.getLogger(__name__)
 
@@ -41,12 +42,14 @@ def create_app(config: Optional[type] = None) -> Flask:
     state_manager = StateManager(job_manager_cfg.state_dir)
     dataset_generator = IncrementalDatasetGenerator(state_manager)
     model_trainer = ModelTrainer(state_manager)
+    benchmark_runner = BenchmarkRunner(state_manager)
 
-    _register_routes(app, state_manager, dataset_generator, model_trainer)
+    _register_routes(app, state_manager, dataset_generator, model_trainer, benchmark_runner)
 
     app.state_manager = state_manager  # type: ignore[attr-defined]
     app.dataset_generator = dataset_generator  # type: ignore[attr-defined]
     app.model_trainer = model_trainer  # type: ignore[attr-defined]
+    app.benchmark_runner = benchmark_runner  # type: ignore[attr-defined]
 
     return app
 
@@ -56,6 +59,7 @@ def _register_routes(
     state_manager: StateManager,
     dataset_generator: IncrementalDatasetGenerator,
     model_trainer: ModelTrainer,
+    benchmark_runner: BenchmarkRunner,
 ) -> None:
     """Bind HTTP routes to the Flask application."""
 
@@ -266,6 +270,195 @@ def _register_routes(
 
         return jsonify({"config": optimal})
 
+    @app.route("/api/datasets/deepsynth", methods=["GET"])
+    def list_deepsynth_datasets():
+        """List all deepsynth-* datasets from HuggingFace for the user."""
+        from huggingface_hub import HfApi, list_datasets
+
+        try:
+            hf_token = os.environ.get("HF_TOKEN")
+            api = HfApi(token=hf_token)
+
+            # Get username from environment (default: baconnier)
+            username = os.environ.get("HF_USERNAME", "baconnier")
+
+            # List all datasets for this user
+            all_datasets = list(api.list_datasets(author=username))
+
+            # Filter for deepsynth-* datasets
+            deepsynth_datasets = []
+            for ds in all_datasets:
+                if ds.id.split('/')[-1].startswith('deepsynth-'):
+                    try:
+                        # Get dataset info
+                        ds_info = api.dataset_info(ds.id)
+
+                        # Extract language from name (e.g., deepsynth-fr -> fr)
+                        name = ds.id.split('/')[-1]
+                        lang_code = name.replace('deepsynth-', '')
+
+                        # Map language codes to flags
+                        lang_flags = {
+                            'fr': '🇫🇷',
+                            'es': '🇪🇸',
+                            'de': '🇩🇪',
+                            'en-news': '📰',
+                            'en-arxiv': '📚',
+                            'en-xsum': '📺',
+                            'en-legal': '⚖️'
+                        }
+
+                        deepsynth_datasets.append({
+                            "repo": ds.id,
+                            "name": name,
+                            "language": lang_code,
+                            "flag": lang_flags.get(lang_code, '🌍'),
+                            "last_modified": ds.lastModified.isoformat() if hasattr(ds, 'lastModified') else None,
+                            "downloads": getattr(ds, 'downloads', 0)
+                        })
+                    except Exception as e:
+                        logger.warning(f"Failed to get info for {ds.id}: {e}")
+                        continue
+
+            # Sort by name
+            deepsynth_datasets.sort(key=lambda x: x['name'])
+
+            return jsonify({"datasets": deepsynth_datasets})
+
+        except Exception as e:
+            logger.exception("Failed to list datasets")
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/datasets/prepare-split", methods=["POST"])
+    def prepare_train_benchmark_split():
+        """Create and save a reproducible train/benchmark split."""
+        import random
+        from datasets import load_dataset
+
+        try:
+            data = request.json or {}
+
+            required = ["dataset_repos", "seed", "benchmark_percentage"]
+            for field in required:
+                if field not in data:
+                    return jsonify({"error": f"Missing required field: {field}"}), 400
+
+            dataset_repos = data["dataset_repos"]
+            seed = int(data["seed"])
+            benchmark_pct = float(data["benchmark_percentage"])
+            stratify = data.get("stratify", True)
+
+            if not (0 < benchmark_pct < 1):
+                return jsonify({"error": "benchmark_percentage must be between 0 and 1"}), 400
+
+            # Set random seed for reproducibility
+            random.seed(seed)
+            import numpy as np
+            np.random.seed(seed)
+
+            train_indices = {}
+            benchmark_indices = {}
+            train_total = 0
+            benchmark_total = 0
+
+            # Create split for each dataset
+            for repo in dataset_repos:
+                logger.info(f"Creating split for {repo}...")
+                ds = load_dataset(repo, split="train")
+                total_samples = len(ds)
+
+                # Calculate split sizes
+                benchmark_size = int(total_samples * benchmark_pct)
+                train_size = total_samples - benchmark_size
+
+                # Generate random indices
+                all_indices = list(range(total_samples))
+                random.shuffle(all_indices)
+
+                # Split indices
+                benchmark_indices[repo] = sorted(all_indices[:benchmark_size])
+                train_indices[repo] = sorted(all_indices[benchmark_size:])
+
+                train_total += train_size
+                benchmark_total += benchmark_size
+
+                logger.info(f"  {repo}: {train_size} train, {benchmark_size} benchmark")
+
+            # Save split to state manager
+            metadata = {
+                "seed": seed,
+                "benchmark_percentage": benchmark_pct,
+                "stratify": stratify,
+                "total_train_samples": train_total,
+                "total_benchmark_samples": benchmark_total
+            }
+
+            split_id = state_manager.create_split(
+                dataset_repos=dataset_repos,
+                train_indices=train_indices,
+                benchmark_indices=benchmark_indices,
+                metadata=metadata
+            )
+
+            logger.info(f"✅ Split created: {split_id}")
+
+            return jsonify({
+                "split_id": split_id,
+                "train_samples": train_total,
+                "benchmark_samples": benchmark_total,
+                "metadata": metadata
+            })
+
+        except Exception as e:
+            logger.exception("Failed to create split")
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/benchmark/run", methods=["POST"])
+    def run_benchmark_evaluation():
+        """Start a benchmark evaluation job."""
+        try:
+            data = request.json or {}
+
+            required = ["split_id", "dataset_repos", "model_path", "hub_model_id"]
+            for field in required:
+                if field not in data:
+                    return jsonify({"error": f"Missing required field: {field}"}), 400
+
+            # Get split metadata to include seed/percentage
+            split_data = state_manager.get_split(data["split_id"])
+            if not split_data:
+                return jsonify({"error": f"Split {data['split_id']} not found"}), 404
+
+            config = {
+                "split_id": data["split_id"],
+                "dataset_repos": data["dataset_repos"],
+                "model_path": data["model_path"],
+                "hub_model_id": data["hub_model_id"],
+                "checkpoint_name": data.get("checkpoint_name", "final"),
+                "seed": split_data["metadata"].get("seed"),
+                "benchmark_percentage": split_data["metadata"].get("benchmark_percentage")
+            }
+
+            job_id = state_manager.create_job("benchmark", config)
+
+            # Run benchmark in background
+            thread = Thread(
+                target=_run_benchmark,
+                args=(benchmark_runner, state_manager, job_id),
+                daemon=True
+            )
+            thread.start()
+
+            return jsonify({
+                "job_id": job_id,
+                "message": "Benchmark started",
+                "status": "in_progress"
+            })
+
+        except Exception as e:
+            logger.exception("Failed to start benchmark")
+            return jsonify({"error": str(e)}), 500
+
 
 def _run_dataset_generation(
     generator: IncrementalDatasetGenerator,
@@ -304,6 +497,28 @@ def _run_model_training(
             state_manager.update_job(job)
     except Exception as exc:  # noqa: BLE001
         logger.exception("Model training failed")
+        job = state_manager.get_job(job_id)
+        if job:
+            job.status = JobStatus.FAILED.value
+            job.last_error = str(exc)
+            state_manager.update_job(job)
+
+
+def _run_benchmark(
+    runner: BenchmarkRunner,
+    state_manager: StateManager,
+    job_id: str,
+) -> None:
+    """Background worker for benchmark evaluation."""
+
+    try:
+        runner.run_benchmark(job_id)
+        job = state_manager.get_job(job_id)
+        if job:
+            job.status = JobStatus.COMPLETED.value
+            state_manager.update_job(job)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Benchmark evaluation failed")
         job = state_manager.get_job(job_id)
         if job:
             job.status = JobStatus.FAILED.value

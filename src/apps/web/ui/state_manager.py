@@ -69,6 +69,8 @@ class StateManager:
         self.jobs_file = self.state_dir / "jobs.json"
         self.hashes_dir = self.state_dir / "hashes"
         self.hashes_dir.mkdir(exist_ok=True)
+        self.splits_dir = self.state_dir / "splits"
+        self.splits_dir.mkdir(exist_ok=True)
 
     def create_job(self, job_type: str, config: Dict) -> str:
         """Create a new job with unique ID."""
@@ -204,3 +206,75 @@ class StateManager:
             "error_count": job.error_count,
             "last_error": job.last_error
         }
+
+    def create_split(
+        self,
+        dataset_repos: List[str],
+        train_indices: Dict[str, List[int]],
+        benchmark_indices: Dict[str, List[int]],
+        metadata: Dict
+    ) -> str:
+        """
+        Create and save a train/benchmark split.
+
+        Args:
+            dataset_repos: List of dataset repository names
+            train_indices: Dict mapping repo_name -> list of training indices
+            benchmark_indices: Dict mapping repo_name -> list of benchmark indices
+            metadata: Additional metadata (seed, percentage, etc.)
+
+        Returns:
+            split_id: Unique identifier for this split
+        """
+        split_id = self._generate_split_id()
+        split_data = {
+            "split_id": split_id,
+            "created_at": datetime.utcnow().isoformat(),
+            "dataset_repos": dataset_repos,
+            "train_indices": train_indices,
+            "benchmark_indices": benchmark_indices,
+            "metadata": metadata
+        }
+
+        split_file = self.splits_dir / f"{split_id}.json"
+        with open(split_file, 'w') as f:
+            json.dump(split_data, f, indent=2)
+
+        return split_id
+
+    def get_split(self, split_id: str) -> Optional[Dict]:
+        """Retrieve a saved split by ID."""
+        split_file = self.splits_dir / f"{split_id}.json"
+        if not split_file.exists():
+            return None
+
+        with open(split_file, 'r') as f:
+            return json.load(f)
+
+    def get_split_indices(self, split_id: str, split_type: str) -> Dict[str, List[int]]:
+        """
+        Get indices for a specific split type (train or benchmark).
+
+        Args:
+            split_id: The split identifier
+            split_type: Either "train" or "benchmark"
+
+        Returns:
+            Dict mapping dataset repo names to lists of indices
+        """
+        split_data = self.get_split(split_id)
+        if not split_data:
+            return {}
+
+        if split_type == "train":
+            return split_data.get("train_indices", {})
+        elif split_type == "benchmark":
+            return split_data.get("benchmark_indices", {})
+        else:
+            raise ValueError(f"Invalid split_type: {split_type}. Must be 'train' or 'benchmark'")
+
+    def _generate_split_id(self) -> str:
+        """Generate unique split ID."""
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        random_suffix = os.urandom(4).hex()
+        return f"split_{timestamp}_{random_suffix}"
