@@ -138,6 +138,11 @@ class DeepSynthDataset(Dataset):
             return_tensors="pt",
         )
 
+        labels_input_ids = labels["input_ids"].clone()
+        pad_token_id = getattr(self.tokenizer, "pad_token_id", None)
+        if pad_token_id is not None:
+            labels_input_ids = labels_input_ids.masked_fill(labels_input_ids == pad_token_id, -100)
+
         # Handle image if present
         image = sample.get("image")
         if image is not None:
@@ -152,7 +157,7 @@ class DeepSynthDataset(Dataset):
         return {
             "input_ids": inputs["input_ids"].squeeze(),
             "attention_mask": inputs["attention_mask"].squeeze(),
-            "labels": labels["input_ids"].squeeze(),
+            "labels": labels_input_ids.squeeze(),
             "image": image,
         }
 

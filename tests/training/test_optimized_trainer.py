@@ -68,15 +68,34 @@ def mock_model():
     return model
 
 
+class DummyTokenizer:
+    """Simple tokenizer stub for tests."""
+
+    pad_token_id = 0
+
+    def __call__(
+        self,
+        text,
+        truncation=True,
+        padding="max_length",
+        max_length=10,
+        return_tensors="pt",
+    ):
+        del truncation, padding, return_tensors  # Unused in stub but kept for signature
+        num_tokens = min(len(text.split()), max_length)
+        input_ids = torch.full((1, max_length), self.pad_token_id, dtype=torch.long)
+        if num_tokens > 0:
+            input_ids[0, :num_tokens] = torch.arange(1, num_tokens + 1)
+        attention_mask = torch.zeros((1, max_length), dtype=torch.long)
+        if num_tokens > 0:
+            attention_mask[0, :num_tokens] = 1
+        return {"input_ids": input_ids, "attention_mask": attention_mask}
+
+
 @pytest.fixture
 def mock_tokenizer():
-    """Create a mock tokenizer."""
-    tokenizer = MagicMock()
-    tokenizer.return_value = {
-        "input_ids": torch.randint(0, 1000, (1, 10)),
-        "attention_mask": torch.ones(1, 10),
-    }
-    return tokenizer
+    """Create a tokenizer stub."""
+    return DummyTokenizer()
 
 
 class TestOptimizedTrainerConfig:
@@ -160,6 +179,30 @@ class TestDeepSynthDataset:
 
         assert "image" in item
         assert isinstance(item["image"], torch.Tensor)
+
+    def test_labels_padding_is_masked(self, sample_data, mock_tokenizer):
+        """Ensure padded label tokens are masked with -100."""
+        max_length = 6
+        dataset = DeepSynthDataset(
+            sample_data,
+            mock_tokenizer,
+            max_length=max_length,
+            cache_encodings=False,
+        )
+
+        item = dataset[0]
+        raw_labels = mock_tokenizer(
+            sample_data[0]["summary"],
+            truncation=True,
+            padding="max_length",
+            max_length=max_length,
+            return_tensors="pt",
+        )["input_ids"].squeeze()
+
+        expected_labels = raw_labels.clone()
+        expected_labels[expected_labels == mock_tokenizer.pad_token_id] = -100
+
+        assert torch.equal(item["labels"], expected_labels)
 
 
 class TestOptimizedDeepSynthTrainer:
