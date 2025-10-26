@@ -89,7 +89,7 @@ class OptimizedDatasetPipeline:
     - Nettoyage automatique des fichiers locaux
     """
 
-    def __init__(self, work_dir="./work_separate", batch_size=50):
+    def __init__(self, work_dir="./work_separate", batch_size=5000):
         self.work_dir = Path(work_dir)
         self.work_dir.mkdir(exist_ok=True)
 
@@ -100,7 +100,7 @@ class OptimizedDatasetPipeline:
         self.converter = OptimizedConverter()
         self.progress = self.load_progress()
 
-        self.batch_size = batch_size  # Samples per local batch file
+        self.batch_size = batch_size  # Samples per local batch file (5000 = 1 upload batch)
         self.current_batch = []
         self.batch_counter = 0
 
@@ -251,8 +251,9 @@ class OptimizedDatasetPipeline:
 
                 # Process samples
                 for count, idx in enumerate(remaining, 1):
-                    if count % 1000 == 0:
+                    if count % 5000 == 0:
                         print(f"      📈 {count}/{len(remaining)} ({count/len(remaining)*100:.1f}%)")
+                        self.save_batch_to_disk()  # Save every 5000
 
                     example = dataset[idx]
                     text, summary = self._extract_text_and_summary(example, name, text_field, summary_field)
