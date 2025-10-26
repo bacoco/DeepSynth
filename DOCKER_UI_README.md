@@ -376,7 +376,7 @@ volumes:
 4. **Use Trained Model**:
 ```bash
 # Inside container
-python -m inference.infer \
+python -m deepsynth.inference.infer \
   --model ./trained_model \
   --text "Your document text here"
 ```

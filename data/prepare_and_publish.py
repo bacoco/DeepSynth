@@ -233,7 +233,10 @@ def main():
             token=args.token,
         )
         LOGGER.info("✅ Complete! Use dataset in training:")
-        LOGGER.info("  python -m training.train --use-deepseek-ocr --hf-dataset %s", args.hub_repo)
+        LOGGER.info(
+            "  python -m deepsynth.training.train --use-deepseek-ocr --hf-dataset %s",
+            args.hub_repo,
+        )
 
 
 if __name__ == "__main__":
