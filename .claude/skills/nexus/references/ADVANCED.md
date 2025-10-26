@@ -157,7 +157,7 @@ Based on analyzed patterns:
 
 ## Example Code
 
-\`\`\`python
+```python
 # Pattern: GitHub API calls
 response = call_api("github.com", "/user/repos", retry=True)
 \`\`\`
