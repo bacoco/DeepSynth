@@ -62,9 +62,9 @@ Controls how NEXUS analyzes patterns.
 
 ```json
 "analysis": {
-  "threshold": 5,        // Minimum occurrences to recommend
-  "window_days": 7,      // Days to analyze
-  "auto_threshold": "high" // Auto-generate if priority >= this
+  "threshold": 5,
+  "window_days": 7,
+  "auto_threshold": "high"
 }
 ```
 
