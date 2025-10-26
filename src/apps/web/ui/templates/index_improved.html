@@ -439,6 +439,104 @@
             background: #ffc107;
             color: #000;
         }
+
+        /* Dataset Selection Cards */
+        .dataset-selector-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        #selection-count {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .datasets-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .dataset-card {
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: white;
+            position: relative;
+        }
+
+        .dataset-card:hover {
+            border-color: #667eea;
+            transform: translateY(-3px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+        }
+
+        .dataset-card.selected {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #f0f4ff 0%, #ffffff 100%);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25);
+        }
+
+        .dataset-flag {
+            font-size: 2.5em;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .dataset-name {
+            font-weight: 600;
+            font-size: 0.95em;
+            color: #495057;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .dataset-info {
+            font-size: 0.85em;
+            color: #6c757d;
+            text-align: center;
+            margin-bottom: 5px;
+        }
+
+        .dataset-modified {
+            font-size: 0.75em;
+            color: #adb5bd;
+            text-align: center;
+        }
+
+        .dataset-checkmark {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: #28a745;
+            font-size: 1.5em;
+            display: none;
+        }
+
+        .dataset-card.selected .dataset-checkmark {
+            display: block;
+        }
+
+        .split-status {
+            margin-top: 15px;
+            padding: 15px;
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 6px;
+            color: #155724;
+            font-weight: 500;
+            display: none;
+        }
+
+        .split-status.visible {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -615,17 +713,64 @@
             </div>
 
             <form id="training-form">
+                <!-- Dataset Selection -->
                 <div class="form-section">
-                    <h3>Dataset</h3>
-                    <div class="form-group">
-                        <label for="dataset_repo">Generated Dataset*</label>
-                        <select id="dataset_repo" name="dataset_repo" required>
-                            <option value="" disabled selected>Select a generated dataset</option>
-                        </select>
-                        <small class="help-text">
-                            Only datasets built through the generator are available. Refresh if you just created one.
-                        </small>
-                        <button type="button" class="btn btn-secondary" style="margin-top:10px;" onclick="loadGeneratedDatasets(true)">↻ Refresh datasets</button>
+                    <h3>1. Select Datasets for Training</h3>
+                    <div class="info-box">
+                        <strong>ℹ️ Select one or more deepsynth datasets.</strong> They will be combined for multilingual training.
+                    </div>
+                    <div class="dataset-selector-header">
+                        <span id="selection-count">0 dataset(s) selected</span>
+                        <button type="button" class="btn btn-secondary" onclick="loadDeepSynthDatasets()">↻ Refresh datasets</button>
+                    </div>
+                    <div id="datasets-grid" class="datasets-grid">
+                        <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #6c757d;">
+                            <p>Click "Refresh datasets" to load available deepsynth datasets from HuggingFace</p>
+                            <small>Datasets will appear here once generated on your Mac Studio</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Train/Benchmark Split Configuration -->
+                <div class="form-section">
+                    <h3>2. Configure Train/Benchmark Split</h3>
+                    <div class="warning-box">
+                        <strong>⚠️ Important:</strong> The benchmark set will be <strong>EXCLUDED</strong> from training and used only for evaluation.
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="split_seed">Seed (reproductibility)*</label>
+                            <input type="number" id="split_seed" value="42" required>
+                            <small class="help-text">Same seed = same split every time</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="benchmark_pct">Benchmark percentage (%)*</label>
+                            <input type="number" id="benchmark_pct" value="10" min="1" max="50" required>
+                            <small class="help-text">% of data reserved for evaluation</small>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-secondary" onclick="createSplit()" id="create-split-btn">
+                        🔀 Prepare Train/Benchmark Split
+                    </button>
+                    <div id="split-status" class="split-status"></div>
+                </div>
+
+                <!-- Model Configuration -->
+                <div class="form-section">
+                    <h3>3. Model Configuration</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="hub_model_id">HuggingFace Model Name*</label>
+                            <input type="text" id="hub_model_id" value="baconnier/deepsynth-multilingual-v1" required>
+                            <small class="help-text">Format: username/model-name (will be created if doesn't exist)</small>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="hub_private" checked>
+                                Private model on HuggingFace
+                            </label>
+                            <small class="help-text">Keep model private until you're ready to share</small>
+                        </div>
                     </div>
                 </div>
 
@@ -862,6 +1007,69 @@
                 <p class="loading">Loading jobs...</p>
             </div>
         </div>
+
+        <!-- Benchmark Tab -->
+        <div id="benchmark-tab" class="tab-content">
+            <h2>📊 Benchmark Evaluation</h2>
+            <div class="info-box">
+                <strong>ℹ️ Evaluate your trained model</strong> on the benchmark split that was excluded from training.
+            </div>
+
+            <form id="benchmark-form">
+                <!-- Model Selection -->
+                <div class="form-section">
+                    <h3>Model to Evaluate</h3>
+                    <div class="form-group">
+                        <label for="benchmark_model_id">HuggingFace Model*</label>
+                        <input type="text" id="benchmark_model_id"
+                               placeholder="baconnier/deepsynth-multilingual-v1"
+                               required>
+                        <small class="help-text">The model repository on HuggingFace to evaluate</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="checkpoint_name">Checkpoint</label>
+                        <select id="checkpoint_name">
+                            <option value="final">Final model</option>
+                            <option value="checkpoint-epoch-1">Epoch 1</option>
+                            <option value="checkpoint-epoch-2">Epoch 2</option>
+                            <option value="checkpoint-epoch-3">Epoch 3</option>
+                        </select>
+                        <small class="help-text">Which checkpoint to evaluate (results will be added to model card)</small>
+                    </div>
+                </div>
+
+                <!-- Split Configuration -->
+                <div class="form-section">
+                    <h3>Dataset Split</h3>
+                    <div class="warning-box">
+                        <strong>⚠️ Must match the split used for training</strong>
+                    </div>
+                    <div class="form-group">
+                        <label for="benchmark_split_id">Split ID*</label>
+                        <input type="text" id="benchmark_split_id"
+                               placeholder="split_20251026_123456_abc123"
+                               required>
+                        <small class="help-text">The split ID created during training setup (check training job for this ID)</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Dataset Repos (from training)</label>
+                        <div id="benchmark_datasets_display" style="font-size: 0.9em; color: #6c757d; margin-top: 5px;">
+                            <em>These will be auto-filled from the split configuration</em>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">📊 Run Benchmark</button>
+            </form>
+
+            <!-- Results Display -->
+            <div id="benchmark-results" style="margin-top: 30px; display: none;">
+                <div class="form-section">
+                    <h3>Benchmark Results</h3>
+                    <div id="benchmark-metrics-display"></div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -871,6 +1079,141 @@
         let selectedTrainerType = 'production';
         let benchmarkDatasets = {};
         let trainingPresets = {};
+
+        // NEW: Dataset selection state
+        let selectedDatasets = new Set();
+        let currentSplitId = null;
+        let allDatasets = [];
+
+        // NEW: Load DeepSynth datasets from HuggingFace
+        async function loadDeepSynthDatasets() {
+            const grid = document.getElementById('datasets-grid');
+            grid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px;"><p>Loading datasets...</p></div>';
+
+            try {
+                const response = await fetch('/api/datasets/deepsynth');
+                const data = await response.json();
+
+                if (!data.datasets || data.datasets.length === 0) {
+                    grid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #6c757d;"><p>No deepsynth datasets found on HuggingFace</p><small>Datasets will appear once generated on your Mac Studio</small></div>';
+                    return;
+                }
+
+                allDatasets = data.datasets;
+                grid.innerHTML = '';
+
+                data.datasets.forEach(ds => {
+                    const card = document.createElement('div');
+                    card.className = 'dataset-card';
+                    card.dataset.repo = ds.repo;
+                    card.onclick = () => toggleDataset(card);
+
+                    // Restore selection if previously selected
+                    if (selectedDatasets.has(ds.repo)) {
+                        card.classList.add('selected');
+                    }
+
+                    card.innerHTML = `
+                        <div class="dataset-checkmark">✓</div>
+                        <div class="dataset-flag">${ds.flag}</div>
+                        <div class="dataset-name">${ds.name}</div>
+                        <div class="dataset-info">Language: ${ds.language}</div>
+                        <div class="dataset-modified">${ds.last_modified ? new Date(ds.last_modified).toLocaleDateString() : 'N/A'}</div>
+                    `;
+
+                    grid.appendChild(card);
+                });
+
+                updateSelectionCount();
+                showToast(`Loaded ${data.datasets.length} dataset(s)`, 'success');
+            } catch (error) {
+                grid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #dc3545;"><p>Error loading datasets</p><small>' + error.message + '</small></div>';
+                showToast('Failed to load datasets: ' + error.message, 'error');
+            }
+        }
+
+        // NEW: Toggle dataset selection
+        function toggleDataset(card) {
+            const repo = card.dataset.repo;
+
+            if (selectedDatasets.has(repo)) {
+                selectedDatasets.delete(repo);
+                card.classList.remove('selected');
+            } else {
+                selectedDatasets.add(repo);
+                card.classList.add('selected');
+            }
+
+            updateSelectionCount();
+        }
+
+        // NEW: Update selection count display
+        function updateSelectionCount() {
+            const count = selectedDatasets.size;
+            document.getElementById('selection-count').textContent = `${count} dataset(s) selected`;
+        }
+
+        // NEW: Create train/benchmark split
+        async function createSplit() {
+            if (selectedDatasets.size === 0) {
+                showToast('Please select at least one dataset', 'error');
+                return;
+            }
+
+            const seed = parseInt(document.getElementById('split_seed').value);
+            const benchmarkPct = parseFloat(document.getElementById('benchmark_pct').value) / 100;
+
+            if (benchmarkPct <= 0 || benchmarkPct >= 1) {
+                showToast('Benchmark percentage must be between 1 and 99', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('create-split-btn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Creating split...';
+
+            try {
+                const response = await fetch('/api/datasets/prepare-split', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        dataset_repos: Array.from(selectedDatasets),
+                        seed: seed,
+                        benchmark_percentage: benchmarkPct,
+                        stratify: true
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to create split');
+                }
+
+                const data = await response.json();
+                currentSplitId = data.split_id;
+
+                const statusDiv = document.getElementById('split-status');
+                statusDiv.innerHTML = `
+                    ✅ Split created successfully!<br>
+                    <strong>Split ID:</strong> ${data.split_id}<br>
+                    <strong>Training samples:</strong> ${data.train_samples.toLocaleString()}<br>
+                    <strong>Benchmark samples:</strong> ${data.benchmark_samples.toLocaleString()}
+                `;
+                statusDiv.classList.add('visible');
+
+                // Enable training button
+                const submitBtn = document.querySelector('#training-form button[type="submit"]');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                }
+
+                showToast('Split created successfully!', 'success');
+            } catch (error) {
+                showToast('Failed to create split: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔀 Prepare Train/Benchmark Split';
+            }
+        }
 
         // Collapsible toggle
         function toggleCollapsible(element) {
@@ -1166,27 +1509,58 @@
         };
 
         // Submit training form
+        // NEW: Modified training form submission
         document.getElementById('training-form').onsubmit = async (e) => {
             e.preventDefault();
 
+            // Validate dataset selection
+            if (selectedDatasets.size === 0) {
+                showToast('Please select at least one dataset', 'error');
+                return;
+            }
+
+            // Validate split creation
+            if (!currentSplitId) {
+                showToast('Please create a train/benchmark split first', 'error');
+                return;
+            }
+
+            // Validate hub model ID
+            let hubModelId = document.getElementById('hub_model_id').value.trim();
+            if (!hubModelId) {
+                showToast('Please specify a HuggingFace model name', 'error');
+                return;
+            }
+
+            // Auto-prefix with username if not provided
+            if (!hubModelId.includes('/')) {
+                hubModelId = 'baconnier/' + hubModelId;
+            }
+
             const formData = {
-                dataset_repo: document.getElementById('dataset_repo').value,
+                // NEW: Multi-dataset support
+                dataset_repos: Array.from(selectedDatasets),
+                split_id: currentSplitId,
+
+                // Model configuration
                 trainer_type: document.getElementById('selected_trainer').value,
+                hub_model_id: hubModelId,
+                hub_private: document.getElementById('hub_private').checked,
+                push_to_hub: true,  // Always push to hub
+                save_checkpoints_to_hub: true,  // Always save checkpoints
+                save_metrics_to_hub: true,  // Always save metrics
+
+                // Training parameters
                 model_name: document.getElementById('model_name').value,
                 output_dir: document.getElementById('output_dir_train').value,
-                batch_size: document.getElementById('batch_size').value,
-                num_epochs: document.getElementById('num_epochs').value,
-                learning_rate: document.getElementById('learning_rate').value,
-                max_length: document.getElementById('max_length').value,
+                batch_size: parseInt(document.getElementById('batch_size').value),
+                num_epochs: parseInt(document.getElementById('num_epochs').value),
+                learning_rate: parseFloat(document.getElementById('learning_rate').value),
+                max_length: parseInt(document.getElementById('max_length').value),
                 mixed_precision: document.getElementById('mixed_precision').value,
-                gradient_accumulation_steps: document.getElementById('gradient_accumulation_steps').value,
+                gradient_accumulation_steps: parseInt(document.getElementById('gradient_accumulation_steps').value),
                 evaluation_split: document.getElementById('evaluation_split').value || null,
-                resume_job_id: document.getElementById('resume_job_id').value || null,
-                push_to_hub: document.getElementById('push_to_hub').checked,
-                hub_model_id: document.getElementById('hub_model_id').value,
-                hub_private: document.getElementById('hub_private').checked,
-                save_checkpoints_to_hub: document.getElementById('save_checkpoints_to_hub').checked,
-                save_metrics_to_hub: document.getElementById('save_metrics_to_hub').checked,
+
                 // MoE Dropout parameters
                 expert_dropout_rate: parseFloat(document.getElementById('expert_dropout_rate').value),
                 expert_dropout_min_keep: parseInt(document.getElementById('expert_dropout_min_keep').value),
@@ -1204,12 +1578,60 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    showToast(`Model training started! Job ID: ${data.job_id}`, 'success');
+                    showToast(`Training started on ${selectedDatasets.size} dataset(s)! Job ID: ${data.job_id}`, 'success');
+                    showToast(`Model will be pushed to: ${hubModelId}`, 'info');
                     switchTab('jobs');
                     setTimeout(refreshJobs, 500);
-                    setTimeout(() => loadTrainingCheckpoints(true), 1000);
                 } else {
                     showToast(data.error || 'Error starting training', 'error');
+                }
+            } catch (error) {
+                showToast('Network error: ' + error.message, 'error');
+            }
+        };
+
+        // NEW: Benchmark form submission
+        document.getElementById('benchmark-form').onsubmit = async (e) => {
+            e.preventDefault();
+
+            const splitId = document.getElementById('benchmark_split_id').value.trim();
+            const hubModelId = document.getElementById('benchmark_model_id').value.trim();
+            const checkpointName = document.getElementById('checkpoint_name').value;
+
+            if (!splitId) {
+                showToast('Please provide a split ID', 'error');
+                return;
+            }
+
+            if (!hubModelId) {
+                showToast('Please provide a HuggingFace model ID', 'error');
+                return;
+            }
+
+            const formData = {
+                split_id: splitId,
+                dataset_repos: Array.from(selectedDatasets),  // Use currently selected datasets
+                model_path: hubModelId + (checkpointName !== 'final' ? '/' + checkpointName : ''),
+                hub_model_id: hubModelId,
+                checkpoint_name: checkpointName
+            };
+
+            try {
+                const response = await fetch('/api/benchmark/run', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showToast(`Benchmark started! Job ID: ${data.job_id}`, 'success');
+                    showToast('Results will be pushed to the model card on HuggingFace', 'info');
+                    switchTab('jobs');
+                    setTimeout(refreshJobs, 500);
+                } else {
+                    showToast(data.error || 'Error starting benchmark', 'error');
                 }
             } catch (error) {
                 showToast('Network error: ' + error.message, 'error');
