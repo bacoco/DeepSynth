@@ -8,11 +8,19 @@ import os
 import sys
 import time
 import logging
+from pathlib import Path
 
-# Ajouter le répertoire parent au path pour les imports
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Ajouter les répertoires nécessaires au path pour les imports
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SRC_DIR = PROJECT_ROOT / "src"
 
-from parallel_processing.parallel_datasets_builder import ParallelDatasetsBuilder
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
+
+if str(SRC_DIR) not in sys.path:
+    sys.path.append(str(SRC_DIR))
+
+from deepsynth.pipelines.parallel import ParallelDatasetsPipeline
 
 # Configuration du logging pour le test
 logging.basicConfig(
@@ -27,7 +35,7 @@ def test_parallel_logic():
     print("="*50)
 
     # Créer le builder avec moins de workers pour le test
-    builder = ParallelDatasetsBuilder(max_workers=2)
+    builder = ParallelDatasetsPipeline(max_workers=2)
 
     # Modifier la configuration pour limiter à 500 échantillons par dataset pour le test
     for dataset_config in builder.datasets_config:
@@ -79,7 +87,7 @@ def test_dataset_independence():
     print("\n🔍 TEST D'INDÉPENDANCE DES DATASETS")
     print("="*40)
 
-    builder = ParallelDatasetsBuilder(max_workers=1)
+    builder = ParallelDatasetsPipeline(max_workers=1)
 
     # Vérifier que chaque dataset a un nom de sortie unique
     output_names = [d['output_name'] for d in builder.datasets_config]

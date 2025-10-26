@@ -13,6 +13,8 @@ from data.text_to_image import TextToImageConverter
 from mlsum_loader import MLSUMLoader
 from efficient_incremental_uploader import EfficientIncrementalUploader
 
+__all__ = ["IncrementalPipeline", "run_incremental_pipeline"]
+
 # Load environment variables
 env_file = Path('.env')
 if env_file.exists():
@@ -33,7 +35,7 @@ class OptimizedConverter(TextToImageConverter):
             background_color=(255, 255, 255), text_color=(0, 0, 0)
         )
 
-class IncrementalBuilder:
+class IncrementalPipeline:
     def __init__(self, work_dir="./work"):
         self.work_dir = Path(work_dir)
         self.work_dir.mkdir(exist_ok=True)
@@ -306,7 +308,7 @@ class IncrementalBuilder:
         dataset_dict.push_to_hub(repo_name, private=False, token=os.getenv('HF_TOKEN'))
         return repo_name
 
-def main():
+def run_incremental_pipeline():
     print("🎯 TRAITEMENT INCRÉMENTAL COMPLET")
     print("=" * 50)
 
@@ -317,7 +319,7 @@ def main():
     print(f"Dataset: {repo_name}")
     print("🔄 Reprise automatique si interruption")
 
-    builder = IncrementalBuilder()
+    builder = IncrementalPipeline()
 
     try:
         arxiv_limit = int(os.getenv('ARXIV_IMAGE_SAMPLES', '50000'))
@@ -364,4 +366,4 @@ def main():
         raise
 
 if __name__ == "__main__":
-    main()
+    run_incremental_pipeline()

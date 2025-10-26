@@ -13,6 +13,8 @@ from huggingface_hub import login, whoami, HfApi
 from data.text_to_image import TextToImageConverter
 from mlsum_loader import MLSUMLoader
 
+__all__ = ["SeparateDatasetsPipeline", "run_separate_datasets_pipeline"]
+
 # Load environment variables
 env_file = Path('.env')
 if env_file.exists():
@@ -44,7 +46,7 @@ class OptimizedConverter(TextToImageConverter):
             background_color=(255, 255, 255), text_color=(0, 0, 0)
         )
 
-class SeparateDatasetBuilder:
+class SeparateDatasetsPipeline:
     def __init__(self, work_dir="./work_separate"):
         self.work_dir = Path(work_dir)
         self.work_dir.mkdir(exist_ok=True)
@@ -309,7 +311,7 @@ class SeparateDatasetBuilder:
             print(f"❌ Failed to upload {repo_name}: {e}")
             raise
 
-def main():
+def run_separate_datasets_pipeline():
     print("🎯 CRÉATION DE DATASETS SÉPARÉS PAR LANGUE")
     print("=" * 60)
 
@@ -321,7 +323,7 @@ def main():
     for (name, subset), output_name in DATASET_NAMING.items():
         print(f"  - {name} ({subset}) → {username}/{output_name}")
 
-    builder = SeparateDatasetBuilder()
+    builder = SeparateDatasetsPipeline()
 
     # Get arXiv limit
     try:
@@ -382,4 +384,4 @@ def main():
         raise
 
 if __name__ == "__main__":
-    main()
+    run_separate_datasets_pipeline()
