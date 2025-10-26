@@ -10,6 +10,11 @@ The script is intentionally defensive: it provides rich logging, automatic
 field detection and helpful error messages when a dataset does not expose the
 expected schema.  For extremely large datasets you may limit the number of
 records pushed via ``--max-records`` which samples each split deterministically.
+
+💡 New in this revision: pass ``--generate-images`` to render PNG snapshots of
+the textual documents directly within the publishing pipeline.  Images are
+produced on the fly, batched in memory for the current upload only, and never
+persisted to disk.
 """
 from __future__ import annotations
 
@@ -18,7 +23,9 @@ import logging
 from dataclasses import dataclass, field
 from typing import Callable, Dict, Optional, Sequence
 
-from datasets import Dataset, DatasetDict, load_dataset
+from datasets import Dataset, DatasetDict, Image as ImageFeature, load_dataset
+
+from .text_to_image import TextToImageConverter
 
 
 LOGGER = logging.getLogger(__name__)
@@ -111,7 +118,42 @@ def _default_transform(row: dict, *, text_field: str, summary_field: str, image_
     return record
 
 
-def _prepare_split(spec: PublishSpec, split: str, *, max_records: Optional[int] = None) -> Optional[Dataset]:
+def _generate_images_on_the_fly(
+    dataset: Dataset,
+    *,
+    converter: TextToImageConverter,
+    batch_size: int,
+) -> Dataset:
+    """Attach an ``image`` column by rendering documents on the fly."""
+
+    def _convert_batch(batch: dict) -> dict:
+        texts = batch.get("text", [])
+        images = [converter.convert(text) for text in texts]
+        return {"image": images}
+
+    augmented = dataset.map(
+        _convert_batch,
+        batched=True,
+        batch_size=batch_size,
+    )
+
+    try:
+        augmented = augmented.cast_column("image", ImageFeature())
+    except Exception as exc:  # pragma: no cover - depends on datasets version
+        LOGGER.warning("Failed to cast generated images to Image feature: %s", exc)
+
+    return augmented
+
+
+def _prepare_split(
+    spec: PublishSpec,
+    split: str,
+    *,
+    max_records: Optional[int] = None,
+    generate_images: bool,
+    converter: Optional[TextToImageConverter],
+    image_batch_size: int,
+) -> Optional[Dataset]:
     try:
         dataset = load_dataset(spec.source, spec.subset, split=split)
     except Exception as exc:  # pragma: no cover - network / auth errors
@@ -152,15 +194,44 @@ def _prepare_split(spec: PublishSpec, split: str, *, max_records: Optional[int] 
     if max_records is not None and len(processed) > max_records:
         processed = processed.select(range(max_records))
 
+    if generate_images and "image" not in processed.column_names:
+        if converter is None:
+            converter = TextToImageConverter()
+        LOGGER.info(
+            "Generating images on the fly for %s/%s (batch size=%d)",
+            spec.source,
+            split,
+            image_batch_size,
+        )
+        processed = _generate_images_on_the_fly(
+            processed,
+            converter=converter,
+            batch_size=image_batch_size,
+        )
+
     return processed
 
 
-def build_dataset_dict(spec: PublishSpec, *, max_records: Optional[int] = None) -> DatasetDict:
+def build_dataset_dict(
+    spec: PublishSpec,
+    *,
+    max_records: Optional[int] = None,
+    generate_images: bool,
+    converter: Optional[TextToImageConverter],
+    image_batch_size: int,
+) -> DatasetDict:
     """Create a :class:`DatasetDict` ready to be pushed to the Hub."""
 
     splits: Dict[str, Dataset] = {}
     for split in spec.splits:
-        dataset = _prepare_split(spec, split, max_records=max_records)
+        dataset = _prepare_split(
+            spec,
+            split,
+            max_records=max_records,
+            generate_images=generate_images,
+            converter=converter,
+            image_batch_size=image_batch_size,
+        )
         if dataset is not None and len(dataset) > 0:
             splits[split] = dataset
 
@@ -174,10 +245,27 @@ def build_dataset_dict(spec: PublishSpec, *, max_records: Optional[int] = None) 
 # CLI
 
 
-def publish(spec: PublishSpec, *, repo_prefix: str, token: Optional[str], private: bool, max_records: Optional[int], dry_run: bool) -> None:
+def publish(
+    spec: PublishSpec,
+    *,
+    repo_prefix: str,
+    token: Optional[str],
+    private: bool,
+    max_records: Optional[int],
+    dry_run: bool,
+    generate_images: bool,
+    converter: Optional[TextToImageConverter],
+    image_batch_size: int,
+) -> None:
     repo_id = f"{repo_prefix}/{spec.repo_suffix}" if repo_prefix else spec.repo_suffix
     LOGGER.info("Preparing dataset %s → %s", spec.source, repo_id)
-    dataset_dict = build_dataset_dict(spec, max_records=max_records)
+    dataset_dict = build_dataset_dict(
+        spec,
+        max_records=max_records,
+        generate_images=generate_images,
+        converter=converter,
+        image_batch_size=image_batch_size,
+    )
 
     if dry_run:
         for split, split_dataset in dataset_dict.items():
@@ -206,6 +294,20 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--dry-run", action="store_true", help="Prepare datasets without uploading them")
     parser.add_argument(
+        "--generate-images",
+        action="store_true",
+        help=(
+            "Render missing image columns from the text content on the fly."
+            " Images exist only during the upload batch and are not stored on disk."
+        ),
+    )
+    parser.add_argument(
+        "--image-batch-size",
+        type=int,
+        default=64,
+        help="Batch size to use when generating images on the fly",
+    )
+    parser.add_argument(
         "--datasets",
         nargs="*",
         help="Subset of dataset repo suffixes to publish (defaults to all)",
@@ -226,6 +328,8 @@ def main() -> None:
         if missing:
             raise SystemExit(f"Unknown dataset specifiers: {sorted(missing)}")
 
+    converter = TextToImageConverter() if args.generate_images else None
+
     for spec in specs:
         publish(
             spec,
@@ -234,6 +338,9 @@ def main() -> None:
             private=args.private,
             max_records=args.max_records,
             dry_run=args.dry_run,
+            generate_images=args.generate_images,
+            converter=converter,
+            image_batch_size=args.image_batch_size,
         )
 
 
