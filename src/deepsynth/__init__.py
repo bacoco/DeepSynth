@@ -1,21 +1,11 @@
-"""DeepSynth package exports."""
+"""Top-level package for DeepSynth components."""
 
-from .pipelines import (
-    IncrementalPipeline,
-    run_incremental_pipeline,
-    GlobalIncrementalPipeline,
-    run_global_incremental_pipeline,
-    SeparateDatasetsPipeline,
-    run_separate_datasets_pipeline,
-    ParallelDatasetsPipeline,
-)
+from .config import Config, load_env  # re-export for compatibility
+from .training import DeepSynthOCRTrainer, SummarizationTrainer
 
 __all__ = [
-    "IncrementalPipeline",
-    "run_incremental_pipeline",
-    "GlobalIncrementalPipeline",
-    "run_global_incremental_pipeline",
-    "SeparateDatasetsPipeline",
-    "run_separate_datasets_pipeline",
-    "ParallelDatasetsPipeline",
+    "Config",
+    "load_env",
+    "DeepSynthOCRTrainer",
+    "SummarizationTrainer",
 ]

@@ -92,7 +92,7 @@ python run_complete_pipeline.py
 The script loads all settings from `.env`:
 
 ```python
-from config import Config
+from deepsynth.config import Config
 
 config = Config.from_env()
 print(f"Target dataset: {config.target_dataset_repo}")
@@ -146,7 +146,7 @@ Result: https://huggingface.co/datasets/your-username/cnn-dailymail-vision
 Fine-tunes DeepSeek-OCR:
 
 ```python
-from training.deepsynth_trainer_v2 import ProductionDeepSynthTrainer
+from deepsynth.training.deepsynth_trainer_v2 import ProductionDeepSynthTrainer
 
 trainer = ProductionDeepSynthTrainer(
     model_name="deepseek-ai/DeepSeek-OCR",
@@ -280,7 +280,7 @@ Should output:
 ### Test Trainer Initialization
 
 ```bash
-python training/deepsynth_trainer_v2.py
+python -m deepsynth.training.deepsynth_trainer_v2
 ```
 
 Should output:
@@ -369,7 +369,7 @@ Check loss decreasing over time - typical values:
 ### Command Line
 
 ```bash
-python -m inference.infer \
+python -m deepsynth.inference.infer \
     --model_path ./deepsynth-ocr-summarizer \
     --input_file article.txt
 ```
@@ -377,7 +377,7 @@ python -m inference.infer \
 ### API Server
 
 ```bash
-MODEL_PATH=./deepsynth-ocr-summarizer python -m inference.api_server
+MODEL_PATH=./deepsynth-ocr-summarizer python -m deepsynth.inference.api_server
 
 # Test
 curl -X POST http://localhost:5000/summarize/text \
