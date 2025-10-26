@@ -106,11 +106,7 @@ class OptimizedDatasetPipeline:
 
         # Auto-upload: Upload immediately when batch is full
         self.auto_upload = auto_upload
-        if self.auto_upload:
-            self.uploader = EfficientIncrementalUploader(
-                work_dir=str(self.work_dir),
-                batches_per_upload=1  # Upload IMMEDIATELY when 1 batch ready (5000 samples)
-            )
+        self.uploader = None  # Will be created with correct dataset_name in process_and_batch_dataset
 
     def load_progress(self):
         if self.progress_file.exists():
@@ -198,6 +194,15 @@ class OptimizedDatasetPipeline:
         self.batch_counter += 1
         self.current_batch = []
 
+    def _ensure_uploader(self, repo_name):
+        """Initialize uploader with correct dataset_name if not already done"""
+        if self.auto_upload and self.uploader is None:
+            self.uploader = EfficientIncrementalUploader(
+                work_dir=str(self.work_dir),
+                batches_per_upload=1,  # Upload IMMEDIATELY when 1 batch ready (5000 samples)
+                dataset_name=repo_name
+            )
+
     def process_and_batch_dataset(self, name, subset, text_field, summary_field, username, *, max_samples=None):
         """
         Process dataset and save to batches (NO immediate upload).
@@ -212,6 +217,9 @@ class OptimizedDatasetPipeline:
 
         output_name = self.get_dataset_output_name(name, subset)
         repo_name = f"{username}/{output_name}"
+
+        # Initialize uploader with correct dataset_name
+        self._ensure_uploader(repo_name)
 
         print(f"\n📥 Processing: {name} ({subset}) → {repo_name}")
 
@@ -373,16 +381,12 @@ def run_optimized_pipeline():
                 max_samples=max_samples
             )
 
-        # Upload batches incrementally
-        print("\n" + "=" * 70)
-        print("📤 UPLOAD INCRÉMENTAL DES BATCHES")
-        print("=" * 70)
-
-        uploader = EfficientIncrementalUploader(
-            work_dir=str(pipeline.work_dir),
-            batches_per_upload=100  # Upload every ~5000 samples
-        )
-        uploader.upload_all_pending()
+        # Upload is now handled automatically per dataset via _ensure_uploader()
+        # when auto_upload=True in OptimizedDatasetPipeline.
+        if not pipeline.auto_upload:
+            print("\n⚠️  WARNING: auto_upload=False mode is deprecated!")
+            print("⚠️  Uploads must be handled manually or use ParallelDatasetsPipeline")
+            print("⚠️  with auto_upload=True for automatic per-dataset uploads")
 
         print("\n🎉 PIPELINE TERMINÉ AVEC SUCCÈS!")
 

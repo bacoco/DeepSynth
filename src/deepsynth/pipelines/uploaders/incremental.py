@@ -21,7 +21,7 @@ from deepsynth.data.hub import HubShardManager
 load_shared_env()
 
 class EfficientIncrementalUploader:
-    def __init__(self, work_dir="./work", batches_per_upload=100):
+    def __init__(self, work_dir="./work", batches_per_upload=100, dataset_name=None):
         self.work_dir = Path(work_dir)
         self.samples_dir = self.work_dir / "samples"
         self.uploaded_dir = self.work_dir / "uploaded"  # Archive uploaded batches
@@ -34,7 +34,15 @@ class EfficientIncrementalUploader:
         login(token=self.hf_token)
         self.username = whoami()['name']
         self.api = HfApi()
-        self.dataset_name = f"{self.username}/deepsynth-vision-complete"
+
+        # dataset_name is REQUIRED - no fallback to avoid accidental repo creation
+        if not dataset_name:
+            raise ValueError(
+                "dataset_name is required! "
+                "You must specify the HuggingFace repo name (e.g., 'deepsynth-fr', 'baconnier/deepsynth-es')"
+            )
+
+        self.dataset_name = dataset_name if '/' in dataset_name else f"{self.username}/{dataset_name}"
 
         self.upload_progress = self.load_upload_progress()
         self.shard_manager = HubShardManager(
