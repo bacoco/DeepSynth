@@ -27,6 +27,8 @@ prepared_images/
 images_*/
 *_data/
 work/
+work_*/
+work_separate*/
 *_cache/
 *.png
 *.jpg
