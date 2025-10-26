@@ -12,7 +12,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from multiprocessing import Manager
 import threading
 from datetime import datetime
-from deepsynth.pipelines.separate import SeparateDatasetsPipeline
+from deepsynth.pipelines._dataset_processor import SeparateDatasetsPipeline
 
 __all__ = ["ParallelDatasetsPipeline"]
 

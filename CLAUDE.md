@@ -33,16 +33,24 @@ make clean                          # Remove __pycache__, *.pyc files
 ```
 
 ### Pipeline Execution
-```bash
-# Complete multilingual pipeline (1.29M+ samples across 6 languages)
-make pipeline                       # Local progress tracking
-make pipeline-parallel              # Multi-process dataset building
-make pipeline-global                # Cross-computer resumable pipeline
 
-# Direct script invocation
-python scripts/cli/run_complete_multilingual_pipeline.py
-python scripts/cli/run_parallel_processing.py
-./scripts/run_global_pipeline.sh
+**🚀 RECOMMENDED: Simple One-Command Workflow**
+```bash
+# Generate ALL 7 datasets in parallel (1.29M+ samples across 7 languages)
+./generate_all_datasets.sh          # Interactive prompt, automatic resumption, 3 workers
+# This is the EASIEST way to generate all datasets. Just run it and wait 6-12 hours.
+
+# Alternative: Direct Python invocation (non-interactive)
+PYTHONPATH=./src python3 run_full_pipeline.py
+```
+
+**Advanced Options (for specific use cases):**
+```bash
+# Interactive CLI with custom configuration
+python scripts/cli/run_parallel_processing.py  # Choose specific datasets, worker count
+
+# Global resumable pipeline (cross-computer, deprecated)
+./scripts/run_global_pipeline.sh    # Use generate_all_datasets.sh instead
 ```
 
 ### Training
@@ -229,9 +237,9 @@ make test-quick
 ```
 
 ### Pipeline Selection Guide
-- **Incremental Pipeline** (`scripts/cli/run_complete_multilingual_pipeline.py`): Single-machine, local checkpoints, 5k sample uploads
-- **Global Pipeline** (`scripts/run_global_pipeline.sh`): Cross-computer resumable, 10k sample batches, HF metadata tracking
-- **Parallel Pipeline** (`scripts/cli/run_parallel_processing.py`): Multi-process for speed
+- **🥇 RECOMMENDED: generate_all_datasets.sh**: Simple one-command workflow, 3 parallel workers, automatic resumption, creates all 7 datasets
+- **Parallel Pipeline** (`run_full_pipeline.py` or `scripts/cli/run_parallel_processing.py`): Multi-process for speed, interactive configuration
+- **Global Pipeline** (`scripts/run_global_pipeline.sh`): Cross-computer resumable (deprecated, use generate_all_datasets.sh instead)
 
 ### Docker Architecture
 **Why CPU/GPU Separation?**
@@ -283,17 +291,26 @@ source venv/bin/activate
 # 2. Configure credentials
 cp .env.example .env
 # Edit .env: Add HF_TOKEN and HF_USERNAME
+# Optional: Adjust ARXIV_IMAGE_SAMPLES (default: 50000)
 huggingface-cli login
 
 # 3. Verify installation
 python tests/system/test_setup.py
 
-# 4. Small test run (100 samples, ~20 minutes)
-echo "MAX_SAMPLES_PER_SPLIT=100" >> .env
-python scripts/cli/run_complete_multilingual_pipeline.py
+# 4. Generate all datasets (PRODUCTION)
+./generate_all_datasets.sh
+# This will create 7 datasets on HuggingFace (~6-12 hours)
+# Output: deepsynth-en-news, deepsynth-en-arxiv, deepsynth-en-xsum,
+#         deepsynth-fr, deepsynth-es, deepsynth-de, deepsynth-en-legal
 
-# 5. Evaluate results
-python scripts/cli/run_benchmark.py --model ./model --benchmark cnn_dailymail --max-samples 100
+# 5. Train model on generated datasets
+python -m deepsynth.training.train \
+    --use-deepseek-ocr \
+    --hf-dataset baconnier/deepsynth-en-news \
+    --output ./model
+
+# 6. Evaluate results
+python scripts/cli/run_benchmark.py --model ./model --benchmark cnn_dailymail
 ```
 
 ## Production Deployment
