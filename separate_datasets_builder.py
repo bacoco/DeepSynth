@@ -284,19 +284,9 @@ class SeparateDatasetBuilder:
         from datasets import Image as ImageFeature
         dataset = dataset.cast_column("image", ImageFeature())
 
-        # Create train/validation splits if we have enough data
-        if len(all_samples) > 1000:
-            # Use 95% for train, 5% for validation
-            train_size = int(0.95 * len(all_samples))
-            train_dataset = dataset.select(range(train_size))
-            val_dataset = dataset.select(range(train_size, len(all_samples)))
-            dataset_dict = DatasetDict({
-                'train': train_dataset,
-                'validation': val_dataset
-            })
-        else:
-            # Small dataset, keep as single train split
-            dataset_dict = DatasetDict({'train': dataset})
+        # Pas de split train/validation - tout reste dans 'train'
+        # Le split se fera au moment de l'entraînement selon les besoins
+        dataset_dict = DatasetDict({'train': dataset})
 
         # Upload to HuggingFace
         try:
