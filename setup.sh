@@ -47,7 +47,25 @@ fi
 
 # Install requirements
 echo "📚 Installing dependencies..."
-pip install -r requirements.txt
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  # macOS: Use base requirements (no xformers, it doesn't compile on macOS)
+  echo "  🍎 macOS detected - Installing base requirements (dataset generation only)"
+  pip install -r requirements-base.txt
+  echo "  ℹ️  Skipping xformers (not needed for dataset generation)"
+  echo "  💡 For model training, use Linux with CUDA"
+elif command -v nvidia-smi >/dev/null 2>&1; then
+  # Linux with GPU: Install everything including training libs
+  echo "  🐧 Linux with GPU detected - Installing all requirements (including training)"
+  pip install -r requirements-base.txt
+  pip install -r requirements-training.txt || {
+    echo "  ⚠️  xformers installation failed - continuing without it"
+    echo "     Training will work but may be slower"
+  }
+else
+  # Linux without GPU: Base requirements only
+  echo "  🐧 Linux without GPU detected - Installing base requirements"
+  pip install -r requirements-base.txt
+fi
 
 # Install Unicode fonts for multilingual support (French, Spanish, German)
 echo ""

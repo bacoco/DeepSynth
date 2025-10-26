@@ -1,11 +1,22 @@
+# IMPORTANT: This file includes ALL dependencies including GPU training libraries
+#
+# For macOS or CPU-only dataset generation, use:
+#   pip install -r requirements-base.txt
+#
+# For Linux with CUDA for training, use:
+#   pip install -r requirements-base.txt
+#   pip install -r requirements-training.txt
+#
+# Or use this file directly (may fail on macOS due to xformers):
+#   pip install -r requirements.txt
+
 torch>=2.0.0
 transformers>=4.46.0
 tokenizers>=0.20.0
 datasets>=2.14.0
 huggingface_hub>=0.20.3
 accelerate>=0.24.0
-# flash-attn>=2.3.0  # Commented out - requires CUDA dev tools
-xformers>=0.0.22
+xformers>=0.0.22  # GPU-only, will fail on macOS
 rouge-score>=0.1.2
 bert-score>=0.3.13
 nltk>=3.8
@@ -20,3 +31,4 @@ scikit-learn>=1.3.0
 flask>=3.0.0
 werkzeug>=3.0.0
 pytesseract>=0.3.10
+python-dotenv>=1.0.0

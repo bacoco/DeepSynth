@@ -1,0 +1,7 @@
+# Additional requirements for GPU training (Linux with CUDA only)
+# Install base requirements first: pip install -r requirements-base.txt
+# Then install training requirements: pip install -r requirements-training.txt
+
+# GPU-optimized libraries (require CUDA and proper compiler)
+xformers>=0.0.22
+# flash-attn>=2.3.0  # Uncomment if you have CUDA dev tools
