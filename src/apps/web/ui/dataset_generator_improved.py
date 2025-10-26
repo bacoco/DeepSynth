@@ -304,12 +304,62 @@ class ModelTrainer:
                 bidrop_passes=int(config.get('bidrop_passes', 1)),
             )
 
-            # Load dataset
-            dataset_repo = config.get('dataset_repo')
-            if not dataset_repo:
-                raise ValueError("dataset_repo is required for training")
+            # Load datasets (can be multiple)
+            dataset_repos = config.get('dataset_repos')
+            if not dataset_repos:
+                # Fallback to single dataset_repo for backward compatibility
+                dataset_repo = config.get('dataset_repo')
+                if dataset_repo:
+                    dataset_repos = [dataset_repo]
+                else:
+                    raise ValueError("dataset_repos is required for training")
 
-            logger.info(f"Loading training dataset from {dataset_repo}")
+            split_id = config.get('split_id')
+            if split_id:
+                # Use train split only (exclude benchmark)
+                logger.info(f"Using split {split_id} for training (benchmark excluded)")
+                train_indices = self.state_manager.get_split_indices(split_id, "train")
+
+                if not train_indices:
+                    raise ValueError(f"No train indices found for split_id: {split_id}")
+
+                # Load and filter each dataset
+                from datasets import concatenate_datasets, load_dataset
+
+                train_datasets = []
+                for repo in dataset_repos:
+                    logger.info(f"Loading training samples from {repo}...")
+                    ds = load_dataset(repo, split="train")
+
+                    # Filter to train indices only
+                    repo_indices = train_indices.get(repo, [])
+                    if repo_indices:
+                        ds_filtered = ds.select(repo_indices)
+                        train_datasets.append(ds_filtered)
+                        logger.info(f"  Loaded {len(ds_filtered)} training samples from {repo}")
+
+                if not train_datasets:
+                    raise ValueError("No training samples loaded!")
+
+                # Combine all datasets
+                combined_dataset = concatenate_datasets(train_datasets)
+                logger.info(f"Combined dataset: {len(combined_dataset)} total training samples")
+
+            else:
+                # No split_id: load entire datasets (backward compatibility)
+                logger.warning("No split_id provided - using entire datasets (no benchmark split)")
+
+                from datasets import concatenate_datasets, load_dataset
+
+                train_datasets = []
+                for repo in dataset_repos:
+                    logger.info(f"Loading entire dataset from {repo}...")
+                    ds = load_dataset(repo, split="train")
+                    train_datasets.append(ds)
+                    logger.info(f"  Loaded {len(ds)} samples from {repo}")
+
+                combined_dataset = concatenate_datasets(train_datasets)
+                logger.info(f"Combined dataset: {len(combined_dataset)} total samples")
 
             # Create trainer based on type
             if trainer_type == 'production':
@@ -340,20 +390,34 @@ class ModelTrainer:
                 job_state.processed_samples = processed
                 self.state_manager.update_job(job_state)
 
-            # Use appropriate training method based on trainer type
+            # Train on combined dataset
+            logger.info(f"Starting training on {len(combined_dataset)} samples...")
+
             if trainer_type == 'production':
-                metrics, checkpoints = trainer.train_from_hf_dataset(
-                    dataset_repo,
+                # Production trainer has train() method that accepts dataset directly
+                metrics, checkpoints = trainer.train(
+                    combined_dataset,
                     progress_callback=progress_callback_wrapper
                 )
             else:
-                # For other trainers, we need to load the dataset and call train()
-                dataset = load_dataset(dataset_repo, split='train')
-                trainer.train(dataset)
+                # Other trainers also use train() method
+                trainer.train(combined_dataset)
 
                 # Create compatible return values
                 metrics = {}
                 checkpoints = {'last_checkpoint': trainer_config.output_dir}
+
+            # Push final model to HuggingFace if configured
+            if trainer_config.push_to_hub and trainer_config.hub_model_id:
+                logger.info(f"Pushing final model to {trainer_config.hub_model_id}...")
+                # The trainers should handle this, but we can add it here for safety
+                # Create model card with dataset info
+                self._create_model_card(
+                    hub_model_id=trainer_config.hub_model_id,
+                    datasets=dataset_repos,
+                    trainer_config=trainer_config,
+                    metrics=metrics
+                )
 
             # Update job
             job.status = JobStatus.COMPLETED.value
@@ -375,3 +439,124 @@ class ModelTrainer:
             job.last_error = str(e)
             self.state_manager.update_job(job)
             raise
+
+    def _create_model_card(
+        self,
+        hub_model_id: str,
+        datasets: list,
+        trainer_config,
+        metrics: dict
+    ):
+        """Create initial model card on HuggingFace."""
+        from huggingface_hub import HfApi
+
+        # Determine languages from datasets
+        languages = set()
+        for ds in datasets:
+            name = ds.split('/')[-1]
+            if 'fr' in name:
+                languages.add('fr')
+            elif 'es' in name:
+                languages.add('es')
+            elif 'de' in name:
+                languages.add('de')
+            elif 'en' in name:
+                languages.add('en')
+
+        lang_list = '\n'.join(f'- {lang}' for lang in sorted(languages))
+        datasets_list = '\n'.join(f'- {ds}' for ds in datasets)
+
+        card_content = f"""---
+language:
+{lang_list}
+license: apache-2.0
+tags:
+- deepseek-ocr
+- summarization
+- multilingual
+- vision-language-model
+datasets:
+{datasets_list}
+metrics:
+- rouge
+- bertscore
+---
+
+# {hub_model_id}
+
+## Model Description
+
+Fine-tuned DeepSeek-OCR model for multilingual document summarization.
+
+This model uses a frozen visual encoder (380M parameters) and fine-tunes the MoE decoder (570M active parameters) for improved summarization across multiple languages.
+
+## Training Data
+
+{datasets_list}
+
+Total training samples: {metrics.get('total_samples', 'N/A')}
+
+## Training Configuration
+
+- **Base Model**: {trainer_config.model_name}
+- **Trainer Type**: Production (frozen encoder + fine-tuned decoder)
+- **Batch Size**: {trainer_config.batch_size}
+- **Epochs**: {trainer_config.num_epochs}
+- **Learning Rate**: {trainer_config.optimizer.learning_rate}
+- **Mixed Precision**: {trainer_config.mixed_precision}
+- **Gradient Accumulation Steps**: {trainer_config.gradient_accumulation_steps}
+
+## MoE Dropout Configuration
+
+- **Expert Dropout Rate**: {trainer_config.expert_dropout_rate}
+- **Gate Dropout Rate**: {trainer_config.gate_dropout_rate}
+- **Bi-Drop Passes**: {trainer_config.bidrop_passes}
+
+## Usage
+
+```python
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+model = AutoModelForSeq2SeqLM.from_pretrained("{hub_model_id}")
+tokenizer = AutoTokenizer.from_pretrained("{hub_model_id}")
+
+# For vision-based input (recommended for DeepSeek-OCR)
+# See DeepSeek-OCR documentation for image processing
+
+# For text-based input (fallback)
+text = "Your document text here..."
+inputs = tokenizer(text, return_tensors="pt", max_length=512, truncation=True)
+outputs = model.generate(**inputs, max_length=128)
+summary = tokenizer.decode(outputs[0], skip_special_tokens=True)
+```
+
+## Benchmark Results
+
+(To be updated after evaluation)
+
+## Citation
+
+```bibtex
+@misc{{deepsynth2025,
+  title={{DeepSynth: Multilingual Document Summarization}},
+  author={{DeepSynth Team}},
+  year={{2025}},
+  url={{https://huggingface.co/{hub_model_id}}}
+}}
+```
+"""
+
+        try:
+            api = HfApi(token=trainer_config.hub_token)
+            api.upload_file(
+                path_or_fileobj=card_content.encode('utf-8'),
+                path_in_repo="README.md",
+                repo_id=hub_model_id,
+                repo_type="model",
+                token=trainer_config.hub_token,
+                commit_message="Initialize model card with training info"
+            )
+            logger.info(f"✅ Model card created for {hub_model_id}")
+        except Exception as e:
+            logger.warning(f"Failed to create model card: {e}")
+            # Don't fail training just because of model card
