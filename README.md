@@ -13,7 +13,7 @@
 python run_complete_multilingual_pipeline.py
 ```
 
-Automatically downloads MLSUM data (3.3GB), processes 1.24M+ multilingual examples with incremental HuggingFace uploads, visual text encoding, and resumable pipeline—all optimized for production scale.
+Automatically downloads MLSUM data (3.3GB), processes 1.29M+ multilingual examples with incremental HuggingFace uploads, visual text encoding, and resumable pipeline—all optimized for production scale.
 
 ---
 
@@ -43,7 +43,7 @@ Automatically downloads MLSUM data (3.3GB), processes 1.24M+ multilingual exampl
 | 🇺🇸 **English BBC** | XSum Reduced | ~50,000 | ✅ Priority #5 |
 | 📜 **Legal English** | BillSum | 22,218 | ✅ Priority #6 |
 
-**Total: ~1.24M+ multilingual summarization examples**
+**Total: ~1.29M+ multilingual summarization examples**
 
 > **Note**: MLSUM English and Chinese are not available in the original dataset. English coverage is provided through CNN/DailyMail and XSum alternatives.
 
@@ -64,7 +64,7 @@ python incremental_builder.py  # Process all languages
 2. ✅ Generates visual representations (PNG images from text)
 3. ✅ Incremental processing with automatic resume on interruption
 4. ✅ Uploads to HuggingFace every 5,000 samples (no data loss)
-5. ✅ Creates unified multilingual dataset with 1.39M+ examples
+5. ✅ Creates unified multilingual dataset with 1.29M+ examples
 6. ✅ Ready for DeepSeek-OCR fine-tuning in any language
 
 ### 🧠 **Cutting-Edge Architecture**

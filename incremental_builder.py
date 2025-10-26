@@ -93,7 +93,7 @@ class IncrementalBuilder:
             print(f"      ⚠ Error extracting fields: {e}")
             return '', ''
 
-    def process_dataset(self, name, subset, text_field, summary_field, batch_size=500):
+    def process_dataset(self, name, subset, text_field, summary_field, *, max_samples=None, batch_size=500):
         if name in self.progress['completed']:
             print(f"✅ {name} déjà complété")
             return
@@ -105,6 +105,7 @@ class IncrementalBuilder:
             'MLSUM': ['train', 'validation', 'test'],
             'billsum': ['train', 'test'],
             'cnn_dailymail': ['train', 'validation', 'test'],
+            'ccdv/arxiv-summarization': ['train'],
             'Rexhaif/xsum_reduced': ['train'],  # XSum reduced version
         }
         splits = splits_map.get(name, ['train'])
@@ -178,10 +179,15 @@ class IncrementalBuilder:
                         continue  # Skip this dataset and continue with others
 
                 total = len(dataset)
-                print(f"    📊 {total} échantillons")
+                limit = min(total, max_samples) if max_samples is not None else total
+                print(f"    📊 {limit} échantillons" + (f" (sur {total} disponibles)" if limit < total else ""))
+
+                if start_idx >= limit:
+                    print(f"    ✅ Limite configurée atteinte pour {split} ({limit} échantillons)")
+                    continue
 
                 batch = []
-                for idx in range(start_idx, total):
+                for idx in range(start_idx, limit):
                     self.progress.update({'current': name, 'split': split, 'index': idx})
 
                     example = dataset[idx]
@@ -216,7 +222,7 @@ class IncrementalBuilder:
                             self.uploader.upload_if_ready()
 
                     if (idx + 1) % 500 == 0:
-                        print(f"      📈 {idx + 1}/{total} ({(idx + 1)/total*100:.1f}%)")
+                        print(f"      📈 {idx + 1}/{limit} ({(idx + 1)/limit*100:.1f}%)")
 
                 # Dernier batch
                 if batch:
@@ -231,7 +237,8 @@ class IncrementalBuilder:
                 raise
 
         # Marquer comme complété
-        self.progress['completed'].append(name)
+        if name not in self.progress['completed']:
+            self.progress['completed'].append(name)
         self.progress.update({'current': None, 'split': None, 'index': 0})
         self.save_progress()
         print(f"✅ {name} terminé")
@@ -292,6 +299,15 @@ def main():
 
     builder = IncrementalBuilder()
 
+    try:
+        arxiv_limit = int(os.getenv('ARXIV_IMAGE_SAMPLES', '50000'))
+    except ValueError:
+        print("⚠️  ARXIV_IMAGE_SAMPLES invalide. Utilisation de 50000 par défaut.")
+        arxiv_limit = 50000
+    if arxiv_limit <= 0:
+        print("⚠️  ARXIV_IMAGE_SAMPLES doit être positif. Utilisation de 10000 par défaut.")
+        arxiv_limit = 10000
+
     sources = [
         # PRIORITY: MLSUM Multilingual Summarization (auto-download enabled)
         ('MLSUM', 'fr', 'text', 'summary'),                          # French news summarization - 392k examples
@@ -300,13 +316,16 @@ def main():
 
         # PRIORITY: English Summarization Datasets (verified and ready)
         ('cnn_dailymail', '3.0.0', 'article', 'highlights'),         # English news articles - 287k examples
+        ('ccdv/arxiv-summarization', None, 'article', 'abstract', arxiv_limit),  # Scientific papers (sampled subset)
         ('Rexhaif/xsum_reduced', None, 'text', 'target'),            # English BBC articles - XSum reduced version
         ('billsum', None, 'text', 'summary'),                        # Legal documents - US bills (~22k examples)
     ]
 
     try:
-        for name, subset, text_field, summary_field in sources:
-            builder.process_dataset(name, subset, text_field, summary_field)
+        for entry in sources:
+            name, subset, text_field, summary_field, *rest = entry
+            max_samples = rest[0] if rest else None
+            builder.process_dataset(name, subset, text_field, summary_field, max_samples=max_samples)
 
         final_repo = builder.create_final_dataset(repo_name)
         print(f"\\n🎉 SUCCÈS: https://huggingface.co/datasets/{final_repo}")
