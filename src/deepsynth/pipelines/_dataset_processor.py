@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Pipeline pour créer des datasets séparés par langue/type sur HuggingFace.
-Chaque dataset aura un nom de la forme: deepsynth-fr, deepsynth-es, etc.
+Pipeline optimisé pour créer des datasets séparés par langue sur HuggingFace.
+VERSION 2: Upload incrémental par batches de 5000, pas de splits, métadonnées seulement.
 """
 
 import os
@@ -9,32 +9,32 @@ import json
 import pickle
 from pathlib import Path
 
-from datasets import Dataset, DatasetDict, load_dataset
+from datasets import load_dataset
 from huggingface_hub import HfApi, login, whoami
 
 from deepsynth.config import load_shared_env
 from deepsynth.data.loaders import MLSUMLoader
 from deepsynth.data.transforms import TextToImageConverter
+from deepsynth.pipelines.uploaders.incremental import EfficientIncrementalUploader
 
-__all__ = ["SeparateDatasetsPipeline", "run_separate_datasets_pipeline"]
+__all__ = ["OptimizedDatasetPipeline", "run_optimized_pipeline"]
 
-# Load environment variables
 load_shared_env()
 
 # Mapping des datasets vers leurs noms de sortie
 DATASET_NAMING = {
-    ('MLSUM', 'fr'): 'deepsynth-fr',                    # Français - 392k exemples
-    ('MLSUM', 'es'): 'deepsynth-es',                    # Espagnol - 266k exemples
-    ('MLSUM', 'de'): 'deepsynth-de',                    # Allemand - 220k exemples
-    ('cnn_dailymail', '3.0.0'): 'deepsynth-en-news',   # Anglais actualités - 287k exemples
-    ('ccdv/arxiv-summarization', None): 'deepsynth-en-arxiv',  # Anglais scientifique - 50k exemples
-    ('Rexhaif/xsum_reduced', None): 'deepsynth-en-xsum',       # Anglais BBC - 50k exemples
-    ('billsum', None): 'deepsynth-en-legal',                   # Anglais juridique - 22k exemples
+    ('MLSUM', 'fr'): 'deepsynth-fr',
+    ('MLSUM', 'es'): 'deepsynth-es',
+    ('MLSUM', 'de'): 'deepsynth-de',
+    ('cnn_dailymail', '3.0.0'): 'deepsynth-en-news',
+    ('ccdv/arxiv-summarization', None): 'deepsynth-en-arxiv',
+    ('Rexhaif/xsum_reduced', None): 'deepsynth-en-xsum',
+    ('billsum', None): 'deepsynth-en-legal',
 }
 
 class OptimizedConverter(TextToImageConverter):
     def __init__(self):
-        # Auto-detect Unicode font for multilingual support (French, Spanish, German accents)
+        # Auto-detect Unicode font for multilingual support
         unicode_font_path = self._find_unicode_font()
         super().__init__(
             font_path=unicode_font_path,
@@ -44,26 +44,24 @@ class OptimizedConverter(TextToImageConverter):
 
     @staticmethod
     def _find_unicode_font():
-        """Find a Unicode-capable font on the system for multilingual text (French, Spanish, German)."""
+        """Find a Unicode-capable font on the system."""
         import os
         import platform
 
-        # Priority order: fonts with best Unicode/multilingual support
         font_paths = []
-
         system = platform.system()
 
         if system == 'Darwin':  # macOS
             font_paths = [
-                '/Library/Fonts/DejaVuSans.ttf',                    # Installed by setup.sh
-                '/System/Library/Fonts/Helvetica.ttc',              # Native macOS (good Unicode)
-                '/System/Library/Fonts/SFNSText.ttf',               # San Francisco
+                '/Library/Fonts/DejaVuSans.ttf',
+                '/System/Library/Fonts/Helvetica.ttc',
+                '/System/Library/Fonts/SFNSText.ttf',
                 '/System/Library/Fonts/Supplemental/Arial Unicode.ttf',
             ]
         elif system == 'Linux':
             font_paths = [
-                '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',  # Ubuntu/Debian
-                '/usr/share/fonts/dejavu/DejaVuSans.ttf',           # Fedora/CentOS
+                '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+                '/usr/share/fonts/dejavu/DejaVuSans.ttf',
                 '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
                 '/usr/share/fonts/liberation/LiberationSans-Regular.ttf',
             ]
@@ -73,29 +71,47 @@ class OptimizedConverter(TextToImageConverter):
                 'C:\\Windows\\Fonts\\calibri.ttf',
             ]
 
-        # Find first available font
         for path in font_paths:
             if os.path.exists(path):
                 print(f"    ✅ Using Unicode font: {os.path.basename(path)}")
                 return path
 
-        # Fallback: no font path (PIL will use default bitmap font)
-        print("    ⚠️  No Unicode font found, using PIL default (accents may not render correctly)")
+        print("    ⚠️  No Unicode font found, using PIL default")
         return None
 
-class SeparateDatasetsPipeline:
-    def __init__(self, work_dir="./work_separate"):
+
+class OptimizedDatasetPipeline:
+    """
+    Pipeline optimisé avec:
+    - Upload incrémental par batches de 5000
+    - Téléchargement métadonnées seulement (pas d'images)
+    - Un seul dataset (pas de splits train/test/validation)
+    - Nettoyage automatique des fichiers locaux
+    """
+
+    def __init__(self, work_dir="./work_separate", batch_size=50):
         self.work_dir = Path(work_dir)
         self.work_dir.mkdir(exist_ok=True)
-        self.progress_file = self.work_dir / "progress_separate.json"
+
+        self.samples_dir = self.work_dir / "samples"
+        self.samples_dir.mkdir(exist_ok=True)
+
+        self.progress_file = self.work_dir / "progress.json"
         self.converter = OptimizedConverter()
         self.progress = self.load_progress()
+
+        self.batch_size = batch_size  # Samples per local batch file
+        self.current_batch = []
+        self.batch_counter = 0
 
     def load_progress(self):
         if self.progress_file.exists():
             with open(self.progress_file, 'r') as f:
                 return json.load(f)
-        return {'completed_datasets': []}
+        return {
+            'completed_datasets': [],
+            'processed_samples': {}  # {dataset_key: {(split, idx): True}}
+        }
 
     def save_progress(self):
         with open(self.progress_file, 'w') as f:
@@ -113,7 +129,6 @@ class SeparateDatasetsPipeline:
                 summary = example.get('target', example.get('summary', ''))
                 return text, summary
             else:
-                # Standard processing using provided field names (works for MLSUM)
                 return example.get(text_field, ''), example.get(summary_field, '')
         except Exception as e:
             print(f"      ⚠ Error extracting fields: {e}")
@@ -122,65 +137,71 @@ class SeparateDatasetsPipeline:
     def get_dataset_output_name(self, name, subset):
         """Get the output dataset name for HuggingFace"""
         key = (name, subset)
-        if key in DATASET_NAMING:
-            return DATASET_NAMING[key]
-        else:
-            # Fallback naming
-            if subset:
-                return f"deepsynth-{subset}"
-            else:
-                return f"deepsynth-{name.replace('/', '-')}"
+        return DATASET_NAMING.get(key, f"deepsynth-{subset or name.replace('/', '-')}")
 
-    def check_existing_dataset_progress(self, repo_name):
-        """Check existing dataset on HuggingFace and return progress info"""
+    def check_processed_indices(self, repo_name):
+        """
+        OPTIMIZED: Download ONLY metadata (indices), NOT images.
+        Returns set of (split, index) tuples already processed.
+        """
         try:
-            print(f"    🔍 Vérification du dataset existant: {repo_name}")
+            print(f"    🔍 Checking processed samples: {repo_name}")
 
-            # Try to load existing dataset
-            existing_dataset = load_dataset(repo_name, split='train')
+            # Download ONLY the metadata columns (no images!)
+            existing_metadata = load_dataset(
+                repo_name,
+                split='train',
+                columns=['original_index', 'original_split']
+            )
 
-            if 'original_index' in existing_dataset.column_names:
-                existing_indices = set(existing_dataset['original_index'])
-                last_index = max(existing_indices) if existing_indices else -1
-                total_processed = len(existing_indices)
+            processed = set()
+            for row in existing_metadata:
+                split = row.get('original_split', 'train')
+                idx = row['original_index']
+                processed.add((split, idx))
 
-                print(f"    📊 Dataset existant trouvé:")
-                print(f"      - {total_processed} échantillons déjà traités")
-                print(f"      - Dernier index traité: {last_index}")
-
-                return {
-                    'exists': True,
-                    'processed_indices': existing_indices,
-                    'last_index': last_index,
-                    'total_processed': total_processed,
-                    'existing_dataset': existing_dataset
-                }
-            else:
-                print(f"    ⚠️ Dataset existant sans colonne 'original_index', recommence depuis le début")
-                return {'exists': False}
+            print(f"    📊 Found {len(processed)} already processed (metadata only)")
+            return processed
 
         except Exception as e:
-            print(f"    ℹ️ Aucun dataset existant trouvé (normal pour nouveau dataset)")
-            return {'exists': False}
+            print(f"    ℹ️  No existing dataset (will create new)")
+            return set()
 
-    def process_and_upload_dataset(self, name, subset, text_field, summary_field, username, *, max_samples=None):
-        """Process a single dataset and upload it immediately to HuggingFace"""
+    def save_batch_to_disk(self):
+        """Save current batch to disk as pickle file"""
+        if not self.current_batch:
+            return
+
+        batch_file = self.samples_dir / f"batch_{self.batch_counter:06d}.pkl"
+        with open(batch_file, 'wb') as f:
+            pickle.dump(self.current_batch, f)
+
+        print(f"      💾 Saved batch {self.batch_counter} ({len(self.current_batch)} samples)")
+        self.batch_counter += 1
+        self.current_batch = []
+
+    def process_and_batch_dataset(self, name, subset, text_field, summary_field, username, *, max_samples=None):
+        """
+        Process dataset and save to batches (NO immediate upload).
+        Upload will be done incrementally by EfficientIncrementalUploader.
+        """
+        dataset_key = f"{name}_{subset}" if subset else name
 
         # Check if already completed
-        dataset_key = f"{name}_{subset}" if subset else name
         if dataset_key in self.progress['completed_datasets']:
-            print(f"✅ {dataset_key} déjà complété et uploadé")
+            print(f"✅ {dataset_key} already completed")
             return
 
         output_name = self.get_dataset_output_name(name, subset)
         repo_name = f"{username}/{output_name}"
 
-        print(f"\\n📥 Traitement: {name} ({subset}) → {repo_name}")
+        print(f"\n📥 Processing: {name} ({subset}) → {repo_name}")
 
-        # Check existing progress on HuggingFace
-        progress_info = self.check_existing_dataset_progress(repo_name)
+        # Check what's already processed (metadata only, fast!)
+        processed_keys = self.check_processed_indices(repo_name)
 
-        # Déterminer les splits
+        # Source splits (to load raw data)
+        # NOTE: Final dataset has NO splits - everything in 'train'
         splits_map = {
             'MLSUM': ['train', 'validation', 'test'],
             'billsum': ['train', 'test'],
@@ -190,92 +211,48 @@ class SeparateDatasetsPipeline:
         }
         splits = splits_map.get(name, ['train'])
 
-        # Start with existing samples if any
-        if progress_info['exists']:
-            all_samples = []
-            existing_dataset = progress_info['existing_dataset']
-
-            # Convert existing dataset back to list of samples
-            for i in range(len(existing_dataset)):
-                all_samples.append({
-                    'text': existing_dataset[i]['text'],
-                    'summary': existing_dataset[i]['summary'],
-                    'image': existing_dataset[i]['image'],
-                    'source_dataset': existing_dataset[i]['source_dataset'],
-                    'original_split': existing_dataset[i]['original_split'],
-                    'original_index': existing_dataset[i]['original_index'],
-                })
-
-            processed_indices = progress_info['processed_indices']
-            last_index = progress_info['last_index']
-            print(f"    🔄 Reprise à partir de l'index {last_index + 1}")
-        else:
-            all_samples = []
-            processed_indices = set()
-            last_index = -1
+        total_new = 0
 
         for split in splits:
-            print(f"  📂 Processing split: {split}")
+            print(f"  📂 Processing source split: {split}")
 
             try:
-                # Load dataset
+                # Load source dataset
                 if name == 'MLSUM':
-                    print(f"    🎯 Loading MLSUM {subset} using custom loader")
                     mlsum_loader = MLSUMLoader()
                     dataset_dict = mlsum_loader.load_language(subset)
-
-                    if split in dataset_dict:
-                        dataset = dataset_dict[split]
-                        print(f"    ✅ MLSUM {subset} {split} loaded successfully")
-                    else:
-                        print(f"    ❌ Split {split} not found for MLSUM {subset}")
+                    dataset = dataset_dict[split] if split in dataset_dict else None
+                    if dataset is None:
+                        print(f"    ❌ Split {split} not found")
                         continue
                 else:
-                    # Try loading with different strategies
-                    dataset = None
                     try:
                         if subset:
                             dataset = load_dataset(name, subset, split=split)
                         else:
                             dataset = load_dataset(name, split=split)
-                        print(f"    ✅ Direct loading successful")
-                    except Exception as e:
-                        try:
-                            if subset:
-                                dataset = load_dataset(name, subset, split=split, trust_remote_code=True)
-                            else:
-                                dataset = load_dataset(name, split=split, trust_remote_code=True)
-                            print(f"    ✅ Trust remote code successful")
-                        except Exception as e2:
-                            print(f"    ❌ Failed to load {name}: {e2}")
-                            continue
+                    except:
+                        if subset:
+                            dataset = load_dataset(name, subset, split=split, trust_remote_code=True)
+                        else:
+                            dataset = load_dataset(name, split=split, trust_remote_code=True)
 
                 total = len(dataset)
-                limit = min(total, max_samples) if max_samples is not None else total
+                limit = min(total, max_samples) if max_samples else total
 
-                # Calculate remaining work
-                remaining_indices = []
-                for idx in range(limit):
-                    # Create a unique key for this sample across all splits
-                    sample_key = f"{split}_{idx}"
-                    if idx not in processed_indices:
-                        remaining_indices.append(idx)
+                # Filter already processed
+                remaining = [idx for idx in range(limit) if (split, idx) not in processed_keys]
 
-                if not remaining_indices:
-                    print(f"    ✅ {split} déjà complètement traité ({limit} échantillons)")
+                if not remaining:
+                    print(f"    ✅ {split} already complete ({limit} samples)")
                     continue
 
-                print(f"    📊 {len(remaining_indices)} échantillons restants à traiter sur {limit}")
-                print(f"    📈 Progression: {((limit - len(remaining_indices)) / limit * 100):.1f}% déjà fait")
+                print(f"    📊 {len(remaining)}/{limit} samples to process ({len(processed_keys)} already done)")
 
-                # Process only remaining samples
-                split_samples = []
-                processed_count = 0
-
-                for idx in remaining_indices:
-                    processed_count += 1
-                    if processed_count % 1000 == 0:
-                        print(f"      📈 {processed_count}/{len(remaining_indices)} ({processed_count/len(remaining_indices)*100:.1f}%)")
+                # Process samples
+                for count, idx in enumerate(remaining, 1):
+                    if count % 1000 == 0:
+                        print(f"      📈 {count}/{len(remaining)} ({count/len(remaining)*100:.1f}%)")
 
                     example = dataset[idx]
                     text, summary = self._extract_text_and_summary(example, name, text_field, summary_field)
@@ -285,140 +262,110 @@ class SeparateDatasetsPipeline:
 
                     try:
                         image = self.converter.convert(text)
-                        split_samples.append({
+
+                        # Add to current batch
+                        self.current_batch.append({
                             'text': text,
                             'summary': summary,
                             'image': image,
                             'source_dataset': name,
-                            'original_split': split,
+                            'original_split': split,  # Source split (for tracking only)
                             'original_index': idx
                         })
+
+                        total_new += 1
+
+                        # Save batch when full
+                        if len(self.current_batch) >= self.batch_size:
+                            self.save_batch_to_disk()
+
                     except Exception as e:
                         print(f"      ❌ Sample {idx}: {e}")
                         continue
 
-                all_samples.extend(split_samples)
-                print(f"    ✅ {split} completed: {len(split_samples)} nouveaux échantillons traités")
+                print(f"    ✅ {split} processed: {len(remaining)} new samples")
 
             except Exception as e:
                 print(f"    ❌ Error processing {split}: {e}")
                 continue
 
-        if not all_samples:
-            print(f"    ❌ No samples processed for {name}")
-            return
+        # Save remaining samples
+        if self.current_batch:
+            self.save_batch_to_disk()
 
-        print(f"\\n🔧 Creating dataset with {len(all_samples)} samples...")
+        if total_new > 0:
+            print(f"\n  ✅ Total new samples batched: {total_new}")
+            print(f"  📦 Batches saved: {self.batch_counter}")
+        else:
+            print(f"\n  ℹ️  No new samples to process")
 
-        # Create dataset
-        dataset = Dataset.from_dict({
-            'text': [s['text'] for s in all_samples],
-            'summary': [s['summary'] for s in all_samples],
-            'image': [s['image'] for s in all_samples],
-            'source_dataset': [s['source_dataset'] for s in all_samples],
-            'original_split': [s['original_split'] for s in all_samples],
-            'original_index': [s['original_index'] for s in all_samples],
-        })
+        # Mark as completed
+        self.progress['completed_datasets'].append(dataset_key)
+        self.save_progress()
 
-        from datasets import Image as ImageFeature
-        dataset = dataset.cast_column("image", ImageFeature())
 
-        # Pas de split train/validation - tout reste dans 'train'
-        # Le split se fera au moment de l'entraînement selon les besoins
-        dataset_dict = DatasetDict({'train': dataset})
-
-        # Upload to HuggingFace
-        try:
-            if progress_info['exists']:
-                print(f"\\n📤 Mise à jour du dataset existant: {repo_name}")
-                print(f"    📊 Total final: {len(all_samples)} échantillons")
-            else:
-                print(f"\\n📤 Création du nouveau dataset: {repo_name}")
-                print(f"    📊 Total: {len(all_samples)} échantillons")
-
-            dataset_dict.push_to_hub(repo_name, private=False, token=os.getenv('HF_TOKEN'))
-
-            print(f"✅ Successfully uploaded: https://huggingface.co/datasets/{repo_name}")
-
-            # Mark as completed
-            self.progress['completed_datasets'].append(dataset_key)
-            self.save_progress()
-
-        except Exception as e:
-            print(f"❌ Failed to upload {repo_name}: {e}")
-            raise
-
-def run_separate_datasets_pipeline():
-    print("🎯 CRÉATION DE DATASETS SÉPARÉS PAR LANGUE")
-    print("=" * 60)
+def run_optimized_pipeline():
+    """Run the optimized pipeline with incremental uploads"""
+    print("🎯 PIPELINE OPTIMISÉ - UPLOAD INCRÉMENTAL")
+    print("=" * 70)
 
     login(token=os.getenv('HF_TOKEN'))
     username = whoami()['name']
 
     print(f"Username: {username}")
-    print("\\n📊 Datasets à créer:")
-    for (name, subset), output_name in DATASET_NAMING.items():
-        print(f"  - {name} ({subset}) → {username}/{output_name}")
+    print("\n📊 Configuration:")
+    print("  • Upload incrémental par batches de ~5000 samples")
+    print("  • Téléchargement métadonnées seulement (pas d'images)")
+    print("  • Un seul dataset (pas de splits train/test/validation)")
+    print("  • Nettoyage automatique après upload")
 
-    builder = SeparateDatasetsPipeline()
+    pipeline = OptimizedDatasetPipeline()
 
     # Get arXiv limit
     try:
         arxiv_limit = int(os.getenv('ARXIV_IMAGE_SAMPLES', '50000'))
     except ValueError:
-        print("⚠️  ARXIV_IMAGE_SAMPLES invalide. Utilisation de 50000 par défaut.")
         arxiv_limit = 50000
-    if arxiv_limit <= 0:
-        print("⚠️  ARXIV_IMAGE_SAMPLES doit être positif. Utilisation de 10000 par défaut.")
-        arxiv_limit = 10000
 
-    # Define sources with their configurations - ORDRE DE PRIORITÉ
+    # Define sources (priority order)
     sources = [
-        # PRIORITÉ 1: CNN/DailyMail (Anglais actualités) - Le plus demandé
         ('cnn_dailymail', '3.0.0', 'article', 'highlights', None),
-
-        # PRIORITÉ 2: arXiv (Anglais scientifique) - Recherche
         ('ccdv/arxiv-summarization', None, 'article', 'abstract', arxiv_limit),
-
-        # PRIORITÉ 3: XSum BBC (Anglais BBC News) - Actualités courtes
         ('Rexhaif/xsum_reduced', None, 'text', 'target', None),
-
-        # PRIORITÉ 4: Français MLSUM - Multilingue commence ici
         ('MLSUM', 'fr', 'text', 'summary', None),
-
-        # PRIORITÉ 5: Autres langues MLSUM
         ('MLSUM', 'es', 'text', 'summary', None),
         ('MLSUM', 'de', 'text', 'summary', None),
-
-        # PRIORITÉ 6: Juridique (plus spécialisé)
         ('billsum', None, 'text', 'summary', None),
     ]
 
     try:
         for name, subset, text_field, summary_field, max_samples in sources:
-            builder.process_and_upload_dataset(
+            pipeline.process_and_batch_dataset(
                 name, subset, text_field, summary_field, username,
                 max_samples=max_samples
             )
 
-        print(f"\\n🎉 TOUS LES DATASETS CRÉÉS AVEC SUCCÈS!")
-        print("\\n📊 Datasets disponibles:")
-        for (name, subset), output_name in DATASET_NAMING.items():
-            print(f"  🔗 https://huggingface.co/datasets/{username}/{output_name}")
+        # Upload batches incrementally
+        print("\n" + "=" * 70)
+        print("📤 UPLOAD INCRÉMENTAL DES BATCHES")
+        print("=" * 70)
 
-        # Cleanup
-        import shutil
-        if builder.work_dir.exists():
-            shutil.rmtree(builder.work_dir)
-            print("\\n🧹 Nettoyage terminé")
+        uploader = EfficientIncrementalUploader(
+            work_dir=str(pipeline.work_dir),
+            batches_per_upload=100  # Upload every ~5000 samples
+        )
+        uploader.upload_all_pending()
+
+        print("\n🎉 PIPELINE TERMINÉ AVEC SUCCÈS!")
 
     except KeyboardInterrupt:
-        print("\\n⏸️ Interruption - relancez pour continuer")
-        builder.save_progress()
+        print("\n⏸️  Interrupted - relaunch to continue")
+        pipeline.save_progress()
     except Exception as e:
-        print(f"\\n❌ Erreur: {e}")
-        builder.save_progress()
+        print(f"\n❌ Error: {e}")
+        pipeline.save_progress()
         raise
 
+
 if __name__ == "__main__":
-    run_separate_datasets_pipeline()
+    run_optimized_pipeline()
