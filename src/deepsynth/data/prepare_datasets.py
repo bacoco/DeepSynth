@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Iterable
 
 from .dataset_loader import DatasetConfig, SummarizationDataset, load_local_jsonl, split_records
-from .text_to_image import TextToImageConverter, batch_convert
+from .transforms.text_to_image import TextToImageConverter, batch_convert
 
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)

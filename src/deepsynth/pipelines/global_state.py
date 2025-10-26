@@ -7,23 +7,19 @@ and enable seamless continuation from any machine.
 
 import os
 from pathlib import Path
-from datasets import load_dataset
-from huggingface_hub import login, whoami, HfApi
-from data.text_to_image import TextToImageConverter
-from mlsum_loader import MLSUMLoader
-from hf_shard_uploader import HubShardManager
+
+from datasets import load_dataset, load_from_disk
+from huggingface_hub import HfApi, login, whoami
+
+from deepsynth.config import load_shared_env
+from deepsynth.data.hub import HubShardManager
+from deepsynth.data.loaders import MLSUMLoader
+from deepsynth.data.transforms import TextToImageConverter
 
 __all__ = ["GlobalIncrementalPipeline", "run_global_incremental_pipeline"]
 
 # Load environment variables
-env_file = Path('.env')
-if env_file.exists():
-    with open(env_file) as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith('#') and '=' in line:
-                key, value = line.split('=', 1)
-                os.environ[key] = value
+load_shared_env()
 
 class GlobalIncrementalPipeline:
     def __init__(self):
