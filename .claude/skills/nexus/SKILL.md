@@ -73,39 +73,48 @@ NEXUS generates a markdown file with prioritized skill recommendations:
 
 ---
 
-## When Claude activates NEXUS
+## When NEXUS runs automatically
 
-NEXUS runs:
-- **Automatically**: Every 24 hours (configurable)
-- **On demand**: When you ask "What skills should I generate?"
-- **After PRD changes**: When you update requirements
-- **When SOUL detects high-frequency patterns**
+NEXUS monitors and generates skills:
+- **Periodically**: Every 30 minutes (via cron or background task)
+- **On git commit**: Via post-commit hook (optional)
+- **When SOUL detects critical patterns**: Immediate generation for critical priority
+- **After PRD updates**: When requirements change
+
+**Skills are generated automatically** when:
+- Pattern appears ≥ 5 times (threshold configurable)
+- Priority is high or critical
+- Skill doesn't already exist
 
 ---
 
-## Workflow
+## Workflow (Automatic)
 
 ```
 User works on project
         ↓
 SOUL traces everything
         ↓
-NEXUS analyzes periodically:
+NEXUS monitors automatically (every 30min or on git commit):
   - SOUL memory (patterns)
   - PRD files (requirements)
   - Task lists (TODO)
   - Code (optional)
         ↓
-Generates NEXUS_RECOMMENDATIONS.md
+Detects patterns >= threshold
         ↓
-Claude reads recommendations
+Auto-generates skills if priority >= high:
+  - Creates .claude/skills/[skill-name]/
+  - Generates SKILL.md
+  - Creates scripts if needed
+  - Logs in SOUL
         ↓
-You: "Generate the api-optimizer skill"
+New skill ready immediately!
         ↓
-skill-generator creates it
-        ↓
-New skill ready!
+Claude uses it automatically
 ```
+
+**No user intervention needed** - NEXUS watches and creates skills automatically.
 
 ---
 
@@ -137,10 +146,26 @@ Create `.nexus_config.json`:
 
 ---
 
-## Manual execution
+## Manual execution (optional)
 
+**Automatic mode** (recommended - generates skills automatically):
 ```bash
-# Run full analysis
+# Run auto-generator with defaults (threshold=5, days=7, priority>=high)
+python .claude/skills/nexus/scripts/auto_skill_generator.py
+
+# Custom settings
+python .claude/skills/nexus/scripts/auto_skill_generator.py \
+  --threshold 3 \
+  --days 14 \
+  --auto-threshold medium
+
+# Dry-run (analyze only, don't generate)
+python .claude/skills/nexus/scripts/auto_skill_generator.py --dry-run
+```
+
+**Analysis only** (generates recommendations, doesn't create skills):
+```bash
+# Just analyze and create NEXUS_RECOMMENDATIONS.md
 python .claude/skills/nexus/scripts/nexus_analyzer.py
 
 # Custom parameters
@@ -148,10 +173,16 @@ python .claude/skills/nexus/scripts/nexus_analyzer.py \
   --threshold 3 \
   --days 14 \
   --output MY_RECOMMENDATIONS.md
+```
 
-# Specific repository
-python .claude/skills/nexus/scripts/nexus_analyzer.py \
-  --repo /path/to/project
+**Setup automatic monitoring**:
+```bash
+# Add to crontab for every 30 minutes
+*/30 * * * * /path/to/.claude/skills/scripts/nexus_auto_watch.sh
+
+# Or run as git hook (add to .git/hooks/post-commit)
+#!/bin/bash
+.claude/skills/scripts/nexus_auto_watch.sh &
 ```
 
 ---
