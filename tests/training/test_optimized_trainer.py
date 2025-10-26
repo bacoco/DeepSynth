@@ -146,6 +146,42 @@ class TestDeepSynthDataset:
         item = dataset[0]
         assert item is dataset._encoding_cache[0]
 
+    def test_dataset_preserves_indexable_inputs(self, sample_data, mock_tokenizer):
+        """Dataset should keep indexable structures without conversion."""
+
+        class DummyDataset:
+            def __init__(self, records):
+                self._records = tuple(records)
+
+            def __len__(self):
+                return len(self._records)
+
+            def __getitem__(self, index):
+                return self._records[index]
+
+        dummy = DummyDataset(sample_data)
+        dataset = DeepSynthDataset(dummy, mock_tokenizer, cache_encodings=False)
+
+        assert dataset.data is dummy
+        assert len(dataset) == len(dummy)
+
+    def test_dataset_cache_guard(self, mock_tokenizer):
+        """Ensure cache guard prevents pre-encoding large datasets."""
+
+        large_data = [
+            {"text": f"Doc {idx}", "summary": f"Summary {idx}"}
+            for idx in range(10)
+        ]
+
+        dataset = DeepSynthDataset(
+            large_data,
+            mock_tokenizer,
+            cache_encodings=True,
+            max_cache_size=5,
+        )
+
+        assert dataset._encoding_cache == {}
+
     def test_dataset_with_images(self, mock_tokenizer):
         """Test dataset handles images correctly."""
         from PIL import Image
