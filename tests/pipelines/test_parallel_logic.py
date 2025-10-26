@@ -5,14 +5,14 @@ Teste avec un petit nombre d'échantillons pour vérifier que tout fonctionne
 """
 
 import os
-import sys
 import time
 import logging
 
-# Ajouter le répertoire parent au path pour les imports
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import pytest
 
-from parallel_processing.parallel_datasets_builder import ParallelDatasetsBuilder
+from deepsynth.pipelines.parallel import ParallelDatasetsBuilder
+
+pytestmark = pytest.mark.skip(reason="legacy integration scenario requiring Hugging Face access")
 
 # Configuration du logging pour le test
 logging.basicConfig(

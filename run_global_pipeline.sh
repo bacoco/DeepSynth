@@ -15,8 +15,8 @@ echo "🎯 ArXiv sampling limit: ${ARXIV_IMAGE_SAMPLES} articles converted to im
 echo ""
 
 # Check if we're in the right directory
-if [[ ! -f "global_incremental_builder.py" ]]; then
-    echo "❌ Error: global_incremental_builder.py not found"
+if [[ ! -f "src/deepsynth/pipelines/global_incremental.py" ]]; then
+    echo "❌ Error: src/deepsynth/pipelines/global_incremental.py not found"
     echo "💡 Please run this script from the DeepSynth repository root (legacy slug: deepseek-synthesia)"
     exit 1
 fi
@@ -168,7 +168,7 @@ echo "💡 You can interrupt with Ctrl+C and resume later from any computer"
 echo "============================================================"
 
 # Launch the pipeline
-python global_incremental_builder.py
+python -m deepsynth.pipelines.global_incremental
 
 echo ""
 echo "🎉 PIPELINE COMPLETED!"

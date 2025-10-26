@@ -3,22 +3,18 @@ Flask web application for dataset generation and model training.
 Provides a minimalist UI with real-time monitoring and job management.
 """
 
-import os
-import sys
-from pathlib import Path
-from flask import Flask, render_template, request, jsonify
-from threading import Thread
 import logging
+import os
+from threading import Thread
 
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+from flask import Flask, render_template, request, jsonify
 
-from web_ui.state_manager import StateManager, JobStatus
-from web_ui.dataset_generator_improved import IncrementalDatasetGenerator, ModelTrainer
-from training.optimal_configs import (
+from .state_manager import StateManager, JobStatus
+from .dataset_generator_improved import IncrementalDatasetGenerator, ModelTrainer
+from deepsynth.training.optimal_configs import (
     list_benchmark_datasets,
     get_optimal_config,
-    PRESET_CONFIGS
+    PRESET_CONFIGS,
 )
 
 # Configure logging

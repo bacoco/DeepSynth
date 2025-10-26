@@ -17,7 +17,8 @@ Features:
 import os
 import sys
 from pathlib import Path
-from incremental_builder import main as run_incremental_builder
+
+from deepsynth.pipelines.incremental import main as run_incremental_builder
 
 
 def _resolve_arxiv_limit() -> int:

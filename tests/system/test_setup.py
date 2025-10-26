@@ -2,6 +2,8 @@
 """Test script to verify setup is correct."""
 import sys
 
+import pytest
+
 
 def test_imports():
     """Test all required imports."""
@@ -12,44 +14,42 @@ def test_imports():
         print(f"  ✓ torch {torch.__version__}")
     except ImportError as e:
         print(f"  ✗ torch: {e}")
-        return False
+        pytest.fail("torch import failed")
 
     try:
         import transformers
         print(f"  ✓ transformers {transformers.__version__}")
     except ImportError as e:
         print(f"  ✗ transformers: {e}")
-        return False
+        pytest.fail("transformers import failed")
 
     try:
         import datasets
         print(f"  ✓ datasets {datasets.__version__}")
     except ImportError as e:
         print(f"  ✗ datasets: {e}")
-        return False
+        pytest.fail("datasets import failed")
 
     try:
         from huggingface_hub import HfApi
         print(f"  ✓ huggingface_hub")
     except ImportError as e:
         print(f"  ✗ huggingface_hub: {e}")
-        return False
+        pytest.fail("huggingface_hub import failed")
 
     try:
         from PIL import Image
         print(f"  ✓ Pillow")
     except ImportError as e:
         print(f"  ✗ Pillow: {e}")
-        return False
+        pytest.fail("pillow import failed")
 
     try:
         from tqdm import tqdm
         print(f"  ✓ tqdm")
     except ImportError as e:
         print(f"  ✗ tqdm: {e}")
-        return False
-
-    return True
+        pytest.fail("tqdm import failed")
 
 
 def test_cuda():
@@ -62,13 +62,11 @@ def test_cuda():
             print(f"  ✓ CUDA available")
             print(f"    Device: {torch.cuda.get_device_name(0)}")
             print(f"    Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f}GB")
-            return True
         else:
             print(f"  ⚠ CUDA not available (will use CPU)")
-            return True
     except Exception as e:
         print(f"  ✗ CUDA test failed: {e}")
-        return False
+        pytest.fail("cuda availability check failed")
 
 
 def test_config():
@@ -80,7 +78,7 @@ def test_config():
         if not Path(".env").exists():
             print(f"  ⚠ .env file not found")
             print(f"    Copy .env.example to .env and configure it")
-            return True  # Not a failure, just a warning
+            return  # Not a failure, just a warning
 
         from config import Config
         config = Config.from_env()
@@ -88,10 +86,10 @@ def test_config():
         print(f"    HF Username: {config.hf_username}")
         print(f"    Source Dataset: {config.source_dataset}")
         print(f"    Target Dataset: {config.target_dataset_repo}")
-        return True
+        return
     except Exception as e:
         print(f"  ✗ Configuration error: {e}")
-        return False
+        pytest.fail("configuration loading failed")
 
 
 def test_modules():
@@ -99,27 +97,25 @@ def test_modules():
     print("\nTesting local modules...")
 
     try:
-        from data.text_to_image import TextToImageConverter
-        print(f"  ✓ data.text_to_image")
+        from deepsynth.data.text_to_image import TextToImageConverter
+        print(f"  ✓ deepsynth.data.text_to_image")
     except Exception as e:
-        print(f"  ✗ data.text_to_image: {e}")
-        return False
+        print(f"  ✗ deepsynth.data.text_to_image: {e}")
+        pytest.fail("text_to_image import failed")
 
     try:
-        from data.prepare_and_publish import DatasetPipeline
-        print(f"  ✓ data.prepare_and_publish")
+        from deepsynth.data.prepare_and_publish import DatasetPipeline
+        print(f"  ✓ deepsynth.data.prepare_and_publish")
     except Exception as e:
-        print(f"  ✗ data.prepare_and_publish: {e}")
-        return False
+        print(f"  ✗ deepsynth.data.prepare_and_publish: {e}")
+        pytest.fail("prepare_and_publish import failed")
 
     try:
-        from training.deepsynth_trainer_v2 import ProductionDeepSynthTrainer
-        print(f"  ✓ training.deepsynth_trainer_v2")
+        from deepsynth.training.deepsynth_trainer_v2 import ProductionDeepSynthTrainer
+        print(f"  ✓ deepsynth.training.deepsynth_trainer_v2")
     except Exception as e:
-        print(f"  ✗ training.deepsynth_trainer_v2: {e}")
-        return False
-
-    return True
+        print(f"  ✗ deepsynth.training.deepsynth_trainer_v2: {e}")
+        pytest.fail("trainer import failed")
 
 
 def main():

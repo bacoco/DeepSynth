@@ -6,7 +6,7 @@ import json
 import logging
 from typing import Iterable, Optional
 
-from data.dataset_loader import load_local_jsonl
+from deepsynth.data.dataset_loader import load_local_jsonl
 from .config import TrainerConfig
 from .deepsynth_trainer import DeepSynthOCRTrainer
 from .trainer import SummarizationTrainer

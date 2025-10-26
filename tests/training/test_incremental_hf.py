@@ -6,8 +6,13 @@ Test script for incremental HuggingFace processing with proper batch sizes.
 import os
 import shutil
 from pathlib import Path
-from incremental_builder import IncrementalBuilder
+
+import pytest
 from huggingface_hub import login
+
+from deepsynth.pipelines.incremental import IncrementalBuilder
+
+pytestmark = pytest.mark.skip(reason="requires Hugging Face access and large datasets")
 
 def test_incremental_processing():
     """Test incremental processing with proper batch sizes and limited samples."""

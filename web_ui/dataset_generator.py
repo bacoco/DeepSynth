@@ -3,21 +3,18 @@ Incremental dataset generator with deduplication support.
 Handles resumable dataset generation and HuggingFace Hub uploads.
 """
 
-import os
-import sys
-from pathlib import Path
-from typing import Dict, Optional, Callable
 import logging
+import os
+from pathlib import Path
+from typing import Callable, Dict, Optional
+
 from datasets import Dataset, DatasetDict, Features, Value, load_dataset
 from datasets.features import Image as HFImage
 from huggingface_hub import HfApi, create_repo
 
-# Add parent directory to path to import project modules
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from data.text_to_image import TextToImageConverter
-from web_ui.state_manager import StateManager, JobStatus
-from training.config import OptimizerConfig, TrainerConfig
+from deepsynth.data.text_to_image import TextToImageConverter
+from deepsynth.training.config import OptimizerConfig, TrainerConfig
+from .state_manager import JobStatus, StateManager
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -260,7 +257,7 @@ class ModelTrainer:
             job_id: Job identifier
             progress_callback: Optional callback for progress updates
         """
-        from training.deepsynth_trainer_v2 import ProductionDeepSynthTrainer
+        from deepsynth.training.deepsynth_trainer_v2 import ProductionDeepSynthTrainer
 
         job = self.state_manager.get_job(job_id)
         if not job:

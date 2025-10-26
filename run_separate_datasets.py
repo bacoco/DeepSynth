@@ -10,7 +10,8 @@ Usage:
 import os
 import sys
 from pathlib import Path
-from separate_datasets_builder import main as run_separate_builder
+
+from deepsynth.pipelines.separate import main as run_separate_builder
 
 def check_environment():
     """Check if environment is properly configured."""

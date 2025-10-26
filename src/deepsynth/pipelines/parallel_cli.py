@@ -4,8 +4,8 @@ Script de lancement pour le traitement parallèle des datasets
 """
 
 import os
-import sys
-from .parallel_datasets_builder import ParallelDatasetsBuilder
+
+from .parallel import ParallelDatasetsBuilder
 
 def main():
     """Point d'entrée principal"""

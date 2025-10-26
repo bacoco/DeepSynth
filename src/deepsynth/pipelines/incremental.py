@@ -8,10 +8,11 @@ import json
 import pickle
 from pathlib import Path
 from datasets import Dataset, DatasetDict, load_dataset
-from huggingface_hub import login, whoami, HfApi
-from data.text_to_image import TextToImageConverter
-from mlsum_loader import MLSUMLoader
-from efficient_incremental_uploader import EfficientIncrementalUploader
+from huggingface_hub import HfApi, login, whoami
+
+from deepsynth.data.text_to_image import TextToImageConverter
+from deepsynth.data.mlsum_loader import MLSUMLoader
+from .efficient_incremental_uploader import EfficientIncrementalUploader
 
 # Load environment variables
 env_file = Path('.env')

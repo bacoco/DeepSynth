@@ -501,7 +501,23 @@ We welcome contributions! Areas for improvement:
 - [ ] Streaming inference
 - [ ] Model distillation
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+The Python sources now live under ``src/deepsynth`` so they can be imported as a
+package (``import deepsynth``).  Tests are grouped by domain under the
+``tests/`` folder:
+
+- ``tests/data`` for dataset utilities (e.g. :mod:`deepsynth.data.text_to_image`)
+- ``tests/pipelines`` for ingestion and upload pipelines
+- ``tests/training`` for model training helpers
+- ``tests/system`` for environment smoke tests
+
+Use ``pytest`` to run the suite locally:
+
+```bash
+pytest
+```
+
+This configuration automatically adds ``src`` to ``PYTHONPATH`` so the package
+layout matches what production code uses.
 
 ---
 

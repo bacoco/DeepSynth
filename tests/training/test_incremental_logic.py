@@ -4,8 +4,13 @@ Test de la logique incrémentale avec un petit échantillon
 """
 
 import os
-from separate_datasets_builder import SeparateDatasetBuilder
+
+import pytest
 from huggingface_hub import login, whoami
+
+from deepsynth.pipelines.separate import SeparateDatasetBuilder
+
+pytestmark = pytest.mark.skip(reason="requires Hugging Face access and live datasets")
 
 def test_incremental_logic():
     """Test avec un petit échantillon pour vérifier la logique"""

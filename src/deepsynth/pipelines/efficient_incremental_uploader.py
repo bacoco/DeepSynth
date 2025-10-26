@@ -11,9 +11,9 @@ import pickle
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from huggingface_hub import login, whoami, HfApi
+from huggingface_hub import HfApi, hf_hub_download, login, whoami
 
-from hf_shard_uploader import HubShardManager
+from .hf_shard_uploader import HubShardManager
 
 import time
 
