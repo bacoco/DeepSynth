@@ -7,6 +7,8 @@ Works with the actual MLSUM dataset files.
 import os
 import requests
 import zipfile
+import time
+import fcntl
 from pathlib import Path
 from datasets import Dataset, DatasetDict
 from typing import Dict, List, Any
@@ -22,12 +24,56 @@ class MLSUMLoader:
         # Available languages in the dataset (fr, es, de order as requested, removed ru, tu)
         self.languages = ['fr', 'es', 'de']  # French, Spanish, German
 
-        # Auto-download if data doesn't exist
+        # Auto-download if data doesn't exist (with locking for parallel workers)
         if not self.data_dir.exists():
             print(f"📥 MLSUM data not found, downloading automatically...")
-            self._download_mlsum_data()
+            self._download_mlsum_data_with_lock()
 
         print(f"✅ MLSUM data ready at: {self.data_dir}")
+
+    def _download_mlsum_data_with_lock(self):
+        """Download MLSUM dataset with file locking for parallel workers."""
+        lock_file = self.base_dir / ".mlsum_download.lock"
+
+        # Create base directory if it doesn't exist
+        self.base_dir.mkdir(exist_ok=True)
+
+        # Open lock file (create if doesn't exist)
+        with open(lock_file, 'w') as lock_fd:
+            try:
+                # Try to acquire exclusive lock (non-blocking first to show status)
+                try:
+                    fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    print("🔒 Acquired download lock, starting download...")
+                    is_downloader = True
+                except BlockingIOError:
+                    print("⏳ Another worker is downloading MLSUM data, waiting...")
+                    fcntl.flock(lock_fd, fcntl.LOCK_EX)  # Block until available
+                    print("✅ Download lock released by other worker")
+                    is_downloader = False
+
+                # Check if data exists now (another worker might have downloaded it)
+                if self.data_dir.exists():
+                    print("✅ MLSUM data is now available (downloaded by another worker)")
+                    return
+
+                # If we're the downloader or data still doesn't exist, download
+                if is_downloader:
+                    self._download_mlsum_data()
+                else:
+                    # Double-check after lock release
+                    if not self.data_dir.exists():
+                        print("⚠️  Data still missing after lock release, downloading...")
+                        self._download_mlsum_data()
+
+            finally:
+                # Release lock
+                fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                # Clean up lock file
+                try:
+                    lock_file.unlink()
+                except:
+                    pass
 
     def _download_mlsum_data(self):
         """Download MLSUM dataset from Google Drive if not exists."""
