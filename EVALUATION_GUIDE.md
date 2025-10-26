@@ -6,7 +6,7 @@ This guide explains how to evaluate your trained models using industry-standard 
 
 ```bash
 # Evaluate on CNN/DailyMail
-python run_benchmark.py \
+deepsynth-benchmark \
     --model ./deepsynth-ocr-summarizer \
     --benchmark cnn_dailymail \
     --max-samples 1000
@@ -129,7 +129,7 @@ ratio = len(original) / len(summary)
 ### Basic Usage
 
 ```bash
-python run_benchmark.py \
+deepsynth-benchmark \
     --model ./your-model \
     --benchmark cnn_dailymail \
     --max-samples 1000
@@ -138,7 +138,7 @@ python run_benchmark.py \
 ### Advanced Options
 
 ```bash
-python run_benchmark.py \
+deepsynth-benchmark \
     --model username/hf-model \      # HuggingFace model
     --benchmark xsum \                # Different dataset
     --split test \                    # test/validation/train
@@ -158,7 +158,7 @@ MODEL="./deepsynth-ocr-summarizer"
 
 for BENCHMARK in cnn_dailymail xsum arxiv samsum; do
     echo "Evaluating on $BENCHMARK..."
-    python run_benchmark.py \
+    deepsynth-benchmark \
         --model $MODEL \
         --benchmark $BENCHMARK \
         --max-samples 1000 \
@@ -301,7 +301,7 @@ For robust evaluation, run multiple times:
 ```bash
 # Run 5 times with different random seeds
 for i in {1..5}; do
-    python run_benchmark.py \
+    deepsynth-benchmark \
         --model ./model \
         --benchmark cnn_dailymail \
         --max-samples 1000 \
@@ -359,26 +359,26 @@ plt.savefig("benchmark_results.png")
 ### 1. **Use Test Set**
 ```bash
 # Always evaluate on test set, not training data
-python run_benchmark.py --benchmark cnn_dailymail --split test
+deepsynth-benchmark --benchmark cnn_dailymail --split test
 ```
 
 ### 2. **Sufficient Sample Size**
 ```bash
 # Use at least 1000 samples for reliable estimates
-python run_benchmark.py --max-samples 1000
+deepsynth-benchmark --max-samples 1000
 ```
 
 ### 3. **Multiple Metrics**
 ```bash
 # Don't rely on ROUGE alone
-python run_benchmark.py --benchmark cnn_dailymail  # Includes BERTScore
+deepsynth-benchmark --benchmark cnn_dailymail  # Includes BERTScore
 ```
 
 ### 4. **Cross-Dataset Evaluation**
 ```bash
 # Test generalization
-python run_benchmark.py --model ./model --benchmark xsum
-python run_benchmark.py --model ./model --benchmark arxiv
+deepsynth-benchmark --model ./model --benchmark xsum
+deepsynth-benchmark --model ./model --benchmark arxiv
 ```
 
 ### 5. **Human Evaluation**
@@ -408,9 +408,9 @@ Test how well your model transfers:
 python run_complete_pipeline.py  # Uses CNN/DM by default
 
 # Evaluate on different domains
-python run_benchmark.py --model ./model --benchmark arxiv
-python run_benchmark.py --model ./model --benchmark pubmed
-python run_benchmark.py --model ./model --benchmark samsum
+deepsynth-benchmark --model ./model --benchmark arxiv
+deepsynth-benchmark --model ./model --benchmark pubmed
+deepsynth-benchmark --model ./model --benchmark samsum
 ```
 
 ### Few-Shot Learning
@@ -423,7 +423,7 @@ echo "MAX_SAMPLES_PER_SPLIT=100" >> .env
 python run_complete_pipeline.py
 
 # Evaluate performance
-python run_benchmark.py --model ./model --benchmark cnn_dailymail
+deepsynth-benchmark --model ./model --benchmark cnn_dailymail
 ```
 
 ### Zero-Shot Evaluation
@@ -431,7 +431,7 @@ python run_benchmark.py --model ./model --benchmark cnn_dailymail
 Test base model without fine-tuning:
 
 ```bash
-python run_benchmark.py \
+deepsynth-benchmark \
     --model deepseek-ai/DeepSeek-OCR \
     --benchmark cnn_dailymail \
     --max-samples 100
@@ -478,13 +478,13 @@ NUM_EPOCHS=5
 **Speed up evaluation:**
 ```bash
 # Skip BERTScore
-python run_benchmark.py --no-bertscore
+deepsynth-benchmark --no-bertscore
 
 # Reduce samples
-python run_benchmark.py --max-samples 500
+deepsynth-benchmark --max-samples 500
 
 # Use smaller model
-python run_benchmark.py --model facebook/bart-base
+deepsynth-benchmark --model facebook/bart-base
 ```
 
 ---
@@ -519,7 +519,7 @@ python run_benchmark.py --model facebook/bart-base
 
 **Quick Command:**
 ```bash
-python run_benchmark.py \
+deepsynth-benchmark \
     --model ./your-model \
     --benchmark cnn_dailymail \
     --max-samples 1000 \

@@ -14,7 +14,7 @@
 **One command. Six datasets. Infinite possibilities.**
 
 ```bash
-python run_complete_multilingual_pipeline.py
+deepsynth-pipeline
 ```
 
 Automatically downloads MLSUM data (3.3GB), processes 1.29M+ multilingual examples with incremental HuggingFace uploads, visual text encoding, and resumable pipeline—all optimized for production scale.
@@ -60,7 +60,7 @@ No complex setup. Resumable processing. Automatic uploads.
 
 ```bash
 cp .env.example .env  # Configure once
-python incremental_builder.py  # Process all languages
+python -m deepsynth.pipelines.incremental_builder  # Process all languages
 ```
 
 **What happens automatically:**
@@ -91,7 +91,7 @@ Compare your model against the best:
 
 ```bash
 # Benchmark your model
-python run_benchmark.py --model ./your-model --benchmark cnn_dailymail
+deepsynth-benchmark --model ./your-model --benchmark cnn_dailymail
 ```
 
 ### 🎨 **Production-Ready Deployment**
@@ -150,8 +150,8 @@ cp .env.example .env
 
 ```bash
 # Traditional approach (local progress only)
-python test_setup.py                    # Verify setup
-python run_complete_multilingual_pipeline.py  # Run pipeline
+python test_setup.py                          # Verify setup
+python -m deepsynth.pipelines.incremental_builder  # Run pipeline module directly
 ```
 
 **That's it!** Your multilingual dataset will be ready on HuggingFace.
@@ -249,7 +249,7 @@ summary = summarizer.summarize_text(long_article)
 ### 🔬 **Research Assistant**
 Process academic papers automatically:
 ```bash
-python run_benchmark.py --model ./model --benchmark arxiv
+deepsynth-benchmark --model ./model --benchmark arxiv
 ```
 
 ### 💼 **Business Intelligence**
@@ -262,7 +262,7 @@ curl -X POST http://localhost:5000/summarize/file \
 ### 📞 **Customer Support**
 Summarize conversation transcripts:
 ```bash
-python run_benchmark.py --model ./model --benchmark samsum
+deepsynth-benchmark --model ./model --benchmark samsum
 ```
 
 ---
@@ -289,7 +289,7 @@ python run_benchmark.py --model ./model --benchmark samsum
 
 ```bash
 # Full evaluation with all metrics
-python run_benchmark.py \
+deepsynth-benchmark \
     --model ./deepsynth-ocr-summarizer \
     --benchmark cnn_dailymail \
     --max-samples 1000
@@ -590,7 +590,7 @@ echo "MAX_SAMPLES_PER_SPLIT=100" >> .env
 python run_complete_pipeline.py
 
 # 2. Benchmark evaluation
-python run_benchmark.py --model ./deepsynth-ocr-summarizer --benchmark cnn_dailymail
+deepsynth-benchmark --model ./deepsynth-ocr-summarizer --benchmark cnn_dailymail
 
 # 3. Production deployment
 MODEL_PATH=./deepsynth-ocr-summarizer python -m inference.api_server

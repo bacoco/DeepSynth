@@ -110,9 +110,9 @@ DELETE /api/jobs/:job_id            - Delete job
 ### 7. ✅ Startup Scripts
 
 **Files:**
-- `start-dataset-generation.sh` - Launch CPU service
-- `start-model-training.sh` - Launch GPU service
-- `start-all.sh` - Launch both services
+- `scripts/shell/start-dataset-generation.sh` - Launch CPU service
+- `scripts/shell/start-model-training.sh` - Launch GPU service
+- `scripts/shell/start-all.sh` - Launch both services
 
 **Features:**
 - Health checks
@@ -140,7 +140,7 @@ export HF_TOKEN="your_token"
 export HF_USERNAME="your_username"
 
 # Start service
-./start-dataset-generation.sh
+./scripts/shell/start-dataset-generation.sh
 
 # Open: http://localhost:5000
 ```
@@ -152,7 +152,7 @@ export HF_TOKEN="your_token"
 export HF_USERNAME="your_username"
 
 # Start service
-./start-model-training.sh
+./scripts/shell/start-model-training.sh
 
 # Open: http://localhost:5001
 ```
@@ -164,7 +164,7 @@ export HF_TOKEN="your_token"
 export HF_USERNAME="your_username"
 
 # Start both
-./start-all.sh
+./scripts/shell/start-all.sh
 
 # Dataset Generation: http://localhost:5000
 # Model Training: http://localhost:5001

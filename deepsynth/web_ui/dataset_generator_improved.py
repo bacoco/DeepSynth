@@ -1,6 +1,8 @@
 """
 Incremental dataset generator with deduplication support.
 Handles resumable dataset generation and HuggingFace Hub uploads.
+
+IMPROVED VERSION: Added multi-trainer support with MoE dropout configuration.
 """
 
 import os
@@ -15,9 +17,9 @@ from huggingface_hub import HfApi, create_repo
 # Add parent directory to path to import project modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from data.text_to_image import TextToImageConverter
-from web_ui.state_manager import StateManager, JobStatus
-from training.config import OptimizerConfig, TrainerConfig
+from deepsynth.data.text_to_image import TextToImageConverter
+from deepsynth.web_ui.state_manager import StateManager, JobStatus
+from deepsynth.training.config import OptimizerConfig, TrainerConfig
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -243,7 +245,7 @@ class IncrementalDatasetGenerator:
 
 
 class ModelTrainer:
-    """Handles model training with resumption support."""
+    """Handles model training with resumption support and multi-trainer selection."""
 
     def __init__(self, state_manager: StateManager):
         self.state_manager = state_manager
@@ -260,8 +262,6 @@ class ModelTrainer:
             job_id: Job identifier
             progress_callback: Optional callback for progress updates
         """
-        from training.deepsynth_trainer_v2 import ProductionDeepSynthTrainer
-
         job = self.state_manager.get_job(job_id)
         if not job:
             raise ValueError(f"Job {job_id} not found")
@@ -272,6 +272,10 @@ class ModelTrainer:
 
         try:
             config = job.config
+
+            # Determine trainer type
+            trainer_type = config.get('trainer_type', 'production')
+            logger.info(f"Using trainer type: {trainer_type}")
 
             # Create trainer config
             optimizer_config = OptimizerConfig(
@@ -297,6 +301,11 @@ class ModelTrainer:
                 save_checkpoints_to_hub=bool(config.get('save_checkpoints_to_hub', True)),
                 resume_from_checkpoint=config.get('resume_from_checkpoint'),
                 save_metrics_to_hub=bool(config.get('save_metrics_to_hub', True)),
+                # MoE dropout parameters (NEW)
+                expert_dropout_rate=float(config.get('expert_dropout_rate', 0.0)),
+                expert_dropout_min_keep=int(config.get('expert_dropout_min_keep', 1)),
+                gate_dropout_rate=float(config.get('gate_dropout_rate', 0.0)),
+                bidrop_passes=int(config.get('bidrop_passes', 1)),
             )
 
             # Load dataset
@@ -306,12 +315,28 @@ class ModelTrainer:
 
             logger.info(f"Loading training dataset from {dataset_repo}")
 
-            # Create trainer
-            trainer = ProductionDeepSynthTrainer(trainer_config)
+            # Create trainer based on type
+            if trainer_type == 'production':
+                from deepsynth.training.deepsynth_trainer_v2 import ProductionDeepSynthTrainer
+                trainer = ProductionDeepSynthTrainer(trainer_config)
+                logger.info(f"Using ProductionDeepSynthTrainer with MoE dropout support")
+                logger.info(f"  - Expert dropout: {trainer_config.expert_dropout_rate}")
+                logger.info(f"  - Gate dropout: {trainer_config.gate_dropout_rate}")
+                logger.info(f"  - Bi-Drop passes: {trainer_config.bidrop_passes}")
+            elif trainer_type == 'deepsynth':
+                from deepsynth.training.deepsynth_trainer import DeepSynthOCRTrainer
+                trainer = DeepSynthOCRTrainer(trainer_config)
+                logger.info("Using DeepSynthOCRTrainer (basic frozen encoder)")
+            elif trainer_type == 'generic':
+                from deepsynth.training.trainer import SummarizationTrainer
+                trainer = SummarizationTrainer(trainer_config)
+                logger.info("Using SummarizationTrainer (generic seq2seq)")
+            else:
+                raise ValueError(f"Unknown trainer type: {trainer_type}")
 
             # Train
             logger.info("Starting training...")
-            def progress_callback(processed: int, total: int):
+            def progress_callback_wrapper(processed: int, total: int):
                 job_state = self.state_manager.get_job(job_id)
                 if not job_state:
                     return
@@ -319,10 +344,20 @@ class ModelTrainer:
                 job_state.processed_samples = processed
                 self.state_manager.update_job(job_state)
 
-            metrics, checkpoints = trainer.train_from_hf_dataset(
-                dataset_repo,
-                progress_callback=progress_callback
-            )
+            # Use appropriate training method based on trainer type
+            if trainer_type == 'production':
+                metrics, checkpoints = trainer.train_from_hf_dataset(
+                    dataset_repo,
+                    progress_callback=progress_callback_wrapper
+                )
+            else:
+                # For other trainers, we need to load the dataset and call train()
+                dataset = load_dataset(dataset_repo, split='train')
+                trainer.train(dataset)
+
+                # Create compatible return values
+                metrics = {}
+                checkpoints = {'last_checkpoint': trainer_config.output_dir}
 
             # Update job
             job.status = JobStatus.COMPLETED.value
@@ -331,11 +366,12 @@ class ModelTrainer:
             job.config['metrics'] = metrics
             job.config['checkpoints'] = checkpoints
             job.config['metrics_path'] = str(Path(trainer_config.output_dir) / 'metrics.json')
+            job.config['trainer_type'] = trainer_type
             if trainer_config.push_to_hub:
                 job.config['hub_model_id'] = trainer_config.hub_model_id
             self.state_manager.update_job(job)
 
-            logger.info("Training completed successfully")
+            logger.info(f"Training completed successfully with {trainer_type} trainer")
 
         except Exception as e:
             logger.error(f"Training failed: {e}")

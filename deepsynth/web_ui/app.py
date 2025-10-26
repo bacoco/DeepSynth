@@ -13,9 +13,9 @@ import logging
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from web_ui.state_manager import StateManager, JobStatus
-from web_ui.dataset_generator_improved import IncrementalDatasetGenerator, ModelTrainer
-from training.optimal_configs import (
+from deepsynth.web_ui.state_manager import StateManager, JobStatus
+from deepsynth.web_ui.dataset_generator_improved import IncrementalDatasetGenerator, ModelTrainer
+from deepsynth.training.optimal_configs import (
     list_benchmark_datasets,
     get_optimal_config,
     PRESET_CONFIGS

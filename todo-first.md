@@ -50,7 +50,7 @@ git push origin multilingual-pipeline-v2
 ### 2. **RUN COMPLETE PIPELINE**
 ```bash
 cd ~/repos/deepseek-synthesia
-python run_complete_multilingual_pipeline.py
+deepsynth-pipeline
 ```
 
 **Expected behavior:**
@@ -69,7 +69,7 @@ python run_complete_multilingual_pipeline.py
 The pipeline is fully resumable:
 ```bash
 # Just run again - it will continue from where it stopped
-python run_complete_multilingual_pipeline.py
+deepsynth-pipeline
 ```
 
 ---
@@ -102,7 +102,7 @@ def process_dataset(self, name, subset, text_field, summary_field, batch_size=50
 working_url = "https://gitlab.lip6.fr/scialom/mlsum_data/-/raw/master/MLSUM.zip"
 ```
 
-### `run_complete_multilingual_pipeline.py` (MAIN SCRIPT)
+### `scripts/cli/run_complete_multilingual_pipeline.py` (MAIN SCRIPT)
 - Complete user-friendly pipeline launcher
 - Environment checks
 - Progress monitoring
@@ -113,7 +113,7 @@ working_url = "https://gitlab.lip6.fr/scialom/mlsum_data/-/raw/master/MLSUM.zip"
 
 ### French Character Test ✅
 ```python
-from incremental_builder import OptimizedConverter
+from deepsynth.pipelines.incremental_builder import OptimizedConverter
 converter = OptimizedConverter()
 text = 'Français: àáâäèéêëìíîïòóôöùúûüÿç'
 image = converter.convert(text)  # ✅ WORKS!
@@ -121,7 +121,7 @@ image = converter.convert(text)  # ✅ WORKS!
 
 ### MLSUM Loading Test ✅
 ```python
-from mlsum_loader import MLSUMLoader
+from deepsynth.mlsum_loader import MLSUMLoader
 loader = MLSUMLoader()  # Auto-downloads if needed
 dataset = loader.load_language('fr')  # ✅ 392,902 samples
 ```
@@ -182,7 +182,7 @@ export HF_TOKEN=your_token_here
 The pipeline is **100% ready** to run. All critical bugs fixed, optimizations applied, and multilingual support confirmed. Just run:
 
 ```bash
-python run_complete_multilingual_pipeline.py
+deepsynth-pipeline
 ```
 
 **Estimated completion time: 4-8 hours**

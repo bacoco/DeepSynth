@@ -6,7 +6,7 @@ Test script for incremental HuggingFace processing with proper batch sizes.
 import os
 import shutil
 from pathlib import Path
-from incremental_builder import IncrementalBuilder
+from deepsynth.pipelines import IncrementalBuilder
 from huggingface_hub import login
 
 def test_incremental_processing():

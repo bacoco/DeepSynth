@@ -4,6 +4,9 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
 echo "🚀 Starting DeepSynth Dataset Generation Service (CPU Only)"
 echo "=================================================="
 
@@ -25,11 +28,11 @@ fi
 
 # Stop any existing container
 echo "🛑 Stopping existing containers..."
-docker-compose -f docker-compose.cpu.yml down 2>/dev/null || true
+docker-compose -f "${REPO_ROOT}/docker-compose.cpu.yml" down 2>/dev/null || true
 
 # Start the service
 echo "▶️  Starting dataset generation service..."
-docker-compose -f docker-compose.cpu.yml up -d
+docker-compose -f "${REPO_ROOT}/docker-compose.cpu.yml" up -d
 
 # Wait for service to be ready
 echo "⏳ Waiting for service to be ready..."
@@ -54,7 +57,7 @@ for i in {1..10}; do
         echo "No GPU required - runs entirely on CPU!"
         echo
         echo "To view logs: docker logs -f deepsynth-dataset-generator-cpu"
-        echo "To stop: docker-compose -f docker-compose.cpu.yml down"
+        echo "To stop: docker-compose -f ${REPO_ROOT}/docker-compose.cpu.yml down"
         exit 0
     fi
     echo "  Attempt $i/10: Service not ready yet..."

@@ -184,7 +184,7 @@ FONT_SIZE=12                        # Text font size
 ```
 
 ### Custom Dataset Sources
-Edit `global_incremental_builder.py`:
+Edit `deepsynth/pipelines/global_incremental_builder.py`:
 ```python
 self.sources = [
     ('your_dataset', 'subset', 'text_field', 'summary_field', expected_count),
@@ -198,7 +198,7 @@ self.sources = [
 
 ### Text Rendering Verification
 ```python
-from global_incremental_builder import GlobalIncrementalBuilder
+from deepsynth.pipelines.global_incremental_builder import GlobalIncrementalBuilder
 builder = GlobalIncrementalBuilder()
 
 # Test multilingual text
@@ -304,7 +304,7 @@ print(f"Avg text length: {sum(text_lengths)/len(text_lengths):.0f} chars")
 ## 🤝 Contributing
 
 ### Adding New Languages
-1. Add dataset source to `self.sources` in `global_incremental_builder.py`
+1. Add dataset source to `self.sources` in `deepsynth/pipelines/global_incremental_builder.py`
 2. Implement text extraction logic in `process_dataset_incremental`
 3. Test with sample data
 4. Submit pull request

@@ -5,7 +5,7 @@ This script evaluates a trained model on standard benchmarks like CNN/DailyMail,
 XSum, etc., and compares against published baselines.
 
 Usage:
-    python run_benchmark.py --model ./deepsynth-ocr-summarizer --benchmark cnn_dailymail
+    deepsynth-benchmark --model ./deepsynth-ocr-summarizer --benchmark cnn_dailymail
 """
 import argparse
 import json
@@ -22,7 +22,7 @@ except ImportError:
     print("Error: transformers required. Install with: pip install transformers")
     sys.exit(1)
 
-from evaluation.benchmarks import (
+from deepsynth.evaluation.benchmarks import (
     BENCHMARKS,
     SummarizationEvaluator,
     load_benchmark,

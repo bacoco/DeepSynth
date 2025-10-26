@@ -13,7 +13,7 @@ from typing import List, Optional, Tuple
 
 from huggingface_hub import login, whoami, HfApi
 
-from hf_shard_uploader import HubShardManager
+from deepsynth.hf_shard_uploader import HubShardManager
 
 import time
 

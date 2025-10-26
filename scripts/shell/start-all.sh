@@ -4,6 +4,8 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 echo "🚀 Starting Complete DeepSynth Pipeline"
 echo "=================================================="
 echo "  • Dataset Generation (CPU): Port 5000"
@@ -13,12 +15,12 @@ echo
 
 # Start dataset generation
 echo "1️⃣  Starting dataset generation service..."
-./start-dataset-generation.sh
+"${SCRIPT_DIR}/start-dataset-generation.sh"
 echo
 
 # Start model training
 echo "2️⃣  Starting model training service..."
-./start-model-training.sh
+"${SCRIPT_DIR}/start-model-training.sh"
 echo
 
 echo "=================================================="

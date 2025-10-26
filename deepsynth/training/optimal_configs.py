@@ -5,7 +5,7 @@ Based on best practices for vision-language model fine-tuning.
 
 from dataclasses import dataclass, field
 from typing import Dict, Any
-from training.config import TrainerConfig, OptimizerConfig
+from deepsynth.training.config import TrainerConfig, OptimizerConfig
 
 
 @dataclass

@@ -4,6 +4,9 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
 echo "🚀 Starting DeepSynth Model Training Service (GPU Required)"
 echo "=================================================="
 
@@ -41,11 +44,11 @@ fi
 
 # Stop any existing container
 echo "🛑 Stopping existing containers..."
-docker-compose -f docker-compose.gpu.yml down 2>/dev/null || true
+docker-compose -f "${REPO_ROOT}/docker-compose.gpu.yml" down 2>/dev/null || true
 
 # Start the service
 echo "▶️  Starting model training service..."
-docker-compose -f docker-compose.gpu.yml up -d
+docker-compose -f "${REPO_ROOT}/docker-compose.gpu.yml" up -d
 
 # Wait for service to be ready
 echo "⏳ Waiting for service to be ready..."
@@ -71,7 +74,7 @@ for i in {1..10}; do
         echo "GPU-accelerated training with mixed precision!"
         echo
         echo "To view logs: docker logs -f deepsynth-trainer-gpu"
-        echo "To stop: docker-compose -f docker-compose.gpu.yml down"
+        echo "To stop: docker-compose -f ${REPO_ROOT}/docker-compose.gpu.yml down"
         exit 0
     fi
     echo "  Attempt $i/10: Service not ready yet..."

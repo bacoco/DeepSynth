@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "deepsynth"
+version = "0.1.0"
+description = "DeepSynth pipelines, evaluation, and tooling"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "datasets>=2.0.0",
+    "huggingface_hub>=0.19.0",
+    "tqdm>=4.65.0",
+    "transformers>=4.30.0",
+    "Pillow>=9.0.0",
+]
+
+[project.scripts]
+deepsynth-pipeline = "scripts.cli.run_complete_multilingual_pipeline:main"
+deepsynth-separate-datasets = "scripts.cli.run_separate_datasets:main"
+deepsynth-parallel = "scripts.cli.run_parallel_processing:main"
+deepsynth-benchmark = "scripts.cli.run_benchmark:main"
+deepsynth-check-shards = "scripts.maintenance.check_shards_duplicates:main"
+
+[tool.setuptools.packages.find]
+include = ["deepsynth", "deepsynth.*", "scripts", "scripts.*"]

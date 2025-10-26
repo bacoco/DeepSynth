@@ -4,7 +4,7 @@
 Auto-downloads MLSUM data and processes all datasets with incremental HuggingFace uploads.
 
 Usage:
-    python run_complete_multilingual_pipeline.py
+    deepsynth-pipeline
 
 Features:
 - ✅ Auto-downloads MLSUM (3.3GB) if not present
@@ -17,7 +17,8 @@ Features:
 import os
 import sys
 from pathlib import Path
-from incremental_builder import main as run_incremental_builder
+
+from deepsynth.pipelines import run_incremental_pipeline
 
 
 def _resolve_arxiv_limit() -> int:
@@ -112,7 +113,7 @@ def main():
     
     try:
         # Run the incremental builder
-        run_incremental_builder()
+        run_incremental_pipeline()
         
         print("\n🎉 PIPELINE COMPLETED SUCCESSFULLY!")
         print("📊 Your multilingual dataset is ready on HuggingFace")

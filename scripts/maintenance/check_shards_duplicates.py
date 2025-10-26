@@ -5,6 +5,9 @@ The script downloads the shard index (``data/shards.json``), streams each
 shard listed in the file, and verifies that no
 ``(source_dataset, original_index)`` pair appears twice.  It also prints a
 small per-source summary of the total samples processed.
+
+Usage:
+    deepsynth-check-shards --repo username/dataset
 """
 from __future__ import annotations
 

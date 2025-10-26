@@ -4,7 +4,8 @@ Test de la logique incrémentale avec un petit échantillon
 """
 
 import os
-from separate_datasets_builder import SeparateDatasetBuilder
+
+from deepsynth.pipelines import SeparateDatasetBuilder
 from huggingface_hub import login, whoami
 
 def test_incremental_logic():

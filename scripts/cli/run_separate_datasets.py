@@ -4,13 +4,14 @@
 Crée: deepsynth-fr, deepsynth-es, deepsynth-de, deepsynth-en-news, etc.
 
 Usage:
-    python run_separate_datasets.py
+    deepsynth-separate-datasets
 """
 
 import os
 import sys
 from pathlib import Path
-from separate_datasets_builder import main as run_separate_builder
+
+from deepsynth.pipelines import run_separate_datasets_pipeline
 
 def check_environment():
     """Check if environment is properly configured."""
@@ -93,7 +94,7 @@ def main():
 
     try:
         # Run the separate datasets builder
-        run_separate_builder()
+        run_separate_datasets_pipeline()
 
         print("\\n🎉 TOUS LES DATASETS CRÉÉS AVEC SUCCÈS!")
         print("🔗 Vos datasets sont maintenant disponibles sur HuggingFace")

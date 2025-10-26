@@ -5,7 +5,7 @@ import argparse
 import json
 from pathlib import Path
 
-from inference.infer import DeepSynthSummarizer
+from deepsynth.inference.infer import DeepSynthSummarizer
 
 
 def main() -> None:

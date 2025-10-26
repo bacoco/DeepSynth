@@ -12,7 +12,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from multiprocessing import Manager
 import threading
 from datetime import datetime
-from separate_datasets_builder import SeparateDatasetBuilder
+from ..separate_datasets_builder import SeparateDatasetBuilder
 
 # Configuration du logging
 logging.basicConfig(
