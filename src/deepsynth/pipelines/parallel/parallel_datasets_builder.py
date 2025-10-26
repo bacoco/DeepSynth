@@ -28,14 +28,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class ParallelDatasetsPipeline:
-    def __init__(self, max_workers=3):
+    def __init__(self, max_workers=7):
         """
         Initialise le builder parallèle
 
         Args:
             max_workers: Nombre maximum de processus parallèles
         """
-        self.max_workers = max_workers
+        self.max_workers = max_workers  # 7 = one per dataset for full parallelism
         # Get arXiv limit from environment
         try:
             arxiv_limit = int(os.getenv('ARXIV_IMAGE_SAMPLES', '50000'))
@@ -143,8 +143,9 @@ class ParallelDatasetsPipeline:
             username = whoami()['name']
 
             # Créer le builder avec un work_dir unique pour ce dataset
+            # auto_upload=True: Upload immediately when batch is ready
             work_dir = f"./work_separate_{dataset_config['output_name']}"
-            builder = OptimizedDatasetPipeline(work_dir=work_dir)
+            builder = OptimizedDatasetPipeline(work_dir=work_dir, auto_upload=True)
 
             # Traitement du dataset
             start_time = time.time()
