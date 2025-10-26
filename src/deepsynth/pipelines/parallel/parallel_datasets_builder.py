@@ -120,13 +120,14 @@ class ParallelDatasetsPipeline:
         # Trier par priorité
         self.datasets_config.sort(key=lambda x: x['priority'])
 
-    def process_single_dataset(self, dataset_config, shared_stats):
+    def process_single_dataset(self, dataset_config, shared_stats, username):
         """
         Traite un seul dataset (fonction pour processus parallèle)
 
         Args:
             dataset_config: Configuration du dataset
             shared_stats: Dictionnaire partagé pour les statistiques
+            username: HuggingFace username (évite rate limit sur whoami())
 
         Returns:
             dict: Résultats du traitement
@@ -135,12 +136,14 @@ class ParallelDatasetsPipeline:
             logger.info(f"🚀 Démarrage du traitement: {dataset_config['name']}")
 
             # Importer les modules nécessaires dans le processus
-            from huggingface_hub import login, whoami
+            from huggingface_hub import login
             import os
+            import time
 
-            # Login HuggingFace
+            # Login HuggingFace (pas de whoami() ici pour éviter rate limit)
+            # Small delay to avoid rate limiting on login
+            time.sleep(dataset_config.get('priority', 1) * 0.5)  # Stagger logins
             login(token=os.getenv('HF_TOKEN'))
-            username = whoami()['name']
 
             # Créer le builder avec un work_dir unique pour ce dataset
             # auto_upload=True: Upload immediately when batch is ready
@@ -224,6 +227,14 @@ class ParallelDatasetsPipeline:
             selected_datasets: Liste des noms de datasets à traiter (None = tous)
             test_mode: Si True, traite seulement quelques échantillons pour test
         """
+        # Login ONCE before starting workers to avoid rate limiting
+        from huggingface_hub import login, whoami
+        import os
+
+        login(token=os.getenv('HF_TOKEN'))
+        username = whoami()['name']
+        logger.info(f"✅ Logged in as: {username}")
+
         logger.info("🚀 Démarrage du traitement parallèle des datasets")
 
         # Filtrer les datasets si spécifié
@@ -259,9 +270,9 @@ class ParallelDatasetsPipeline:
             results = []
 
             with ProcessPoolExecutor(max_workers=self.max_workers) as executor:
-                # Soumettre tous les jobs
+                # Soumettre tous les jobs (pass username to avoid rate limit)
                 future_to_dataset = {
-                    executor.submit(self.process_single_dataset, dataset_config, shared_stats): dataset_config
+                    executor.submit(self.process_single_dataset, dataset_config, shared_stats, username): dataset_config
                     for dataset_config in datasets_to_process
                 }
 
