@@ -11,7 +11,7 @@ echo "🔧 Building skill distribution zips..."
 echo ""
 
 # Array of skills to package
-SKILLS=("soul" "nexus" "skill-generator")
+SKILLS=("soul" "nexus" "skill-creator")
 
 for skill in "${SKILLS[@]}"; do
     echo "📦 Packaging ${skill}..."
