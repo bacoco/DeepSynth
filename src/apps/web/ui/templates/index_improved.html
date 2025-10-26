@@ -1,0 +1,1310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepSynth Dataset Generator & Trainer - Enhanced</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 18px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 500;
+            color: #6c757d;
+            transition: all 0.3s;
+        }
+
+        .tab-btn:hover {
+            background: #e9ecef;
+        }
+
+        .tab-btn.active {
+            color: #667eea;
+            background: white;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 30px;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .form-section {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .form-section h3 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .form-row-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #495057;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            width: 100%;
+            padding: 15px;
+            font-size: 1.1em;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .preset-selector {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .preset-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            border: 2px solid #dee2e6;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .preset-card:hover {
+            border-color: #667eea;
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .preset-card.selected {
+            border-color: #667eea;
+            background: #f0f3ff;
+        }
+
+        .preset-card h4 {
+            color: #667eea;
+            margin-bottom: 8px;
+        }
+
+        .preset-card p {
+            color: #6c757d;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .warning-box {
+            background: #fff4e5;
+            border-left: 4px solid #ff9800;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .success-box {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .collapsible {
+            background: #f8f9fa;
+            cursor: pointer;
+            padding: 18px;
+            width: 100%;
+            border: none;
+            text-align: left;
+            outline: none;
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #495057;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            transition: all 0.3s;
+        }
+
+        .collapsible:hover {
+            background-color: #e9ecef;
+        }
+
+        .collapsible.active {
+            background-color: #667eea;
+            color: white;
+        }
+
+        .collapsible:after {
+            content: '\002B';
+            color: white;
+            font-weight: bold;
+            float: right;
+            margin-left: 5px;
+            background: #667eea;
+            padding: 2px 10px;
+            border-radius: 4px;
+        }
+
+        .collapsible.active:after {
+            content: "\2212";
+            background: white;
+            color: #667eea;
+        }
+
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .collapsible-content.active {
+            max-height: 1000px;
+            padding: 20px;
+            border: 2px solid #667eea;
+        }
+
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            border-bottom: 1px dotted black;
+            margin-left: 5px;
+            cursor: help;
+        }
+
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 300px;
+            background-color: #555;
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 10px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -150px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .job-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+            margin-bottom: 15px;
+            transition: all 0.3s;
+        }
+
+        .job-card:hover {
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .job-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .job-status {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .status-in_progress {
+            background: #cfe2ff;
+            color: #084298;
+        }
+
+        .status-completed {
+            background: #d1e7dd;
+            color: #0f5132;
+        }
+
+        .status-failed {
+            background: #f8d7da;
+            color: #842029;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 25px;
+            background: #e9ecef;
+            border-radius: 12px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            animation: slideIn 0.3s;
+            z-index: 1000;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+            }
+            to {
+                transform: translateX(0);
+            }
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+
+        .help-text {
+            font-size: 0.85em;
+            color: #6c757d;
+            margin-top: 5px;
+            display: block;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75em;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
+        .badge-new {
+            background: #28a745;
+            color: white;
+        }
+
+        .badge-experimental {
+            background: #ffc107;
+            color: #000;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 DeepSynth Dataset Generator & Trainer</h1>
+            <p class="subtitle">Production-grade fine-tuning with MoE dropout regularization</p>
+        </header>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('benchmark')">📊 Benchmark Datasets</button>
+            <button class="tab-btn" onclick="switchTab('dataset')">🗂️ Custom Dataset</button>
+            <button class="tab-btn" onclick="switchTab('training')">🎯 Train Model</button>
+            <button class="tab-btn" onclick="switchTab('jobs')">📈 Monitor Jobs</button>
+        </div>
+
+        <!-- Benchmark Dataset Tab -->
+        <div id="benchmark-tab" class="tab-content active">
+            <h2>Create Benchmark Dataset</h2>
+            <div class="info-box">
+                <strong>ℹ️ No GPU Required:</strong> Dataset generation runs on CPU only. GPU is only needed for model training.
+            </div>
+
+            <div class="form-section">
+                <h3>Select Benchmark Dataset</h3>
+                <div id="benchmark-presets" class="preset-selector">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <form id="benchmark-form">
+                <div class="form-section">
+                    <h3>Configuration</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="benchmark_max_samples">Max Samples (optional)</label>
+                            <input type="number" id="benchmark_max_samples" name="max_samples"
+                                   placeholder="Leave empty for full dataset">
+                        </div>
+                        <div class="form-group">
+                            <label for="benchmark_split">Dataset Split</label>
+                            <select id="benchmark_split" name="split">
+                                <option value="train" selected>train</option>
+                                <option value="validation">validation</option>
+                                <option value="test">test</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Save to HuggingFace</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="benchmark_hf_username">HF Username</label>
+                            <input type="text" id="benchmark_hf_username" name="hf_username"
+                                   placeholder="Your HuggingFace username">
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="benchmark_private" name="private_dataset">
+                                Make dataset private
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <input type="hidden" id="selected_benchmark" name="benchmark_name">
+                <button type="submit" class="btn btn-primary">🚀 Generate Benchmark Dataset</button>
+            </form>
+        </div>
+
+        <!-- Custom Dataset Generation Tab -->
+        <div id="dataset-tab" class="tab-content">
+            <h2>Custom Dataset Generation</h2>
+            <div class="info-box">
+                <strong>ℹ️ No GPU Required:</strong> This process converts text to images on CPU.
+            </div>
+            <form id="dataset-form">
+                <div class="form-section">
+                    <h3>Source Dataset</h3>
+                    <div class="form-group">
+                        <label for="source_dataset">HuggingFace Dataset*</label>
+                        <input type="text" id="source_dataset" name="source_dataset"
+                               placeholder="e.g., ccdv/cnn_dailymail" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="source_subset">Subset (optional)</label>
+                            <input type="text" id="source_subset" name="source_subset"
+                                   placeholder="e.g., 3.0.0">
+                        </div>
+                        <div class="form-group">
+                            <label for="source_split">Split</label>
+                            <select id="source_split" name="source_split">
+                                <option value="train" selected>train</option>
+                                <option value="validation">validation</option>
+                                <option value="test">test</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Field Mapping</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="text_field">Text Field*</label>
+                            <input type="text" id="text_field" name="text_field"
+                                   placeholder="e.g., article" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="summary_field">Summary Field*</label>
+                            <input type="text" id="summary_field" name="summary_field"
+                                   placeholder="e.g., highlights" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Output Configuration</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="output_dir">Output Directory*</label>
+                            <input type="text" id="output_dir" name="output_dir"
+                                   value="./generated_images" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="max_samples">Max Samples (optional)</label>
+                            <input type="number" id="max_samples" name="max_samples"
+                                   placeholder="Leave empty for all samples">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Save to HuggingFace</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="hf_username">HF Username</label>
+                            <input type="text" id="hf_username" name="hf_username">
+                        </div>
+                        <div class="form-group">
+                            <label for="dataset_name">Dataset Name</label>
+                            <input type="text" id="dataset_name" name="dataset_name"
+                                   placeholder="e.g., my-vision-dataset">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="private_dataset" name="private_dataset">
+                            Make dataset private
+                        </label>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">🚀 Generate Dataset</button>
+            </form>
+        </div>
+
+        <!-- Training Tab -->
+        <div id="training-tab" class="tab-content">
+            <h2>Model Training</h2>
+            <div class="warning-box">
+                <strong>⚠️ GPU Required:</strong> Model training requires GPU. Make sure you're using docker-compose.gpu.yml
+            </div>
+
+            <div class="form-section">
+                <h3>Select Training Preset</h3>
+                <div id="training-presets" class="preset-selector">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <form id="training-form">
+                <div class="form-section">
+                    <h3>Dataset</h3>
+                    <div class="form-group">
+                        <label for="dataset_repo">Generated Dataset*</label>
+                        <select id="dataset_repo" name="dataset_repo" required>
+                            <option value="" disabled selected>Select a generated dataset</option>
+                        </select>
+                        <small class="help-text">
+                            Only datasets built through the generator are available. Refresh if you just created one.
+                        </small>
+                        <button type="button" class="btn btn-secondary" style="margin-top:10px;" onclick="loadGeneratedDatasets(true)">↻ Refresh datasets</button>
+                    </div>
+                </div>
+
+                <!-- Trainer Selection -->
+                <div class="form-section">
+                    <h3>Trainer Selection <span class="badge badge-new">NEW</span></h3>
+                    <div class="success-box">
+                        <strong>💡 Trainer Comparison:</strong><br>
+                        <strong>Production</strong>: Frozen encoder (380M) + Fine-tuned MoE decoder (570M) + Dropout regularization<br>
+                        <strong>DeepSynth</strong>: Same frozen architecture without advanced dropout<br>
+                        <strong>Generic</strong>: Standard seq2seq for text-only datasets
+                    </div>
+                    <div class="preset-selector">
+                        <div class="preset-card selected" onclick="selectTrainer('production')">
+                            <h4>⭐ Production Trainer</h4>
+                            <p>570M params trainable</p>
+                            <p>MoE dropout enabled</p>
+                            <p style="font-size: 0.8em; color: #28a745;"><strong>✅ Recommended</strong></p>
+                        </div>
+                        <div class="preset-card" onclick="selectTrainer('deepsynth')">
+                            <h4>🎯 DeepSynth Trainer</h4>
+                            <p>570M params trainable</p>
+                            <p>Basic configuration</p>
+                            <p style="font-size: 0.8em; color: #999;">For experiments</p>
+                        </div>
+                        <div class="preset-card" onclick="selectTrainer('generic')">
+                            <h4>📝 Generic Trainer</h4>
+                            <p>Full model trainable</p>
+                            <p>Text-only mode</p>
+                            <p style="font-size: 0.8em; color: #999;">No visual encoding</p>
+                        </div>
+                    </div>
+                    <input type="hidden" id="selected_trainer" name="trainer_type" value="production">
+                </div>
+
+                <div class="form-section">
+                    <h3>Model Configuration</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="model_name">Model Name</label>
+                            <input type="text" id="model_name" name="model_name"
+                                   value="deepseek-ai/DeepSeek-OCR">
+                        </div>
+                        <div class="form-group">
+                            <label for="output_dir_train">Output Directory</label>
+                            <input type="text" id="output_dir_train" name="output_dir"
+                                   value="./trained_model">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Training Parameters</h3>
+                    <div class="info-box">
+                        <strong>✨ Optimized for DeepSeek-OCR:</strong> These hyperparameters are tuned for vision-based document understanding.
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="batch_size">Batch Size</label>
+                            <input type="number" id="batch_size" name="batch_size" value="2">
+                            <small class="help-text">Lower for GPU memory constraints</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="num_epochs">Epochs</label>
+                            <input type="number" id="num_epochs" name="num_epochs" value="3">
+                            <small class="help-text">More epochs = better quality</small>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="learning_rate">Learning Rate</label>
+                            <input type="text" id="learning_rate" name="learning_rate" value="5e-5">
+                            <small class="help-text">Default: 5e-5 for fine-tuning</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="max_length">Max Length</label>
+                            <input type="number" id="max_length" name="max_length" value="512">
+                            <small class="help-text">Token limit for sequences</small>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="mixed_precision">Mixed Precision</label>
+                            <select id="mixed_precision" name="mixed_precision">
+                                <option value="bf16" selected>bf16 (Recommended)</option>
+                                <option value="fp16">fp16</option>
+                                <option value="no">no (Full precision)</option>
+                            </select>
+                            <small class="help-text">bf16 for better stability</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="gradient_accumulation_steps">Gradient Accumulation</label>
+                            <input type="number" id="gradient_accumulation_steps"
+                                   name="gradient_accumulation_steps" value="8">
+                            <small class="help-text">Effective batch = batch_size × accumulation</small>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="evaluation_split">Evaluation Split (optional)</label>
+                        <input type="text" id="evaluation_split" name="evaluation_split" placeholder="validation or test">
+                        <small class="help-text">Leave empty to skip evaluation during training</small>
+                    </div>
+                </div>
+
+                <!-- Advanced MoE Dropout Options -->
+                <button type="button" class="collapsible" onclick="toggleCollapsible(this)">
+                    ⚙️ Advanced: MoE Dropout Regularization <span class="badge badge-new">NEW</span>
+                </button>
+                <div class="collapsible-content">
+                    <div class="info-box">
+                        <strong>🧠 MoE Dropout Strategies:</strong><br>
+                        <strong>Expert Dropout:</strong> Randomly drops expert gradients to prevent overfitting to specific pathways.<br>
+                        <strong>Gate Dropout:</strong> Applies dropout to router/gating parameters for better expert load balancing.<br>
+                        <strong>Bi-Drop:</strong> Multiple forward passes with different dropout masks for robust subnet learning.
+                    </div>
+
+                    <div class="form-row-3">
+                        <div class="form-group">
+                            <label for="expert_dropout_rate">
+                                Expert Dropout Rate
+                                <span class="tooltip">ℹ️
+                                    <span class="tooltiptext">Probability of dropping expert gradients during training. Higher values = more regularization. Range: 0.0-1.0. Recommended: 0.1-0.3 for production.</span>
+                                </span>
+                            </label>
+                            <input type="number" id="expert_dropout_rate" name="expert_dropout_rate"
+                                   value="0.0" min="0" max="1" step="0.05">
+                            <small class="help-text">0 = disabled, 0.2 = recommended</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="expert_dropout_min_keep">
+                                Min Experts Active
+                                <span class="tooltip">ℹ️
+                                    <span class="tooltiptext">Minimum number of experts that must remain active even after dropout. Prevents complete expert dropout. Recommended: 1-2 for stability.</span>
+                                </span>
+                            </label>
+                            <input type="number" id="expert_dropout_min_keep" name="expert_dropout_min_keep"
+                                   value="1" min="1" max="8">
+                            <small class="help-text">Guarantees min active experts</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="gate_dropout_rate">
+                                Gate Dropout Rate
+                                <span class="tooltip">ℹ️
+                                    <span class="tooltiptext">Dropout rate for router/gating parameters. Helps prevent routing collapse and improves expert load balancing. Range: 0.0-1.0. Recommended: 0.05-0.15.</span>
+                                </span>
+                            </label>
+                            <input type="number" id="gate_dropout_rate" name="gate_dropout_rate"
+                                   value="0.0" min="0" max="1" step="0.05">
+                            <small class="help-text">0 = disabled, 0.1 = recommended</small>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bidrop_passes">
+                            Bi-Drop Forward Passes
+                            <span class="tooltip">ℹ️
+                                <span class="tooltiptext">Number of forward passes with different dropout masks. Each pass uses a different sub-network configuration. Higher values = more robust but slower training. 1 = disabled, 2-3 = recommended for production.</span>
+                            </span>
+                        </label>
+                        <input type="number" id="bidrop_passes" name="bidrop_passes"
+                               value="1" min="1" max="5">
+                        <small class="help-text">1 = standard, 2-3 = robust subnet training</small>
+                    </div>
+
+                    <div class="warning-box">
+                        <strong>⚠️ Performance Note:</strong> Enabling these options improves model quality but increases training time by ~10-30%. Bi-Drop with 3 passes is the most computationally expensive but yields the best generalization.
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Resume Training</h3>
+                    <div class="form-group">
+                        <label for="resume_job_id">Resume from checkpoint</label>
+                        <select id="resume_job_id" name="resume_job_id">
+                            <option value="">Start a new run</option>
+                        </select>
+                        <small class="help-text">
+                            Completed training runs automatically save checkpoints that can be resumed from here.
+                        </small>
+                        <button type="button" class="btn btn-secondary" style="margin-top:10px;" onclick="loadTrainingCheckpoints(true)">↻ Refresh checkpoints</button>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Save Model to HuggingFace</h3>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="push_to_hub" name="push_to_hub">
+                            Push model to HuggingFace Hub
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="hub_model_id">Model ID (username/model-name)</label>
+                        <input type="text" id="hub_model_id" name="hub_model_id"
+                               placeholder="username/model-name">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="hub_private" name="hub_private">
+                            Make model private on HuggingFace
+                        </label>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="save_checkpoints_to_hub" name="save_checkpoints_to_hub" checked>
+                                Upload checkpoints to HuggingFace
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="save_metrics_to_hub" name="save_metrics_to_hub" checked>
+                                Upload metrics.json to HuggingFace
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <input type="hidden" id="selected_preset" name="preset">
+                <button type="submit" class="btn btn-primary">🎯 Start Training</button>
+            </form>
+        </div>
+
+        <!-- Jobs Monitoring Tab -->
+        <div id="jobs-tab" class="tab-content">
+            <h2>Job Monitor</h2>
+            <div class="filter-bar" style="margin-bottom: 20px; display: flex; gap: 10px;">
+                <button class="btn btn-secondary" onclick="filterJobs('all')">All</button>
+                <button class="btn btn-secondary" onclick="filterJobs('dataset_generation')">Datasets</button>
+                <button class="btn btn-secondary" onclick="filterJobs('model_training')">Training</button>
+                <button class="btn btn-secondary" onclick="refreshJobs()">↻ Refresh</button>
+            </div>
+            <div id="jobs-container">
+                <p class="loading">Loading jobs...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let selectedBenchmark = null;
+        let selectedPreset = 'default';
+        let selectedTrainerType = 'production';
+        let benchmarkDatasets = {};
+        let trainingPresets = {};
+
+        // Collapsible toggle
+        function toggleCollapsible(element) {
+            element.classList.toggle("active");
+            const content = element.nextElementSibling;
+            content.classList.toggle("active");
+        }
+
+        // Trainer selection
+        function selectTrainer(type) {
+            selectedTrainerType = type;
+            document.getElementById('selected_trainer').value = type;
+
+            // Update UI
+            document.querySelectorAll('.preset-selector .preset-card').forEach((card, index) => {
+                card.classList.remove('selected');
+                if ((type === 'production' && index === 0) ||
+                    (type === 'deepsynth' && index === 1) ||
+                    (type === 'generic' && index === 2)) {
+                    card.classList.add('selected');
+                }
+            });
+
+            // Show/hide advanced options based on trainer
+            const advancedSection = document.querySelector('.collapsible');
+            if (type === 'production') {
+                advancedSection.style.display = 'block';
+            } else {
+                advancedSection.style.display = 'none';
+            }
+        }
+
+        async function loadGeneratedDatasets(forceToast = false) {
+            const select = document.getElementById('dataset_repo');
+            if (!select) return;
+
+            const previousValue = select.value;
+            select.innerHTML = '<option value="" disabled selected>Loading datasets...</option>';
+
+            try {
+                const response = await fetch('/api/datasets/generated');
+                const data = await response.json();
+
+                if (!data.datasets || data.datasets.length === 0) {
+                    select.innerHTML = '<option value="" disabled selected>No generated datasets found</option>';
+                    if (forceToast) {
+                        showToast('No generated datasets available yet', 'warning');
+                    }
+                    return;
+                }
+
+                select.innerHTML = '<option value="" disabled>Select a generated dataset</option>';
+                for (const dataset of data.datasets) {
+                    const option = document.createElement('option');
+                    option.value = dataset.repo;
+                    option.textContent = `${dataset.dataset_name || dataset.repo} (${dataset.repo})`;
+                    if (dataset.repo === previousValue) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                }
+            } catch (error) {
+                select.innerHTML = '<option value="" disabled selected>Failed to load datasets</option>';
+                showToast('Failed to load datasets: ' + error.message, 'error');
+            }
+        }
+
+        async function loadTrainingCheckpoints(forceToast = false) {
+            const select = document.getElementById('resume_job_id');
+            if (!select) return;
+
+            const previousValue = select.value;
+            select.innerHTML = '<option value="">Loading checkpoints...</option>';
+
+            try {
+                const response = await fetch('/api/training/checkpoints');
+                const data = await response.json();
+
+                select.innerHTML = '<option value="">Start a new run</option>';
+
+                if (!data.checkpoints || data.checkpoints.length === 0) {
+                    if (forceToast) {
+                        showToast('No checkpoints available yet', 'warning');
+                    }
+                    return;
+                }
+
+                for (const checkpoint of data.checkpoints) {
+                    if (!checkpoint.checkpoint) continue;
+                    const option = document.createElement('option');
+                    option.value = checkpoint.job_id;
+                    const label = checkpoint.hub_model_id
+                        ? `${checkpoint.job_id} → ${checkpoint.hub_model_id}`
+                        : `${checkpoint.job_id} (${checkpoint.checkpoint})`;
+                    option.textContent = label;
+                    if (checkpoint.job_id === previousValue) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                }
+            } catch (error) {
+                select.innerHTML = '<option value="">Failed to load checkpoints</option>';
+                showToast('Failed to load checkpoints: ' + error.message, 'error');
+            }
+        }
+
+        // Tab switching
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            document.querySelector(`[onclick="switchTab('${tabName}')"]`).classList.add('active');
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+
+            if (tabName === 'jobs') {
+                refreshJobs();
+            }
+        }
+
+        // Load benchmark datasets
+        async function loadBenchmarkDatasets() {
+            try {
+                const response = await fetch('/api/datasets/presets');
+                const data = await response.json();
+                benchmarkDatasets = data.datasets;
+
+                const container = document.getElementById('benchmark-presets');
+                container.innerHTML = '';
+
+                for (const [key, dataset] of Object.entries(benchmarkDatasets)) {
+                    const card = document.createElement('div');
+                    card.className = 'preset-card';
+                    card.onclick = () => selectBenchmark(key);
+                    card.innerHTML = `
+                        <h4>${key.toUpperCase()}</h4>
+                        <p>${dataset.description}</p>
+                        <p style="font-size: 0.8em; color: #999;">${dataset.size}</p>
+                    `;
+                    container.appendChild(card);
+                }
+            } catch (error) {
+                console.error('Error loading benchmark datasets:', error);
+            }
+        }
+
+        // Select benchmark
+        function selectBenchmark(key) {
+            selectedBenchmark = key;
+            document.getElementById('selected_benchmark').value = key;
+
+            document.querySelectorAll('#benchmark-presets .preset-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            event.target.closest('.preset-card').classList.add('selected');
+        }
+
+        // Load training presets
+        async function loadTrainingPresets() {
+            try {
+                const response = await fetch('/api/training/presets');
+                const data = await response.json();
+                trainingPresets = data.presets;
+
+                const container = document.getElementById('training-presets');
+                container.innerHTML = '';
+
+                for (const [key, config] of Object.entries(trainingPresets)) {
+                    const card = document.createElement('div');
+                    card.className = 'preset-card';
+                    if (key === 'default') card.classList.add('selected');
+                    card.onclick = () => selectTrainingPreset(key);
+                    card.innerHTML = `
+                        <h4>${key.replace('_', ' ').toUpperCase()}</h4>
+                        <p>Batch: ${config.batch_size} × ${config.gradient_accumulation_steps}</p>
+                        <p>LR: ${config.learning_rate}, Epochs: ${config.num_epochs}</p>
+                    `;
+                    container.appendChild(card);
+                }
+            } catch (error) {
+                console.error('Error loading training presets:', error);
+            }
+        }
+
+        // Select training preset
+        function selectTrainingPreset(key) {
+            selectedPreset = key;
+            document.getElementById('selected_preset').value = key;
+
+            const config = trainingPresets[key];
+            document.getElementById('batch_size').value = config.batch_size;
+            document.getElementById('num_epochs').value = config.num_epochs;
+            document.getElementById('learning_rate').value = config.learning_rate;
+            document.getElementById('max_length').value = config.max_length;
+            document.getElementById('gradient_accumulation_steps').value = config.gradient_accumulation_steps;
+            document.getElementById('mixed_precision').value = config.mixed_precision;
+
+            document.querySelectorAll('#training-presets .preset-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            event.target.closest('.preset-card').classList.add('selected');
+        }
+
+        // Show toast notification
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerHTML = `
+                <span>${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span>
+                <span>${message}</span>
+            `;
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+                toast.remove();
+            }, 4000);
+        }
+
+        // Submit benchmark form
+        document.getElementById('benchmark-form').onsubmit = async (e) => {
+            e.preventDefault();
+
+            if (!selectedBenchmark) {
+                showToast('Please select a benchmark dataset', 'error');
+                return;
+            }
+
+            const formData = {
+                benchmark_name: selectedBenchmark,
+                max_samples: document.getElementById('benchmark_max_samples').value || null,
+                split: document.getElementById('benchmark_split').value,
+                hf_username: document.getElementById('benchmark_hf_username').value,
+                private_dataset: document.getElementById('benchmark_private').checked
+            };
+
+            try {
+                const response = await fetch('/api/benchmark/create', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showToast(`Benchmark dataset generation started! Job ID: ${data.job_id}`, 'success');
+                    switchTab('jobs');
+                    setTimeout(refreshJobs, 500);
+                } else {
+                    showToast(data.error || 'Error creating benchmark dataset', 'error');
+                }
+            } catch (error) {
+                showToast('Network error: ' + error.message, 'error');
+            }
+        };
+
+        // Submit custom dataset form
+        document.getElementById('dataset-form').onsubmit = async (e) => {
+            e.preventDefault();
+
+            const formData = {
+                source_dataset: document.getElementById('source_dataset').value,
+                source_subset: document.getElementById('source_subset').value,
+                source_split: document.getElementById('source_split').value,
+                text_field: document.getElementById('text_field').value,
+                summary_field: document.getElementById('summary_field').value,
+                output_dir: document.getElementById('output_dir').value,
+                max_samples: document.getElementById('max_samples').value || null,
+                hf_username: document.getElementById('hf_username').value,
+                dataset_name: document.getElementById('dataset_name').value,
+                private_dataset: document.getElementById('private_dataset').checked
+            };
+
+            try {
+                const response = await fetch('/api/dataset/generate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showToast(`Dataset generation started! Job ID: ${data.job_id}`, 'success');
+                    switchTab('jobs');
+                    setTimeout(refreshJobs, 500);
+                    setTimeout(() => loadGeneratedDatasets(true), 1000);
+                } else {
+                    showToast(data.error || 'Error generating dataset', 'error');
+                }
+            } catch (error) {
+                showToast('Network error: ' + error.message, 'error');
+            }
+        };
+
+        // Submit training form
+        document.getElementById('training-form').onsubmit = async (e) => {
+            e.preventDefault();
+
+            const formData = {
+                dataset_repo: document.getElementById('dataset_repo').value,
+                trainer_type: document.getElementById('selected_trainer').value,
+                model_name: document.getElementById('model_name').value,
+                output_dir: document.getElementById('output_dir_train').value,
+                batch_size: document.getElementById('batch_size').value,
+                num_epochs: document.getElementById('num_epochs').value,
+                learning_rate: document.getElementById('learning_rate').value,
+                max_length: document.getElementById('max_length').value,
+                mixed_precision: document.getElementById('mixed_precision').value,
+                gradient_accumulation_steps: document.getElementById('gradient_accumulation_steps').value,
+                evaluation_split: document.getElementById('evaluation_split').value || null,
+                resume_job_id: document.getElementById('resume_job_id').value || null,
+                push_to_hub: document.getElementById('push_to_hub').checked,
+                hub_model_id: document.getElementById('hub_model_id').value,
+                hub_private: document.getElementById('hub_private').checked,
+                save_checkpoints_to_hub: document.getElementById('save_checkpoints_to_hub').checked,
+                save_metrics_to_hub: document.getElementById('save_metrics_to_hub').checked,
+                // MoE Dropout parameters
+                expert_dropout_rate: parseFloat(document.getElementById('expert_dropout_rate').value),
+                expert_dropout_min_keep: parseInt(document.getElementById('expert_dropout_min_keep').value),
+                gate_dropout_rate: parseFloat(document.getElementById('gate_dropout_rate').value),
+                bidrop_passes: parseInt(document.getElementById('bidrop_passes').value)
+            };
+
+            try {
+                const response = await fetch('/api/model/train', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showToast(`Model training started! Job ID: ${data.job_id}`, 'success');
+                    switchTab('jobs');
+                    setTimeout(refreshJobs, 500);
+                    setTimeout(() => loadTrainingCheckpoints(true), 1000);
+                } else {
+                    showToast(data.error || 'Error starting training', 'error');
+                }
+            } catch (error) {
+                showToast('Network error: ' + error.message, 'error');
+            }
+        };
+
+        // Refresh jobs
+        async function refreshJobs(type = null) {
+            try {
+                const url = type ? `/api/jobs?type=${type}` : '/api/jobs';
+                const response = await fetch(url);
+                const data = await response.json();
+
+                const container = document.getElementById('jobs-container');
+                container.innerHTML = '';
+
+                if (data.jobs.length === 0) {
+                    container.innerHTML = '<p class="loading">No jobs found</p>';
+                    return;
+                }
+
+                for (const job of data.jobs) {
+                    const card = document.createElement('div');
+                    card.className = 'job-card';
+
+                    const progress = job.progress || {};
+                    const percentage = progress.progress_percentage || 0;
+                    const metrics = job.metrics || {};
+
+                    const detailLines = [];
+                    if (job.hf_dataset_repo) {
+                        detailLines.push(`Dataset: ${job.hf_dataset_repo}`);
+                    }
+                    if (job.model_output_path) {
+                        detailLines.push(`Output: ${job.model_output_path}`);
+                    }
+
+                    const metricLines = [];
+                    if (typeof metrics.train_loss !== 'undefined') {
+                        metricLines.push(`Train loss: ${Number(metrics.train_loss).toFixed(4)}`);
+                    }
+                    if (typeof metrics.eval_loss !== 'undefined') {
+                        metricLines.push(`Eval loss: ${Number(metrics.eval_loss).toFixed(4)}`);
+                    }
+                    if (typeof metrics.eval_perplexity !== 'undefined' && Number.isFinite(Number(metrics.eval_perplexity))) {
+                        metricLines.push(`Perplexity: ${Number(metrics.eval_perplexity).toFixed(2)}`);
+                    }
+
+                    const detailsHtml = detailLines.length ? `<div style="font-size:0.85em;color:#495057;margin-top:10px;">${detailLines.join('<br>')}</div>` : '';
+                    const metricsHtml = metricLines.length ? `<div style="font-size:0.85em;color:#212529;margin-top:6px;">${metricLines.join(' • ')}</div>` : '';
+
+                    card.innerHTML = `
+                        <div class="job-header">
+                            <div>
+                                <strong>${job.job_type.replace('_', ' ').toUpperCase()}</strong>
+                                <div style="font-size: 0.85em; color: #6c757d;">Job ID: ${job.job_id}</div>
+                            </div>
+                            <span class="job-status status-${job.status}">${job.status.toUpperCase()}</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${percentage}%">${percentage.toFixed(1)}%</div>
+                        </div>
+                        <div style="font-size: 0.9em; color: #6c757d; margin-top: 10px;">
+                            ${progress.processed_samples || 0} / ${progress.total_samples || 0} samples
+                        </div>
+                        ${detailsHtml}
+                        ${metricsHtml}
+                    `;
+
+                    container.appendChild(card);
+                }
+            } catch (error) {
+                console.error('Error refreshing jobs:', error);
+            }
+        }
+
+        function filterJobs(type) {
+            refreshJobs(type === 'all' ? null : type);
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadBenchmarkDatasets();
+            loadTrainingPresets();
+            loadGeneratedDatasets();
+            loadTrainingCheckpoints();
+            refreshJobs();
+
+            // Auto-refresh jobs every 5 seconds
+            setInterval(() => {
+                if (document.getElementById('jobs-tab').classList.contains('active')) {
+                    refreshJobs();
+                }
+            }, 5000);
+        });
+    </script>
+</body>
+</html>

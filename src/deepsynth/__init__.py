@@ -9,4 +9,8 @@ __all__ = [
     "DeepSynthOCRTrainer",
     "SummarizationTrainer",
     "data",
+    "evaluation",
+    "inference",
+    "pipelines",
+    "training",
 ]
