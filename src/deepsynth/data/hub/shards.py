@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
-from datasets import Dataset, DatasetDict
+from datasets import Dataset
 from datasets import Image as ImageFeature
 from huggingface_hub import HfApi, hf_hub_download
 
@@ -149,8 +149,8 @@ class HubShardManager:
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir)
-            dataset_dict = DatasetDict({"train": dataset})
-            dataset_dict.save_to_disk(tmp_path)
+            # Save dataset directly (not as DatasetDict) to avoid complex structure
+            dataset.save_to_disk(str(tmp_path))
             self.api.upload_folder(
                 folder_path=str(tmp_path),
                 path_in_repo=path_in_repo,
