@@ -1,6 +1,8 @@
-# DeepSeek Dataset Generator & Trainer - Docker UI
+# DeepSynth Dataset Generator & Trainer - Docker UI
 
 A Docker-based web interface for generating datasets and training models with the DeepSeek-OCR framework. Features include:
+
+> _Repository note_: Docker examples still reference the legacy slug `deepseek-synthesia` until the GitHub rename is complete.
 
 - **Resumable Jobs**: Automatically resume interrupted dataset generation or training
 - **Incremental Datasets**: Add new samples without duplicates
@@ -179,10 +181,10 @@ docker-compose up -d
 docker ps
 
 # Check resource usage
-docker stats deepseek-dataset-generator
+docker stats deepsynth-dataset-generator
 
 # Access container shell
-docker exec -it deepseek-dataset-generator bash
+docker exec -it deepsynth-dataset-generator bash
 ```
 
 ### Cleanup
@@ -195,7 +197,7 @@ docker-compose down
 docker-compose down -v
 
 # Remove images
-docker rmi deepseek-synthesia-deepseek-ui
+docker rmi deepsynth-ui
 ```
 
 ---
@@ -282,7 +284,7 @@ Reduce batch size in training configuration:
 
 ```bash
 # Login to HuggingFace
-docker exec -it deepseek-dataset-generator bash
+docker exec -it deepsynth-dataset-generator bash
 huggingface-cli login
 
 # Or update HF_TOKEN in .env
@@ -369,7 +371,7 @@ volumes:
 3. **Train Model**:
    - Dataset: `username/cnn-vision-1k`
    - Epochs: 1
-   - Push to Hub: `username/deepseek-cnn-model`
+   - Push to Hub: `username/deepsynth-cnn-model`
 
 4. **Use Trained Model**:
 ```bash

@@ -1,10 +1,10 @@
 #!/bin/bash
-# Startup script for DeepSeek Docker UI
+# Startup script for DeepSynth Docker UI
 
 set -e
 
 echo "=========================================="
-echo "DeepSeek Dataset Generator & Trainer"
+echo "DeepSynth Dataset Generator & Trainer"
 echo "=========================================="
 echo ""
 
@@ -67,7 +67,7 @@ docker-compose up -d
 
 echo ""
 echo "=========================================="
-echo "DeepSeek UI is starting..."
+echo "DeepSynth UI is starting..."
 echo "=========================================="
 echo ""
 echo "Web UI will be available at:"
@@ -77,7 +77,7 @@ echo "Useful commands:"
 echo "  View logs:    docker-compose logs -f"
 echo "  Stop:         docker-compose down"
 echo "  Restart:      docker-compose restart"
-echo "  Shell access: docker exec -it deepseek-dataset-generator bash"
+echo "  Shell access: docker exec -it deepsynth-dataset-generator bash"
 echo ""
 echo "Waiting for service to be healthy..."
 

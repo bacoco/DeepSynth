@@ -14,10 +14,10 @@ class OptimizerConfig:
 
 @dataclass
 class TrainerConfig:
-    """Configuration values used by :class:`ProductionDeepSeekTrainer`."""
+    """Configuration values used by :class:`ProductionDeepSynthTrainer`."""
 
     model_name: str = "deepseek-ai/DeepSeek-OCR"
-    output_dir: str = "./deepseek-summarizer"
+    output_dir: str = "./deepsynth-summarizer"
     batch_size: int = 2
     num_epochs: int = 1
     gradient_accumulation_steps: int = 1

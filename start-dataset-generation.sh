@@ -4,7 +4,7 @@
 
 set -e
 
-echo "🚀 Starting DeepSeek Dataset Generation Service (CPU Only)"
+echo "🚀 Starting DeepSynth Dataset Generation Service (CPU Only)"
 echo "=================================================="
 
 # Check if HF_TOKEN is set
@@ -53,7 +53,7 @@ for i in {1..10}; do
         echo
         echo "No GPU required - runs entirely on CPU!"
         echo
-        echo "To view logs: docker logs -f deepseek-dataset-generator-cpu"
+        echo "To view logs: docker logs -f deepsynth-dataset-generator-cpu"
         echo "To stop: docker-compose -f docker-compose.cpu.yml down"
         exit 0
     fi
@@ -62,5 +62,5 @@ for i in {1..10}; do
 done
 
 echo "❌ Service failed to start. Check logs with:"
-echo "   docker logs deepseek-dataset-generator-cpu"
+echo "   docker logs deepsynth-dataset-generator-cpu"
 exit 1

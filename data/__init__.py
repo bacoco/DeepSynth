@@ -1,4 +1,4 @@
-"""Data preparation utilities for DeepSeek-OCR summarization."""
+"""Data preparation utilities for DeepSynth summarization (powered by DeepSeek-OCR)."""
 from .dataset_loader import DatasetConfig, SummarizationDataset, load_local_jsonl, split_records
 from .text_to_image import TextToImageConverter, batch_convert
 

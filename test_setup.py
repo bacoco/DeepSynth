@@ -113,10 +113,10 @@ def test_modules():
         return False
 
     try:
-        from training.deepseek_trainer_v2 import ProductionDeepSeekTrainer
-        print(f"  ✓ training.deepseek_trainer_v2")
+        from training.deepsynth_trainer_v2 import ProductionDeepSynthTrainer
+        print(f"  ✓ training.deepsynth_trainer_v2")
     except Exception as e:
-        print(f"  ✗ training.deepseek_trainer_v2: {e}")
+        print(f"  ✗ training.deepsynth_trainer_v2: {e}")
         return False
 
     return True

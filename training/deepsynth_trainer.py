@@ -1,4 +1,4 @@
-"""DeepSeek-OCR specific trainer implementing the PRD architecture.
+"""DeepSynth trainer wrapping the DeepSeek-OCR architecture.
 
 This trainer implements the architecture specified in the PRD:
 - Freeze DeepEncoder (380M params)
@@ -37,8 +37,8 @@ class VisualBatch:
     attention_mask: torch.Tensor
 
 
-class DeepSeekOCRTrainer:
-    """Trainer specifically for DeepSeek-OCR with frozen encoder architecture.
+class DeepSynthOCRTrainer:
+    """Trainer for DeepSynth that fine-tunes the DeepSeek-OCR decoder with a frozen encoder.
 
     This implements the PRD specification:
     - Text → Image → DeepEncoder (frozen, 380M) → Visual Tokens (20x compression)
@@ -54,7 +54,7 @@ class DeepSeekOCRTrainer:
         self.config = config
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        LOGGER.info("Loading DeepSeek-OCR model from %s", config.model_name)
+        LOGGER.info("Loading DeepSeek-OCR model for DeepSynth from %s", config.model_name)
 
         # Load DeepSeek-OCR with trust_remote_code as per PRD
         self.model = AutoModel.from_pretrained(
@@ -376,4 +376,4 @@ class DeepSeekOCRTrainer:
         LOGGER.info("Model uploaded to %s", repo_id)
 
 
-__all__ = ["DeepSeekOCRTrainer", "VisualBatch"]
+__all__ = ["DeepSynthOCRTrainer", "VisualBatch"]

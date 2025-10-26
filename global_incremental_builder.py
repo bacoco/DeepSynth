@@ -29,7 +29,7 @@ class GlobalIncrementalBuilder:
         login(token=self.hf_token)
         self.username = whoami()['name']
         self.api = HfApi()
-        self.dataset_name = f"{self.username}/deepseek-vision-complete"
+        self.dataset_name = f"{self.username}/deepsynth-vision-complete"
 
         # Text-to-image converter
         unicode_font_path = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
@@ -117,12 +117,12 @@ class GlobalIncrementalBuilder:
             # Create metadata description with progress
             metadata = {
                 'global_progress': progress,
-                'description': 'DeepSeek multilingual summarization dataset with text-image pairs',
+                'description': 'DeepSynth multilingual summarization dataset with text-image pairs',
                 'total_expected': sum(entry[4] for entry in self.sources)
             }
 
             # Update dataset card with progress
-            card_content = f"""# DeepSeek Multilingual Summarization Dataset
+            card_content = f"""# DeepSynth Multilingual Summarization Dataset
 
 ## Progress Status
 - **Total Samples**: {progress['total_samples']:,}

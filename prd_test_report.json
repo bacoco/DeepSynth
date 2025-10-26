@@ -50,7 +50,7 @@
       "example_tasks": [
         "Documentation API",
         "**Guide Complet 2025** : https://skywork.ai/blog/ai-agent/how-to-install-run-deepseek-ocr-2025-guide/",
-        "**vLLM Integration** : https://docs.vllm.ai/projects/recipes/en/latest/DeepSeek/DeepSeek-OCR.html"
+        "**vLLM Integration** : https://docs.vllm.ai/projects/recipes/en/latest/DeepSynth/DeepSeek-OCR.html"
       ]
     },
     "database": {
@@ -81,7 +81,7 @@
       "example_tasks": [
         "**OOM (Out of Memory)** : R\u00e9duire batch_size, activer gradient_checkpointing",
         "**Guide Complet 2025** : https://skywork.ai/blog/ai-agent/how-to-install-run-deepseek-ocr-2025-guide/",
-        "**vLLM Integration** : https://docs.vllm.ai/projects/recipes/en/latest/DeepSeek/DeepSeek-OCR.html"
+        "**vLLM Integration** : https://docs.vllm.ai/projects/recipes/en/latest/DeepSynth/DeepSeek-OCR.html"
       ]
     }
   },
@@ -154,7 +154,7 @@
       "example_tasks": [
         "Documentation API",
         "**Guide Complet 2025** : https://skywork.ai/blog/ai-agent/how-to-install-run-deepseek-ocr-2025-guide/",
-        "**vLLM Integration** : https://docs.vllm.ai/projects/recipes/en/latest/DeepSeek/DeepSeek-OCR.html",
+        "**vLLM Integration** : https://docs.vllm.ai/projects/recipes/en/latest/DeepSynth/DeepSeek-OCR.html",
         "Transformers: https://huggingface.co/docs/transformers/",
         "Datasets: https://huggingface.co/docs/datasets/"
       ],

@@ -7,7 +7,7 @@ This guide explains how to evaluate your trained models using industry-standard 
 ```bash
 # Evaluate on CNN/DailyMail
 python run_benchmark.py \
-    --model ./deepseek-ocr-summarizer \
+    --model ./deepsynth-ocr-summarizer \
     --benchmark cnn_dailymail \
     --max-samples 1000
 
@@ -154,7 +154,7 @@ python run_benchmark.py \
 #!/bin/bash
 # benchmark_all.sh
 
-MODEL="./deepseek-ocr-summarizer"
+MODEL="./deepsynth-ocr-summarizer"
 
 for BENCHMARK in cnn_dailymail xsum arxiv samsum; do
     echo "Evaluating on $BENCHMARK..."

@@ -61,7 +61,7 @@ python run_complete_multilingual_pipeline.py
 - ✅ Automatic space management
 
 ### 3. **MONITOR PROGRESS**
-- Check HuggingFace uploads: `baconnier/deepseek-vision-complete`
+- Check HuggingFace uploads: `baconnier/deepsynth-vision-complete`
 - Monitor disk space: `df -h`
 - Progress tracking in: `work/progress.json`
 
@@ -146,7 +146,7 @@ dataset = loader.load_language('fr')  # ✅ 392,902 samples
 ## 🎯 FINAL RESULT EXPECTED
 
 After completion:
-- ✅ HuggingFace dataset: `baconnier/deepseek-vision-complete`
+- ✅ HuggingFace dataset: `baconnier/deepsynth-vision-complete`
 - ✅ 1.24M+ multilingual text-image pairs
 - ✅ Perfect French/Spanish/German character rendering
 - ✅ Ready for DeepSeek-OCR fine-tuning

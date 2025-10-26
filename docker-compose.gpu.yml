@@ -1,11 +1,11 @@
 version: '3.8'
 
 services:
-  deepseek-trainer:
+  deepsynth-trainer:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: deepseek-trainer-gpu
+    container_name: deepsynth-trainer-gpu
     ports:
       - "5001:5000"
     volumes:
@@ -49,4 +49,4 @@ services:
 
 networks:
   default:
-    name: deepseek-network
+    name: deepsynth-network

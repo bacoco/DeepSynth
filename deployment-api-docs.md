@@ -6,7 +6,7 @@
 
 ```python
 """
-Flask API server for DeepSeek-OCR summarization service
+Flask API server for DeepSynth (DeepSeek-OCR) summarization service
 """
 
 from flask import Flask, request, jsonify, send_file
@@ -18,7 +18,7 @@ from datetime import datetime
 import logging
 from typing import Dict, Any
 
-from infer import DeepSeekSummarizer
+from infer import DeepSynthSummarizer
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -28,14 +28,14 @@ app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 # Initialize model (global to avoid reloading)
-MODEL_PATH = os.getenv('MODEL_PATH', './deepseek-summarizer')
+MODEL_PATH = os.getenv('MODEL_PATH', './deepsynth-summarizer')
 summarizer = None
 
 def init_model():
     """Initialize the summarization model"""
     global summarizer
     try:
-        summarizer = DeepSeekSummarizer(MODEL_PATH)
+        summarizer = DeepSynthSummarizer(MODEL_PATH)
         logger.info(f"✅ Model loaded from {MODEL_PATH}")
     except Exception as e:
         logger.error(f"❌ Failed to load model: {e}")
@@ -275,7 +275,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--host', default='0.0.0.0')
     parser.add_argument('--port', type=int, default=5000)
-    parser.add_argument('--model-path', default='./deepseek-summarizer')
+    parser.add_argument('--model-path', default='./deepsynth-summarizer')
     parser.add_argument('--debug', action='store_true')
     
     args = parser.parse_args()
@@ -351,7 +351,7 @@ CMD ["python", "inference/api_server.py", "--host", "0.0.0.0", "--port", "5000"]
 version: '3.8'
 
 services:
-  deepseek-summarizer:
+  deepsynth-summarizer:
     build: .
     ports:
       - "5000:5000"
@@ -384,7 +384,7 @@ services:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./ssl:/etc/nginx/ssl:ro
     depends_on:
-      - deepseek-summarizer
+      - deepsynth-summarizer
     restart: unless-stopped
 
 volumes:
@@ -400,8 +400,8 @@ events {
 }
 
 http {
-    upstream deepseek_backend {
-        server deepseek-summarizer:5000;
+    upstream deepsynth_backend {
+        server deepsynth-summarizer:5000;
     }
 
     server {
@@ -413,7 +413,7 @@ http {
 
         # Proxy to API server
         location / {
-            proxy_pass http://deepseek_backend;
+            proxy_pass http://deepsynth_backend;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -427,7 +427,7 @@ http {
 
         # Health check
         location /health {
-            proxy_pass http://deepseek_backend/health;
+            proxy_pass http://deepsynth_backend/health;
             proxy_set_header Host $host;
         }
     }
@@ -442,7 +442,7 @@ http {
 import requests
 import json
 
-class DeepSeekSummarizerClient:
+class DeepSynthSummarizerClient:
     def __init__(self, base_url: str = "http://localhost:5000"):
         self.base_url = base_url.rstrip('/')
     
@@ -502,7 +502,7 @@ class DeepSeekSummarizerClient:
 
 # Usage example
 if __name__ == "__main__":
-    client = DeepSeekSummarizerClient()
+    client = DeepSynthSummarizerClient()
     
     # Test text summarization
     text = """
@@ -749,23 +749,23 @@ if __name__ == "__main__":
 
 ```bash
 # 1. Build Docker image
-docker build -t deepseek-summarizer .
+docker build -t deepsynth-summarizer .
 
 # 2. Run with Docker Compose
 docker-compose up -d
 
 # 3. Scale service
-docker-compose up -d --scale deepseek-summarizer=3
+docker-compose up -d --scale deepsynth-summarizer=3
 
 # 4. Monitor logs
-docker-compose logs -f deepseek-summarizer
+docker-compose logs -f deepsynth-summarizer
 
 # 5. Update service
-docker-compose build deepseek-summarizer
-docker-compose up -d deepseek-summarizer
+docker-compose build deepsynth-summarizer
+docker-compose up -d deepsynth-summarizer
 
 # 6. Backup model
-docker run --rm -v $(pwd)/models:/backup deepseek-summarizer \
+docker run --rm -v $(pwd)/models:/backup deepsynth-summarizer \
   tar czf /backup/model-$(date +%Y%m%d).tar.gz /app/models
 
 # 7. Load test

@@ -1,4 +1,4 @@
-"""Production-ready DeepSeek-OCR trainer with Hugging Face integration."""
+"""Production-ready DeepSynth trainer (powered by DeepSeek-OCR) with Hugging Face integration."""
 
 from __future__ import annotations
 
@@ -26,8 +26,8 @@ except ImportError as exc:  # pragma: no cover
 LOGGER = logging.getLogger(__name__)
 
 
-class ProductionDeepSeekTrainer:
-    """Trainer that fine-tunes DeepSeek-OCR and syncs artefacts to the Hub."""
+class ProductionDeepSynthTrainer:
+    """Trainer that fine-tunes DeepSeek-OCR for the DeepSynth project and syncs artefacts to the Hub."""
 
     def __init__(self, config: TrainerConfig):
         if not isinstance(config, TrainerConfig):  # pragma: no cover - guardrail
@@ -449,7 +449,7 @@ if __name__ == "__main__":
 
     try:
         demo_config = TrainerConfig(batch_size=1)
-        trainer = ProductionDeepSeekTrainer(demo_config)
+        trainer = ProductionDeepSynthTrainer(demo_config)
         print("✓ Trainer initialized successfully")
         print(f"  Device: {trainer.device}")
         print(f"  Model: {trainer.config.model_name}")

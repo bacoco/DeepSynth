@@ -1,4 +1,4 @@
-// Frontend JavaScript for DeepSeek Dataset Generator & Trainer
+// Frontend JavaScript for DeepSynth Dataset Generator & Trainer
 
 let currentFilter = 'all';
 let refreshInterval = null;
