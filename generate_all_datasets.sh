@@ -80,16 +80,6 @@ echo "  • Vous pouvez interrompre (Ctrl+C) et reprendre plus tard"
 echo "  • Les datasets seront visibles sur HuggingFace au fur et à mesure"
 echo "  • Les logs détaillés sont dans 'parallel_datasets.log'"
 echo ""
-
-# Demander confirmation
-read -p "🚀 Démarrer le traitement? (o/N): " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[OoYy]$ ]]; then
-    echo "⏹️  Annulé par l'utilisateur"
-    exit 0
-fi
-
-echo ""
 echo "🚀 DÉMARRAGE DU TRAITEMENT..."
 echo "============================================================="
 echo ""
