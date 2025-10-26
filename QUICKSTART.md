@@ -86,11 +86,44 @@ HF_TOKEN=hf_your_token_here
 HF_USERNAME=your_username
 ```
 
+### Updating the Repository
+
+If you already have the repo installed and want to get the latest updates:
+
+```bash
+# Simple one-command update
+./update.sh
+```
+
+This script will:
+- Clean temporary files (.DS_Store, __pycache__, etc.)
+- Backup your .env file
+- Pull latest changes from GitHub
+- Restore your .env
+- Update Python dependencies
+
+**Manual update** (if update.sh fails):
+```bash
+# Remove temporary files
+find . -name ".DS_Store" -delete
+rm -rf work_separate_* __pycache__
+
+# Pull changes
+git stash  # Save local changes
+git pull --rebase origin main
+git stash pop  # Restore local changes
+
+# Update dependencies (if venv exists)
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
 ### Troubleshooting
 
 **Script doesn't start?**
 ```bash
 chmod +x generate_all_datasets.sh  # Make it executable
+chmod +x update.sh                 # Make update script executable
 ```
 
 **Out of disk space?**
