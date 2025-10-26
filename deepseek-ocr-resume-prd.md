@@ -19,7 +19,7 @@ Texte/PDF → Image 2D → DeepEncoder (frozen, 380M) → Tokens Visuels 20x →
 
 ### Guides d'Installation
 - **Guide Complet 2025** : https://skywork.ai/blog/ai-agent/how-to-install-run-deepseek-ocr-2025-guide/
-- **vLLM Integration** : https://docs.vllm.ai/projects/recipes/en/latest/DeepSeek/DeepSeek-OCR.html
+- **vLLM Integration** : https://docs.vllm.ai/projects/recipes/en/latest/DeepSynth/DeepSeek-OCR.html
 - **Colab Officiel** : https://huggingface.co/deepseek-ai/DeepSeek-OCR/discussions/27
 - **Simon Willison Demo** : https://simonwillison.net/2025/Oct/20/deepseek-ocr-claude-code/
 
@@ -193,7 +193,7 @@ print(f"Paramètres entraînables: {trainable_params:,}")  # ~570M
 ### Configuration Entraînement
 ```python
 training_args = TrainingArguments(
-    output_dir="./deepseek-summarizer",
+    output_dir="./deepsynth-summarizer",
     
     # Epochs & Batch
     num_train_epochs=4,
@@ -356,7 +356,7 @@ print(f"Résumé: {summary}")
 from vllm import LLM, SamplingParams
 
 llm = LLM(
-    model="./deepseek-summarizer",
+    model="./deepsynth-summarizer",
     trust_remote_code=True,
     dtype="float16",
     gpu_memory_utilization=0.9,

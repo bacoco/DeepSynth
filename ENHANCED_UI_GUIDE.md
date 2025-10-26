@@ -1,4 +1,4 @@
-# Enhanced UI Guide - DeepSeek Dataset Generator & Trainer
+# Enhanced UI Guide - DeepSynth Dataset Generator & Trainer
 
 ## Overview
 
@@ -432,7 +432,7 @@ tracker.save_metrics()
 ## Support
 
 For issues or questions:
-1. Check the logs: `docker logs deepseek-dataset-generator-cpu` or `deepseek-trainer-gpu`
+1. Check the logs: `docker logs deepsynth-dataset-generator-cpu` or `deepsynth-trainer-gpu`
 2. Review the troubleshooting section
 3. Open an issue on GitHub
 

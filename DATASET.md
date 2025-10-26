@@ -1,8 +1,10 @@
-# 🌍 DeepSeek Multilingual Vision-Text Dataset
+# 🌍 DeepSynth Multilingual Vision-Text Dataset
 
 > **1.29M+ multilingual text-image pairs for vision-language model training**
 
-[![Dataset](https://img.shields.io/badge/🤗%20Dataset-baconnier/deepseek--vision--complete-blue)](https://huggingface.co/datasets/baconnier/deepseek-vision-complete)
+> _Brand update_: Dataset resources are published under **DeepSynth**; until GitHub migration completes the repository slug remains `bacoco/deepseek-synthesia`.
+
+[![Dataset](https://img.shields.io/badge/🤗%20Dataset-baconnier/deepsynth--vision--complete-blue)](https://huggingface.co/datasets/baconnier/deepsynth-vision-complete)
 [![Cross-Computer](https://img.shields.io/badge/Cross--Computer-Resumable-green)](#global-incremental-processing)
 [![Multilingual](https://img.shields.io/badge/Languages-6+-orange)](#dataset-composition)
 [![No Duplicates](https://img.shields.io/badge/Duplicate--Free-✓-brightgreen)](#duplicate-prevention)
@@ -139,17 +141,9 @@ cp .env.example .env
 
 **Check current progress:**
 ```python
-import json
-from huggingface_hub import hf_hub_download
-
-repo_id = "your-username/deepseek-vision-complete"
-index_path = hf_hub_download(repo_id, filename="data/shards.json", repo_type="dataset")
-
-with open(index_path, "r", encoding="utf-8") as handle:
-    index = json.load(handle)
-
-total_samples = sum(shard["num_samples"] for shard in index["shards"])
-print(f"Current samples: {total_samples:,}")
+from datasets import load_dataset
+dataset = load_dataset("your-username/deepsynth-vision-complete")
+print(f"Current samples: {len(dataset['train']):,}")
 ```
 
 ---
@@ -221,8 +215,20 @@ for text in test_texts:
 ```
 
 ### Dataset Integrity Check
-```bash
-python scripts/check_shards_duplicates.py --repo your-username/deepseek-vision-complete
+```python
+from datasets import load_dataset
+dataset = load_dataset("your-username/deepsynth-vision-complete")
+
+# Verify no duplicates
+original_indices = dataset['train']['original_index']
+assert len(original_indices) == len(set(original_indices))
+print("✅ No duplicate samples found")
+
+# Verify all languages present
+sources = set(dataset['train']['source_dataset'])
+expected = {'MLSUM', 'cnn_dailymail', 'Rexhaif/xsum_reduced', 'billsum'}
+assert expected.issubset(sources)
+print("✅ All source datasets present")
 ```
 
 The script streams every shard listed in the index, verifies duplicate
@@ -284,7 +290,7 @@ The pipeline is designed to handle interruptions gracefully:
 ```python
 # Language distribution
 from collections import Counter
-dataset = load_dataset("your-username/deepseek-vision-complete")
+dataset = load_dataset("your-username/deepsynth-vision-complete")
 lang_dist = Counter(dataset['train']['source_dataset'])
 print("Language distribution:", dict(lang_dist))
 
@@ -321,10 +327,10 @@ print(f"Avg text length: {sum(text_lengths)/len(text_lengths):.0f} chars")
 
 ```bibtex
 @dataset{deepseek_multilingual_vision_2024,
-  title={DeepSeek Multilingual Vision-Text Dataset},
+  title={DeepSynth Multilingual Vision-Text Dataset},
   author={Global Incremental Builder},
   year={2024},
-  url={https://huggingface.co/datasets/baconnier/deepseek-vision-complete},
+  url={https://huggingface.co/datasets/baconnier/deepsynth-vision-complete},
   note={1.29M+ multilingual text-image pairs for vision-language models}
 }
 ```
@@ -333,7 +339,7 @@ print(f"Avg text length: {sum(text_lengths)/len(text_lengths):.0f} chars")
 
 ## 🔗 Links
 
-- **🤗 Dataset**: [baconnier/deepseek-vision-complete](https://huggingface.co/datasets/baconnier/deepseek-vision-complete)
+- **🤗 Dataset**: [baconnier/deepsynth-vision-complete](https://huggingface.co/datasets/baconnier/deepsynth-vision-complete)
 - **📁 Repository**: [bacoco/deepseek-synthesia](https://github.com/bacoco/deepseek-synthesia)
 - **📖 DeepSeek-OCR**: [Original Model](https://huggingface.co/deepseek-ai/DeepSeek-OCR)
 - **🛠️ Issues**: [Report Problems](https://github.com/bacoco/deepseek-synthesia/issues)

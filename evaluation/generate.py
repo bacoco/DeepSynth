@@ -5,20 +5,20 @@ import argparse
 import json
 from pathlib import Path
 
-from inference.infer import DeepSeekSummarizer
+from inference.infer import DeepSynthSummarizer
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate summaries for evaluation")
     parser.add_argument("input", help="JSONL file with records containing 'text'")
-    parser.add_argument("--model", default="./deepseek-summarizer")
+    parser.add_argument("--model", default="./deepsynth-summarizer")
     parser.add_argument("--output", default="predictions.jsonl")
     parser.add_argument("--max-length", type=int, default=128)
     parser.add_argument("--temperature", type=float, default=0.7)
 
     args = parser.parse_args()
 
-    summarizer = DeepSeekSummarizer(args.model)
+    summarizer = DeepSynthSummarizer(args.model)
 
     records = []
     with open(args.input, "r", encoding="utf-8") as handle:

@@ -5,7 +5,7 @@ This script evaluates a trained model on standard benchmarks like CNN/DailyMail,
 XSum, etc., and compares against published baselines.
 
 Usage:
-    python run_benchmark.py --model ./deepseek-ocr-summarizer --benchmark cnn_dailymail
+    python run_benchmark.py --model ./deepsynth-ocr-summarizer --benchmark cnn_dailymail
 """
 import argparse
 import json

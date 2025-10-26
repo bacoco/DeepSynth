@@ -44,10 +44,10 @@ class GenerationParams:
     num_beams: int = 4
 
 
-class DeepSeekSummarizer:
-    """High level wrapper around the transformer model.
+class DeepSynthSummarizer:
+    """High level wrapper around the DeepSynth transformer pipeline.
 
-    The class attempts to load the official DeepSeek model via
+    The class attempts to load the official DeepSeek-OCR model via
     ``transformers``.  When the dependency is unavailable we rely on a
     deterministic heuristic so that the remainder of the pipeline can be
     exercised in lightweight environments.
@@ -74,7 +74,7 @@ class DeepSeekSummarizer:
             self.tokenizer = None
 
         if self.model is None:
-            LOGGER.info("Using rule-based summariser fallback")
+            LOGGER.info("Using rule-based DeepSynth summariser fallback")
 
     # ------------------------------------------------------------------
     def summarize_text(self, text: str, max_length: int = 128, temperature: float = 0.7, num_beams: int = 4) -> str:
@@ -123,7 +123,7 @@ class DeepSeekSummarizer:
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
-    parser = argparse.ArgumentParser(description="Run inference using the DeepSeek summarizer")
+    parser = argparse.ArgumentParser(description="Run inference using the DeepSynth summarizer")
     parser.add_argument("--model_path", default="deepseek-ai/DeepSeek-OCR")
     parser.add_argument("--input_text")
     parser.add_argument("--input_file")
@@ -135,7 +135,7 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    summarizer = DeepSeekSummarizer(args.model_path)
+    summarizer = DeepSynthSummarizer(args.model_path)
 
     if args.input_text:
         text = args.input_text

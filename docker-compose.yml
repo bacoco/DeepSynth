@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  deepseek-ui:
+  deepsynth-ui:
     build: .
-    container_name: deepseek-dataset-generator
+    container_name: deepsynth-dataset-generator
     ports:
       - "5000:5000"
     volumes:
@@ -46,4 +46,4 @@ services:
 
 networks:
   default:
-    name: deepseek-network
+    name: deepsynth-network

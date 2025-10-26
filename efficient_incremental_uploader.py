@@ -41,7 +41,7 @@ class EfficientIncrementalUploader:
         login(token=self.hf_token)
         self.username = whoami()['name']
         self.api = HfApi()
-        self.dataset_name = f"{self.username}/deepseek-vision-complete"
+        self.dataset_name = f"{self.username}/deepsynth-vision-complete"
 
         self.upload_progress = self.load_upload_progress()
         self.shard_manager = HubShardManager(

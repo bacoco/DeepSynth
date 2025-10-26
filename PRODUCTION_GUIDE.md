@@ -7,6 +7,8 @@ This guide explains how to run the **complete end-to-end pipeline** to:
 4. Fine-tune DeepSeek-OCR model
 5. Push the trained model to HuggingFace
 
+> **Brand update:** Throughout this guide the pipeline is referred to as **DeepSynth**, highlighting the rebranded experience built on DeepSeek-OCR.
+
 **This is production code - no mocks, no placeholders. It actually works.**
 
 ## 🚀 Quick Start
@@ -56,7 +58,7 @@ MAX_SAMPLES_PER_SPLIT=1000
 
 # Model configuration
 MODEL_NAME=deepseek-ai/DeepSeek-OCR
-OUTPUT_MODEL_NAME=deepseek-ocr-summarizer
+OUTPUT_MODEL_NAME=deepsynth-ocr-summarizer
 
 # Training hyperparameters
 BATCH_SIZE=2
@@ -144,9 +146,9 @@ Result: https://huggingface.co/datasets/your-username/cnn-dailymail-vision
 Fine-tunes DeepSeek-OCR:
 
 ```python
-from training.deepseek_trainer_v2 import ProductionDeepSeekTrainer
+from training.deepsynth_trainer_v2 import ProductionDeepSynthTrainer
 
-trainer = ProductionDeepSeekTrainer(
+trainer = ProductionDeepSynthTrainer(
     model_name="deepseek-ai/DeepSeek-OCR",
     batch_size=2,
     num_epochs=1,
@@ -168,12 +170,12 @@ Uploads trained model:
 
 ```python
 trainer.push_to_hub(
-    repo_id="your-username/deepseek-ocr-summarizer",
+    repo_id="your-username/deepsynth-ocr-summarizer",
     token=config.hf_token,
 )
 ```
 
-Result: https://huggingface.co/your-username/deepseek-ocr-summarizer
+Result: https://huggingface.co/your-username/deepsynth-ocr-summarizer
 
 ## 🎯 Production Configuration
 
@@ -272,13 +274,13 @@ Should output:
   HF Username: your-username
   Source Dataset: ccdv/cnn_dailymail
   Target Dataset: your-username/cnn-dailymail-vision
-  Output Model: your-username/deepseek-ocr-summarizer
+  Output Model: your-username/deepsynth-ocr-summarizer
 ```
 
 ### Test Trainer Initialization
 
 ```bash
-python training/deepseek_trainer_v2.py
+python training/deepsynth_trainer_v2.py
 ```
 
 Should output:
@@ -354,7 +356,7 @@ The trainer shows real-time progress:
 ```
 Epoch 1/1: 100%|████████████| 500/500 [1:23:45<00:00, 10.05it/s, loss=2.1234]
 Epoch 1 avg loss: 2.3456
-✓ Model saved to: ./deepseek-ocr-summarizer
+✓ Model saved to: ./deepsynth-ocr-summarizer
 ```
 
 Check loss decreasing over time - typical values:
@@ -368,14 +370,14 @@ Check loss decreasing over time - typical values:
 
 ```bash
 python -m inference.infer \
-    --model_path ./deepseek-ocr-summarizer \
+    --model_path ./deepsynth-ocr-summarizer \
     --input_file article.txt
 ```
 
 ### API Server
 
 ```bash
-MODEL_PATH=./deepseek-ocr-summarizer python -m inference.api_server
+MODEL_PATH=./deepsynth-ocr-summarizer python -m inference.api_server
 
 # Test
 curl -X POST http://localhost:5000/summarize/text \
@@ -391,11 +393,11 @@ from transformers import AutoModel, AutoTokenizer
 
 # Load your trained model
 model = AutoModel.from_pretrained(
-    "your-username/deepseek-ocr-summarizer",
+    "your-username/deepsynth-ocr-summarizer",
     trust_remote_code=True
 )
 tokenizer = AutoTokenizer.from_pretrained(
-    "your-username/deepseek-ocr-summarizer",
+    "your-username/deepsynth-ocr-summarizer",
     trust_remote_code=True
 )
 
@@ -411,13 +413,13 @@ After training:
 1. **Evaluate**: Test on held-out data
    ```bash
    python -m evaluation.evaluate \
-       ./deepseek-ocr-summarizer \
+       ./deepsynth-ocr-summarizer \
        prepared_data/test.jsonl
    ```
 
 2. **Share**: Your model is public on HuggingFace
    ```
-   https://huggingface.co/your-username/deepseek-ocr-summarizer
+   https://huggingface.co/your-username/deepsynth-ocr-summarizer
    ```
 
 3. **Deploy**: Use in production
