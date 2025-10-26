@@ -377,7 +377,7 @@ docker logs -f deepsynth-trainer-gpu | grep "job_id"
 ## Credits
 
 Built on top of:
-- DeepSeek-OCR by DeepSynth AI
+- DeepSeek-OCR by DeepSeek AI
 - HuggingFace Transformers & Datasets
 - Flask web framework
 - Docker & nvidia-docker
