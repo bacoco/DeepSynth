@@ -51,6 +51,98 @@ class EfficientIncrementalUploader:
         )
         self.upload_progress['dataset_created'] = True
 
+    def load_index_registry(self):
+        """Load the remote index registry tracking processed samples."""
+        try:
+            registry_path = hf_hub_download(
+                repo_id=self.dataset_name,
+                repo_type="dataset",
+                filename="metadata/index_registry.json",
+                token=self.hf_token,
+            )
+            with open(registry_path, "r") as f:
+                raw_registry = json.load(f)
+
+            registry = {}
+            for source, splits in raw_registry.items():
+                registry[source] = {}
+                for split, max_index in splits.items():
+                    try:
+                        registry[source][split] = int(max_index)
+                    except (TypeError, ValueError):
+                        registry[source][split] = -1
+            return registry
+        except Exception:
+            return {}
+
+    def upload_index_registry(self, registry, commit_message):
+        """Persist the updated index registry to HuggingFace."""
+        metadata_dir = self.work_dir / "metadata"
+        metadata_dir.mkdir(exist_ok=True)
+        local_path = metadata_dir / "index_registry.json"
+        with open(local_path, "w") as f:
+            json.dump(registry, f, indent=2, sort_keys=True)
+
+        self.api.upload_file(
+            path_or_fileobj=str(local_path),
+            path_in_repo="metadata/index_registry.json",
+            repo_id=self.dataset_name,
+            repo_type="dataset",
+            token=self.hf_token,
+            commit_message=commit_message,
+        )
+
+    def filter_duplicate_samples(self, samples, registry):
+        """Remove samples already present according to the registry."""
+        if not samples:
+            return samples, registry, 0
+
+        filtered = []
+        seen_in_chunk = set()
+        updates = {}
+        skipped = 0
+
+        for sample in samples:
+            source = sample.get("source_dataset")
+            split = sample.get("original_split", "train") or "train"
+            original_index = sample.get("original_index")
+
+            # If we can't identify the sample, keep it but don't update registry
+            if source is None or original_index is None:
+                filtered.append(sample)
+                continue
+
+            try:
+                original_index = int(original_index)
+            except (TypeError, ValueError):
+                filtered.append(sample)
+                continue
+
+            key = (source, split, original_index)
+
+            if key in seen_in_chunk:
+                skipped += 1
+                continue
+
+            seen_in_chunk.add(key)
+
+            existing_max = registry.get(source, {}).get(split, -1)
+            if original_index <= existing_max:
+                skipped += 1
+                continue
+
+            filtered.append(sample)
+
+            new_max = max(updates.get((source, split), existing_max), original_index)
+            updates[(source, split)] = new_max
+
+        if updates:
+            for (source, split), max_index in updates.items():
+                registry.setdefault(source, {})
+                registry[source][split] = max(registry[source].get(split, -1), max_index)
+
+        return filtered, registry, skipped
+
     def load_upload_progress(self):
         if self.upload_progress_file.exists():
             with open(self.upload_progress_file, 'r') as f:

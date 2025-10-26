@@ -269,6 +269,20 @@ for shard in index["shards"]:
                     print(f"❌ Upload failed, stopping at index {idx}")
                     return False
 
+                # Update progress
+                progress['current_dataset'] = dataset_key
+                progress['current_index'] = idx + 1
+                progress['total_samples'] += uploaded
+                self.save_global_progress(progress)
+
+                # Clear batch to free memory
+                batch_samples.clear()
+                print(f"📈 Progress: {idx + 1:,}/{target_limit:,} ({(idx + 1)/target_limit*100:.1f}%) - {progress['total_samples']:,} total samples")
+
+                # Force garbage collection for memory efficiency
+                import gc
+                gc.collect()
+
             # Progress reporting every 1000 samples
             if (idx + 1) % 1000 == 0:
                 print(f"  📊 Processed {idx + 1:,}/{target_limit:,} samples ({len(batch_samples)} in current batch)")
@@ -289,6 +303,97 @@ for shard in index["shards"]:
 
         print(f"✅ {dataset_key} completed!")
         return True
+
+    def load_index_registry(self):
+        if self.index_registry is not None:
+            return self.index_registry
+
+        try:
+            registry_path = hf_hub_download(
+                repo_id=self.dataset_name,
+                repo_type="dataset",
+                filename="metadata/index_registry.json",
+                token=self.hf_token,
+            )
+            with open(registry_path, 'r') as f:
+                raw_registry = json.load(f)
+
+            self.index_registry = {}
+            for source, splits in raw_registry.items():
+                self.index_registry[source] = {}
+                for split, max_index in splits.items():
+                    try:
+                        self.index_registry[source][split] = int(max_index)
+                    except (TypeError, ValueError):
+                        self.index_registry[source][split] = -1
+        except Exception:
+            self.index_registry = {}
+
+        return self.index_registry
+
+    def persist_index_registry(self, commit_message):
+        if self.index_registry is None:
+            return
+
+        metadata_dir = Path("./global_metadata")
+        metadata_dir.mkdir(exist_ok=True)
+        local_path = metadata_dir / "index_registry.json"
+        with open(local_path, 'w') as f:
+            json.dump(self.index_registry, f, indent=2, sort_keys=True)
+
+        self.api.upload_file(
+            path_or_fileobj=str(local_path),
+            path_in_repo="metadata/index_registry.json",
+            repo_id=self.dataset_name,
+            repo_type="dataset",
+            token=self.hf_token,
+            commit_message=commit_message,
+        )
+
+    def filter_duplicates(self, batch_samples):
+        registry = self.load_index_registry()
+        filtered = []
+        seen = set()
+        skipped = 0
+        updates = {}
+
+        for sample in batch_samples:
+            source = sample.get('source_dataset')
+            split = sample.get('original_split', 'train') or 'train'
+            index = sample.get('original_index')
+
+            if source is None or index is None:
+                filtered.append(sample)
+                continue
+
+            try:
+                index = int(index)
+            except (TypeError, ValueError):
+                filtered.append(sample)
+                continue
+
+            key = (source, split, index)
+            if key in seen:
+                skipped += 1
+                continue
+            seen.add(key)
+
+            existing_max = registry.get(source, {}).get(split, -1)
+            if index <= existing_max:
+                skipped += 1
+                continue
+
+            filtered.append(sample)
+            updates[(source, split)] = max(updates.get((source, split), existing_max), index)
+
+        for (source, split), max_index in updates.items():
+            registry.setdefault(source, {})
+            registry[source][split] = max(registry[source].get(split, -1), max_index)
+
+        if skipped:
+            print(f"⚖️  {skipped} duplicate samples skipped (already uploaded)")
+
+        return filtered
 
     def upload_batch_append(self, batch_samples):
         """Upload a batch as a new shard and update the shard index."""
