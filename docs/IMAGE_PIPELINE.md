@@ -85,7 +85,7 @@ example['image'].show()
 #### Step 3: Train with Image Dataset
 
 ```bash
-python -m training.train \
+python -m deepsynth.training.train \
     --use-deepseek-ocr \
     --hf-dataset your-username/cnn-dailymail-images \
     --hf-train-split train \

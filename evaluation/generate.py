@@ -4,8 +4,14 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import sys
 
-from inference.infer import DeepSynthSummarizer
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+SRC_DIR = PROJECT_ROOT / "src"
+if SRC_DIR.exists() and str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+from deepsynth.inference.infer import DeepSynthSummarizer
 
 
 def main() -> None:

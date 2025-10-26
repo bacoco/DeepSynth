@@ -302,7 +302,7 @@ python test_setup.py
 
 # Test individual components
 python config.py
-python training/deepsynth_trainer_v2.py
+python -m deepsynth.training.deepsynth_trainer_v2
 ```
 
 ## 📚 Documentation
