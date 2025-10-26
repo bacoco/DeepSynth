@@ -17,7 +17,7 @@ echo ""
 # Check if we're in the right directory
 if [[ ! -f "global_incremental_builder.py" ]]; then
     echo "❌ Error: global_incremental_builder.py not found"
-    echo "💡 Please run this script from the deepseek-synthesia repository root"
+    echo "💡 Please run this script from the DeepSynth repository root (legacy slug: deepseek-synthesia)"
     exit 1
 fi
 
@@ -111,7 +111,7 @@ try:
     login(token=os.getenv('HF_TOKEN'))
     from huggingface_hub import whoami
     username = whoami()['name']
-    dataset_name = f'{username}/deepseek-vision-complete'
+    dataset_name = f'{username}/deepsynth-vision-complete'
     
     try:
         dataset = load_dataset(dataset_name, token=os.getenv('HF_TOKEN'))
@@ -172,4 +172,4 @@ python global_incremental_builder.py
 
 echo ""
 echo "🎉 PIPELINE COMPLETED!"
-echo "📊 Check your dataset at: https://huggingface.co/datasets/$(python -c 'from huggingface_hub import whoami; import os; print(whoami()[\"name\"])')/deepseek-vision-complete"
+echo "📊 Check your dataset at: https://huggingface.co/datasets/$(python -c 'from huggingface_hub import whoami; import os; print(whoami()[\"name\"])')/deepsynth-vision-complete"

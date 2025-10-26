@@ -13,6 +13,8 @@ Create a **production-ready, end-to-end pipeline** that:
 
 ## ✅ What Was Delivered
 
+> **Brand update:** The end-to-end solution is now published as the **DeepSynth** pipeline, while retaining the original DeepSeek-OCR model under the hood.
+
 ### 🎯 **One-Command Production Pipeline**
 
 ```bash
@@ -48,7 +50,7 @@ Complete end-to-end automation:
 - Validation and error messages
 - All secrets centralized
 
-### 3. **training/deepseek_trainer_v2.py** - Production Trainer
+### 3. **training/deepsynth_trainer_v2.py** - Production Trainer
 
 **Real DeepSeek-OCR implementation:**
 - ✅ Uses actual model API (no placeholders)
@@ -69,7 +71,7 @@ HF_USERNAME=your-username
 SOURCE_DATASET=ccdv/cnn_dailymail
 SOURCE_SUBSET=3.0.0
 TARGET_DATASET_NAME=cnn-dailymail-vision
-OUTPUT_MODEL_NAME=deepseek-ocr-summarizer
+OUTPUT_MODEL_NAME=deepsynth-ocr-summarizer
 BATCH_SIZE=2
 NUM_EPOCHS=1
 LEARNING_RATE=2e-5
@@ -113,7 +115,7 @@ Step-by-step production guide:
 6. Fine-tunes DeepSeek-OCR model (REAL training)
    ↓
 7. Pushes trained model to HuggingFace:
-   https://huggingface.co/username/deepseek-ocr-summarizer
+   https://huggingface.co/username/deepsynth-ocr-summarizer
    ↓
 8. Model ready to use!
 ```
@@ -180,7 +182,7 @@ DeepSeek-OCR Complete Production Pipeline
   HF Username: myusername
   Source Dataset: ccdv/cnn_dailymail
   Target Dataset: myusername/cnn-dailymail-vision
-  Output Model: myusername/deepseek-ocr-summarizer
+  Output Model: myusername/deepsynth-ocr-summarizer
 
 [2/6] Logging in to HuggingFace...
 ✓ Logged in as: myusername
@@ -204,7 +206,7 @@ Epoch 1/1: 100%|████████| 500/500 [23:45<00:00]
 
 [6/6] Pushing trained model to HuggingFace...
 ✓ Model pushed to HuggingFace
-  URL: https://huggingface.co/myusername/deepseek-ocr-summarizer
+  URL: https://huggingface.co/myusername/deepsynth-ocr-summarizer
 
 ===========================================================
 ✓ PIPELINE COMPLETE!
@@ -212,14 +214,14 @@ Epoch 1/1: 100%|████████| 500/500 [23:45<00:00]
 
 Summary:
   Dataset: https://huggingface.co/datasets/myusername/cnn-dailymail-vision
-  Model: https://huggingface.co/myusername/deepseek-ocr-summarizer
+  Model: https://huggingface.co/myusername/deepsynth-ocr-summarizer
 ```
 
 ## 🔧 Technical Details
 
 ### Real Model Training
 
-The `ProductionDeepSeekTrainer` uses actual DeepSeek-OCR:
+The `ProductionDeepSynthTrainer` uses actual DeepSeek-OCR:
 
 ```python
 # Real model loading
@@ -300,7 +302,7 @@ python test_setup.py
 
 # Test individual components
 python config.py
-python training/deepseek_trainer_v2.py
+python training/deepsynth_trainer_v2.py
 ```
 
 ## 📚 Documentation

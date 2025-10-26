@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Complete DeepSeek-OCR Pipeline: Dataset → Images → HuggingFace → Training
+# Complete DeepSynth Pipeline (powered by DeepSeek-OCR): Dataset → Images → HuggingFace → Training
 #
 # This script demonstrates the full workflow from the PRD:
 # 1. Download dataset from HuggingFace
@@ -15,7 +15,7 @@ DATASET_SUBSET="${DATASET_SUBSET:-3.0.0}"
 HF_USERNAME="${HF_USERNAME:-your-username}"
 TARGET_REPO="${TARGET_REPO:-${HF_USERNAME}/cnn-dailymail-images}"
 MAX_SAMPLES="${MAX_SAMPLES:-1000}"  # Set to empty string for full dataset
-MODEL_OUTPUT="${MODEL_OUTPUT:-./deepseek-summarizer}"
+MODEL_OUTPUT="${MODEL_OUTPUT:-./deepsynth-summarizer}"
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -24,7 +24,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}================================================${NC}"
-echo -e "${BLUE}DeepSeek-OCR Complete Pipeline${NC}"
+echo -e "${BLUE}DeepSynth Complete Pipeline (DeepSeek-OCR)${NC}"
 echo -e "${BLUE}================================================${NC}"
 echo ""
 echo "Configuration:"
@@ -100,7 +100,7 @@ except Exception as e:
 echo ""
 
 # Step 3: Train model
-echo -e "${BLUE}[Step 3/3] Training DeepSeek-OCR model...${NC}"
+echo -e "${BLUE}[Step 3/3] Training DeepSynth (DeepSeek-OCR) model...${NC}"
 echo ""
 
 TRAIN_CMD="python -m training.train \

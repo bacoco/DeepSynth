@@ -4,7 +4,7 @@
 
 set -e
 
-echo "🚀 Starting DeepSeek Model Training Service (GPU Required)"
+echo "🚀 Starting DeepSynth Model Training Service (GPU Required)"
 echo "=================================================="
 
 # Check if nvidia-docker is available
@@ -70,7 +70,7 @@ for i in {1..10}; do
         echo
         echo "GPU-accelerated training with mixed precision!"
         echo
-        echo "To view logs: docker logs -f deepseek-trainer-gpu"
+        echo "To view logs: docker logs -f deepsynth-trainer-gpu"
         echo "To stop: docker-compose -f docker-compose.gpu.yml down"
         exit 0
     fi
@@ -79,5 +79,5 @@ for i in {1..10}; do
 done
 
 echo "❌ Service failed to start. Check logs with:"
-echo "   docker logs deepseek-trainer-gpu"
+echo "   docker logs deepsynth-trainer-gpu"
 exit 1

@@ -3,7 +3,7 @@
 ## 📁 Structure du Projet
 
 ```
-deepseek-summarizer/
+deepsynth-summarizer/
 ├── data/
 │   ├── prepare_datasets.py
 │   ├── text_to_image.py
@@ -396,7 +396,7 @@ class TrainingArgs:
     gradient_checkpointing: bool = True
     report_to: str = "tensorboard"
 
-class DeepSeekSummarizationModel(torch.nn.Module):
+class DeepSynthSummarizationModel(torch.nn.Module):
     def __init__(self, model_name: str):
         super().__init__()
         self.model = AutoModel.from_pretrained(
@@ -542,7 +542,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_name", default="deepseek-ai/DeepSeek-OCR")
     parser.add_argument("--dataset_name", default="ccdv/cnn_dailymail")
-    parser.add_argument("--output_dir", default="./deepseek-summarizer")
+    parser.add_argument("--output_dir", default="./deepsynth-summarizer")
     parser.add_argument("--num_epochs", type=int, default=4)
     parser.add_argument("--batch_size", type=int, default=4)
     parser.add_argument("--learning_rate", type=float, default=2e-5)
@@ -554,7 +554,7 @@ def main():
     print(f"Dataset: {args.dataset_name}")
     
     # Load model
-    model = DeepSeekSummarizationModel(args.model_name)
+    model = DeepSynthSummarizationModel(args.model_name)
     tokenizer = model.tokenizer
     
     # Print trainable parameters
@@ -630,7 +630,7 @@ import argparse
 import os
 from data.text_to_image import TextToImageConverter
 
-class DeepSeekSummarizer:
+class DeepSynthSummarizer:
     def __init__(self, model_path: str, device: str = "auto"):
         """Initialize the summarizer"""
         self.device = device if device != "auto" else ("cuda" if torch.cuda.is_available() else "cpu")
@@ -757,7 +757,7 @@ def main():
     args = parser.parse_args()
     
     # Initialize summarizer
-    summarizer = DeepSeekSummarizer(args.model_path)
+    summarizer = DeepSynthSummarizer(args.model_path)
     
     # Get input text
     if args.input_text:
@@ -810,9 +810,9 @@ if __name__ == "__main__":
     main()
 
 # Usage examples:
-# python inference/infer.py --model_path ./deepseek-summarizer --input_text "Long article text here..."
-# python inference/infer.py --model_path ./deepseek-summarizer --input_file article.txt --output_file summary.txt
-# python inference/infer.py --model_path ./deepseek-summarizer --image_path document.png
+# python inference/infer.py --model_path ./deepsynth-summarizer --input_text "Long article text here..."
+# python inference/infer.py --model_path ./deepsynth-summarizer --input_file article.txt --output_file summary.txt
+# python inference/infer.py --model_path ./deepsynth-summarizer --image_path document.png
 ```
 
 ### 6. Requirements (`requirements.txt`)
@@ -854,14 +854,14 @@ source venv/bin/activate
 python training/train.py \
     --model_name deepseek-ai/DeepSeek-OCR \
     --dataset_name ccdv/cnn_dailymail \
-    --output_dir ./deepseek-summarizer \
+    --output_dir ./deepsynth-summarizer \
     --num_epochs 4 \
     --batch_size 4 \
     --learning_rate 2e-5
 
 # 3. Inférence
 python inference/infer.py \
-    --model_path ./deepseek-summarizer \
+    --model_path ./deepsynth-summarizer \
     --input_file document.txt \
     --output_file summary.txt \
     --max_length 128

@@ -4,7 +4,7 @@
 
 set -e
 
-echo "🚀 Starting Complete DeepSeek Pipeline"
+echo "🚀 Starting Complete DeepSynth Pipeline"
 echo "=================================================="
 echo "  • Dataset Generation (CPU): Port 5000"
 echo "  • Model Training (GPU): Port 5001"

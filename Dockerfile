@@ -1,4 +1,4 @@
-# DeepSeek Synthesia - Docker Image for Dataset Generation & Model Training
+# DeepSynth - Docker Image for Dataset Generation & Model Training
 FROM nvidia/cuda:12.1.0-cudnn8-devel-ubuntu22.04
 
 # Set environment variables

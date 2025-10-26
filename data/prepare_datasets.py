@@ -23,7 +23,7 @@ def _prepare_images(records: Iterable[dict], output_dir: Path, prefix: str) -> N
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Prepare datasets for DeepSeek summarisation")
+    parser = argparse.ArgumentParser(description="Prepare datasets for DeepSynth summarisation")
     parser.add_argument("dataset", help="HuggingFace dataset name, e.g. ccdv/cnn_dailymail")
     parser.add_argument("--subset", help="Dataset subset")
     parser.add_argument("--text-field", default="article")

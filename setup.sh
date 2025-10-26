@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "🚀 Setting up DeepSeek-OCR fine-tuning environment"
+echo "🚀 Setting up the DeepSynth fine-tuning environment (DeepSeek-OCR)"
 
 # Check Python version
 if ! command -v python3 >/dev/null; then

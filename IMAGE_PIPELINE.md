@@ -90,7 +90,7 @@ python -m training.train \
     --hf-dataset your-username/cnn-dailymail-images \
     --hf-train-split train \
     --model-name deepseek-ai/DeepSeek-OCR \
-    --output ./deepseek-summarizer
+    --output ./deepsynth-summarizer
 ```
 
 The trainer automatically handles:
@@ -173,7 +173,7 @@ print(type(example['image']))  # <class 'PIL.Image.Image'>
 
 ### Training with Images
 
-The `DeepSeekOCRTrainer` handles both formats:
+The `DeepSynthOCRTrainer` handles both formats:
 
 ```python
 # From HuggingFace (PIL.Image)

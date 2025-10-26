@@ -2,7 +2,7 @@
 
 ## What Was Created
 
-I've implemented a comprehensive enhancement to the DeepSeek Dataset Generator & Trainer with the following key features:
+I've implemented a comprehensive enhancement to the DeepSynth Dataset Generator & Trainer with the following key features:
 
 ### 1. ✅ Separated CPU and GPU Workloads
 
@@ -363,13 +363,13 @@ deepseek-synthesia/
 ### Logs
 ```bash
 # Dataset generation
-docker logs -f deepseek-dataset-generator-cpu
+docker logs -f deepsynth-dataset-generator-cpu
 
 # Model training
-docker logs -f deepseek-trainer-gpu
+docker logs -f deepsynth-trainer-gpu
 
 # Follow specific job
-docker logs -f deepseek-trainer-gpu | grep "job_id"
+docker logs -f deepsynth-trainer-gpu | grep "job_id"
 ```
 
 ---
@@ -377,7 +377,7 @@ docker logs -f deepseek-trainer-gpu | grep "job_id"
 ## Credits
 
 Built on top of:
-- DeepSeek-OCR by DeepSeek AI
+- DeepSeek-OCR by DeepSynth AI
 - HuggingFace Transformers & Datasets
 - Flask web framework
 - Docker & nvidia-docker

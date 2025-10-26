@@ -1,6 +1,10 @@
-# 🚀 DeepSeek-OCR Multilingual Summarization Framework
+# 🚀 DeepSynth Multilingual Summarization Framework
 
 > **Transform any document into actionable insights with state-of-the-art multilingual AI summarization**
+>
+> _DeepSynth is powered by the open-source DeepSeek-OCR foundation model._
+
+> _Repository note_: the GitHub slug remains `bacoco/deepseek-synthesia` until the migration to the `deepsynth` organisation is complete.
 
 [![Production Ready](https://img.shields.io/badge/production-ready-green.svg)](PRODUCTION_GUIDE.md)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
@@ -17,7 +21,7 @@ Automatically downloads MLSUM data (3.3GB), processes 1.29M+ multilingual exampl
 
 ---
 
-## 💡 Why DeepSeek-OCR Multilingual Summarization?
+## 💡 Why DeepSynth Multilingual Summarization?
 
 ### The Problem
 - **Global information overload**: Millions of documents in multiple languages to process
@@ -236,9 +240,9 @@ SOUL represents the first step toward **Universal AI Intelligence** - where know
 ### 📰 **News Aggregation**
 Summarize hundreds of news articles daily:
 ```python
-from inference import DeepSeekSummarizer
+from inference import DeepSynthSummarizer
 
-summarizer = DeepSeekSummarizer("your-username/model")
+summarizer = DeepSynthSummarizer("your-username/model")
 summary = summarizer.summarize_text(long_article)
 ```
 
@@ -286,7 +290,7 @@ python run_benchmark.py --model ./model --benchmark samsum
 ```bash
 # Full evaluation with all metrics
 python run_benchmark.py \
-    --model ./deepseek-ocr-summarizer \
+    --model ./deepsynth-ocr-summarizer \
     --benchmark cnn_dailymail \
     --max-samples 1000
 
@@ -391,7 +395,7 @@ GRADIENT_ACCUMULATION_STEPS=2
 
 **1. REST API Server**
 ```bash
-MODEL_PATH=./deepseek-ocr-summarizer python -m inference.api_server
+MODEL_PATH=./deepsynth-ocr-summarizer python -m inference.api_server
 
 # Test endpoint
 curl -X POST http://localhost:5000/summarize/text \
@@ -403,7 +407,7 @@ curl -X POST http://localhost:5000/summarize/text \
 ```bash
 python -m evaluation.generate \
     input_documents.jsonl \
-    --model ./deepseek-ocr-summarizer \
+    --model ./deepsynth-ocr-summarizer \
     --output summaries.jsonl
 ```
 
@@ -586,10 +590,10 @@ echo "MAX_SAMPLES_PER_SPLIT=100" >> .env
 python run_complete_pipeline.py
 
 # 2. Benchmark evaluation
-python run_benchmark.py --model ./deepseek-ocr-summarizer --benchmark cnn_dailymail
+python run_benchmark.py --model ./deepsynth-ocr-summarizer --benchmark cnn_dailymail
 
 # 3. Production deployment
-MODEL_PATH=./deepseek-ocr-summarizer python -m inference.api_server
+MODEL_PATH=./deepsynth-ocr-summarizer python -m inference.api_server
 ```
 
 **Your AI-powered summarization system is just minutes away.** 🎉

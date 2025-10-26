@@ -13,7 +13,7 @@ from typing import Any, Dict
 from flask import Flask, jsonify, request
 from werkzeug.utils import secure_filename
 
-from .infer import DeepSeekSummarizer
+from .infer import DeepSynthSummarizer
 
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)
@@ -21,14 +21,14 @@ LOGGER = logging.getLogger(__name__)
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
 
-MODEL_PATH = os.getenv("MODEL_PATH", "./deepseek-summarizer")
-summarizer: DeepSeekSummarizer | None = None
+MODEL_PATH = os.getenv("MODEL_PATH", "./deepsynth-summarizer")
+summarizer: DeepSynthSummarizer | None = None
 
 
 def init_model() -> None:
     global summarizer
     if summarizer is None:
-        summarizer = DeepSeekSummarizer(MODEL_PATH)
+        summarizer = DeepSynthSummarizer(MODEL_PATH)
         LOGGER.info("Model initialised from %s", MODEL_PATH)
 
 

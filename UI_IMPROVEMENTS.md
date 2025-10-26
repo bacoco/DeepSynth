@@ -1,4 +1,4 @@
-# UI Improvements for DeepSeek Fine-Tuning
+# UI Improvements for DeepSynth Fine-Tuning
 
 ## Overview
 
@@ -11,7 +11,7 @@ The web UI has been enhanced with advanced fine-tuning controls based on the lat
 Choose between three trainer types based on your needs:
 
 #### ⭐ Production Trainer (Recommended)
-- **File**: `training/deepseek_trainer_v2.py` - `ProductionDeepSeekTrainer`
+- **File**: `training/deepsynth_trainer_v2.py` - `ProductionDeepSynthTrainer`
 - **Architecture**: Frozen encoder (380M params) + Fine-tuned MoE decoder (570M params)
 - **Features**:
   - Expert Gradient Dropout
@@ -21,8 +21,8 @@ Choose between three trainer types based on your needs:
   - Evaluation during training
 - **Use Case**: Production-grade models with best quality
 
-#### 🎯 DeepSeek Trainer
-- **File**: `training/deepseek_trainer.py` - `DeepSeekOCRTrainer`
+#### 🎯 DeepSynth Trainer
+- **File**: `training/deepsynth_trainer.py` - `DeepSynthOCRTrainer`
 - **Architecture**: Same frozen architecture without advanced dropout
 - **Features**:
   - Basic frozen encoder setup
@@ -131,7 +131,7 @@ Learning Rate: 5e-5
 
 #### Fast Iteration (Prototyping)
 ```
-Trainer: DeepSeek
+Trainer: DeepSynth
 Expert Dropout: 0.0 (disabled)
 Gate Dropout: 0.0 (disabled)
 Bi-Drop Passes: 1
@@ -178,7 +178,7 @@ The `/api/model/train` endpoint now accepts additional parameters:
 ```json
 {
   "dataset_repo": "username/dataset-name",
-  "trainer_type": "production",  // NEW: "production" | "deepseek" | "generic"
+  "trainer_type": "production",  // NEW: "production" | "deepsynth" | "generic"
   "expert_dropout_rate": 0.2,    // NEW: 0.0 - 1.0
   "expert_dropout_min_keep": 1,  // NEW: min active experts
   "gate_dropout_rate": 0.1,      // NEW: 0.0 - 1.0
@@ -209,7 +209,7 @@ The `/api/model/train` endpoint now accepts additional parameters:
 - **web_ui/dataset_generator_improved.py**: Multi-trainer support with parameter passing
 - **web_ui/app.py**: Updated to use improved components
 - **training/config.py**: Already included new dropout parameters
-- **training/deepseek_trainer_v2.py**: Already implemented MoE dropout strategies
+- **training/deepsynth_trainer_v2.py**: Already implemented MoE dropout strategies
 
 ## Troubleshooting
 
@@ -234,7 +234,7 @@ The `/api/model/train` endpoint now accepts additional parameters:
 
 - **DeepSeek-OCR Paper**: https://arxiv.org/abs/2510.18234
 - **MoE Dropout Implementation**: `training/moe_dropout.py`
-- **Production Trainer**: `training/deepseek_trainer_v2.py`
+- **Production Trainer**: `training/deepsynth_trainer_v2.py`
 
 ## Support
 
@@ -245,4 +245,4 @@ For issues or questions:
 
 ---
 
-**Built with ❤️ for production-grade DeepSeek fine-tuning**
+**Built with ❤️ for production-grade DeepSynth fine-tuning**

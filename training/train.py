@@ -8,7 +8,7 @@ from typing import Iterable, Optional
 
 from data.dataset_loader import load_local_jsonl
 from .config import TrainerConfig
-from .deepseek_trainer import DeepSeekOCRTrainer
+from .deepsynth_trainer import DeepSynthOCRTrainer
 from .trainer import SummarizationTrainer
 
 try:
@@ -74,7 +74,7 @@ def _load_hf_dataset(repo_id: str, split: str) -> Optional[Iterable[dict]]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Fine-tune DeepSeek OCR summarizer")
+    parser = argparse.ArgumentParser(description="Fine-tune the DeepSynth summarizer")
     parser.add_argument("--config", help="Optional JSON configuration file")
     parser.add_argument("--train", default="prepared_data/train.jsonl")
     parser.add_argument("--val", default="prepared_data/val.jsonl")
@@ -89,7 +89,10 @@ def main() -> None:
     parser.add_argument(
         "--use-deepseek-ocr",
         action="store_true",
-        help="Use DeepSeekOCRTrainer with frozen encoder (recommended for PRD implementation)"
+        help=(
+            "Use DeepSynthOCRTrainer with frozen encoder (backward-compatible flag name; "
+            "recommended for PRD implementation)"
+        )
     )
 
     args = parser.parse_args()
@@ -113,8 +116,8 @@ def main() -> None:
 
     # Select trainer based on --use-deepseek-ocr flag
     if args.use_deepseek_ocr:
-        LOGGER.info("Using DeepSeekOCRTrainer with frozen encoder architecture")
-        trainer = DeepSeekOCRTrainer(config)
+        LOGGER.info("Using DeepSynthOCRTrainer with frozen encoder architecture")
+        trainer = DeepSynthOCRTrainer(config)
     else:
         LOGGER.info("Using generic SummarizationTrainer")
         trainer = SummarizationTrainer(config)
