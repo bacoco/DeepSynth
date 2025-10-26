@@ -241,7 +241,7 @@ The `/api/model/train` endpoint now accepts additional parameters:
 For issues or questions:
 - Check the "Monitor Jobs" tab for error messages
 - Review logs in the Docker container
-- See main README.md for general troubleshooting
+- See the [main README](../README.md) for general troubleshooting
 
 ---
 

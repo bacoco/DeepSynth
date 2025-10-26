@@ -73,9 +73,9 @@ Wednesday: Gemini adds two-factor authentication
 
 ## 📊 SOUL Files Explained
 
-SOUL creates three types of memory files:
+SOUL creates three types of memory files (now stored in `docs/`):
 
-### `.agent_log.md` - Complete Work History
+### `docs/.agent_log.md` - Complete Work History
 ```markdown
 # Agent Work Log - Session 2024-10-25
 
@@ -113,7 +113,7 @@ SOUL creates three types of memory files:
 }
 ```
 
-### `.agent_handoff.md` - Immediate Next Steps
+### `docs/.agent_handoff.md` - Immediate Next Steps
 ```markdown
 # 🔄 Agent Handoff
 
@@ -168,7 +168,7 @@ SOUL represents the first step toward **Universal AI Intelligence** - where know
 ### For Developers (Any LLM)
 ```python
 # Load SOUL context before API calls
-with open('.agent_handoff.md', 'r') as f:
+with open('docs/.agent_handoff.md', 'r') as f:
     soul_context = f.read()
 
 # Include in your LLM prompt

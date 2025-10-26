@@ -342,7 +342,7 @@ Typical processing times:
 
 See `scripts/complete_pipeline.sh` for a fully automated example.
 
-For more details on training with these datasets, see the main [README.md](README.md).
+For more details on training with these datasets, see the [main README](../README.md).
 
 ## 📚 References
 
