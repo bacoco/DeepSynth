@@ -111,7 +111,10 @@ class TextToImageConverter:
         # Calculate the required height - ENSURE ALL TEXT FITS by extending height if needed
         required_height = int(len(lines) * self.line_height) + 2 * self.margin
         # Allow height to exceed max_height if necessary to fit all text
-        total_height = max(required_height, self.max_height) if required_height > self.max_height else min(required_height, self.max_height)
+        # Limit height to prevent memory explosion on very long texts
+        MAX_HEIGHT_MULTIPLIER = 4  # Allow up to 4x the configured height
+        max_allowed_height = self.max_height * MAX_HEIGHT_MULTIPLIER
+        total_height = min(required_height, max_allowed_height) if required_height > self.max_height else min(required_height, self.max_height)
 
         return TextLayout(lines=lines, width=total_width, height=total_height)
 

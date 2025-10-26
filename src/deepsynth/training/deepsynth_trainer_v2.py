@@ -44,6 +44,12 @@ class ProductionDeepSynthTrainer:
         # Determine model source (fresh vs checkpoint resume)
         model_source = config.resume_from_checkpoint or config.model_name
         if config.resume_from_checkpoint:
+            # Validate checkpoint exists and is loadable
+            checkpoint_path = Path(config.resume_from_checkpoint)
+            if not checkpoint_path.exists():
+                raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
+            if not checkpoint_path.is_dir():
+                raise ValueError(f"Checkpoint path is not a directory: {checkpoint_path}")
             LOGGER.info("Resuming training from checkpoint: %s", config.resume_from_checkpoint)
 
         dtype = torch.bfloat16 if config.mixed_precision == "bf16" else torch.float16

@@ -297,8 +297,8 @@ class IncrementalPipeline:
         # Upload
         try:
             HfApi().delete_repo(repo_id=repo_name, repo_type='dataset')
-        except:
-            pass
+        except (FileNotFoundError, PermissionError):
+            pass  # Safely ignore if repo doesn\'t exist
 
         print(f"\\n📤 Upload: {repo_name}")
         dataset_dict.push_to_hub(repo_name, private=False, token=os.getenv('HF_TOKEN'))

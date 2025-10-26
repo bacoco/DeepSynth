@@ -252,7 +252,7 @@ for shard in index["shards"]:
                     # Update progress
                     progress['current_dataset'] = dataset_key
                     progress['current_index'] = idx + 1
-                    progress['total_samples'] += uploaded_count
+                    progress['total_samples'] += uploaded_count_count
                     self.save_global_progress(progress)
 
                     # Clear batch to free memory
@@ -269,7 +269,7 @@ for shard in index["shards"]:
                 # Update progress
                 progress['current_dataset'] = dataset_key
                 progress['current_index'] = idx + 1
-                progress['total_samples'] += uploaded
+                progress['total_samples'] += uploaded_count
                 self.save_global_progress(progress)
 
                 # Clear batch to free memory
@@ -289,7 +289,7 @@ for shard in index["shards"]:
             uploaded_count = self.upload_batch_append(batch_samples)
             if uploaded_count is None:
                 return False
-            progress['total_samples'] += uploaded_count
+            progress['total_samples'] += uploaded_count_count
 
         # Mark dataset as completed
         if dataset_key not in progress['completed_datasets']:
