@@ -5,9 +5,9 @@ Script de lancement pour le traitement parallèle des datasets
 
 import os
 import sys
-from .parallel_datasets_builder import ParallelDatasetsBuilder
+from .parallel_datasets_builder import ParallelDatasetsPipeline
 
-def main():
+def run_parallel_datasets_cli():
     """Point d'entrée principal"""
     print("🚀 TRAITEMENT PARALLÈLE DES DATASETS DEEPSYNTH")
     print("="*60)
@@ -47,12 +47,12 @@ def main():
     
     choice = input("\nVotre choix (1-3): ").strip()
     
-    # Créer le builder
-    builder = ParallelDatasetsBuilder(max_workers=max_workers)
+    # Créer le pipeline
+    pipeline = ParallelDatasetsPipeline(max_workers=max_workers)
     
-    print(f"\n📊 DATASETS DISPONIBLES ({len(builder.datasets_config)} au total)")
+    print(f"\n📊 DATASETS DISPONIBLES ({len(pipeline.datasets_config)} au total)")
     print("-" * 50)
-    for i, dataset in enumerate(builder.datasets_config, 1):
+    for i, dataset in enumerate(pipeline.datasets_config, 1):
         max_samples = dataset.get('max_samples')
         samples_info = f" (max {max_samples:,})" if max_samples else " (complet)"
         print(f"{i:2d}. {dataset['name']:<20} → {dataset['output_name']}{samples_info}")
@@ -69,7 +69,7 @@ def main():
                 print("❌ Annulé par l'utilisateur")
                 return 0
             
-            results = builder.run_parallel_processing()
+            results = pipeline.run_parallel_processing()
             
         elif choice == "2":
             # Datasets spécifiques
@@ -82,8 +82,8 @@ def main():
                 selected_datasets = []
                 
                 for i in indices:
-                    if 0 <= i < len(builder.datasets_config):
-                        selected_datasets.append(builder.datasets_config[i]['name'])
+                    if 0 <= i < len(pipeline.datasets_config):
+                        selected_datasets.append(pipeline.datasets_config[i]['name'])
                     else:
                         print(f"⚠️ Index {i+1} invalide, ignoré")
                 
@@ -92,7 +92,7 @@ def main():
                     return 1
                 
                 print(f"\n✅ Datasets sélectionnés: {', '.join(selected_datasets)}")
-                results = builder.run_parallel_processing(selected_datasets=selected_datasets)
+                results = pipeline.run_parallel_processing(selected_datasets=selected_datasets)
                 
             except ValueError:
                 print("❌ Format invalide")
@@ -105,26 +105,26 @@ def main():
             print("Traitement de 500 échantillons maximum par dataset pour test")
             
             # Limiter tous les datasets à 500 échantillons
-            for dataset_config in builder.datasets_config:
+            for dataset_config in pipeline.datasets_config:
                 dataset_config['max_samples'] = 500
             
             # Demander quels datasets tester
             test_choice = input("Tester tous les datasets (o) ou seulement quelques-uns (n)? (o/N): ").strip().lower()
             
             if test_choice in ['o', 'oui', 'y', 'yes']:
-                results = builder.run_parallel_processing()
+                results = pipeline.run_parallel_processing()
             else:
                 selected_indices = input("Indices des datasets à tester (ex: 1,3): ").strip()
                 try:
                     indices = [int(x.strip()) - 1 for x in selected_indices.split(",")]
                     selected_datasets = [
-                        builder.datasets_config[i]['name'] 
-                        for i in indices 
-                        if 0 <= i < len(builder.datasets_config)
+                        pipeline.datasets_config[i]['name']
+                        for i in indices
+                        if 0 <= i < len(pipeline.datasets_config)
                     ]
                     
                     if selected_datasets:
-                        results = builder.run_parallel_processing(selected_datasets=selected_datasets)
+                        results = pipeline.run_parallel_processing(selected_datasets=selected_datasets)
                     else:
                         print("❌ Aucun dataset valide sélectionné")
                         return 1
@@ -168,5 +168,5 @@ def main():
         return 1
 
 if __name__ == "__main__":
-    exit_code = main()
+    exit_code = run_parallel_datasets_cli()
     sys.exit(exit_code)
