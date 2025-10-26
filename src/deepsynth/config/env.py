@@ -107,7 +107,7 @@ class Config:
             source_dataset=get_env("SOURCE_DATASET"),
             source_subset=get_env("SOURCE_SUBSET", None, required=False),
             target_dataset_name=get_env("TARGET_DATASET_NAME"),
-            max_samples_per_split=int(get_env("MAX_SAMPLES_PER_SPLIT", "1000", required=False)) if get_env("MAX_SAMPLES_PER_SPLIT", None, required=False) else None,
+            max_samples_per_split=self._parse_optional_int("MAX_SAMPLES_PER_SPLIT", "1000"),
             model_name=get_env("MODEL_NAME"),
             output_model_name=get_env("OUTPUT_MODEL_NAME"),
             batch_size=int(get_env("BATCH_SIZE", "2")),
