@@ -2,6 +2,7 @@
 """
 SOUL - Session Tracer
 Analyzes current session and creates agent memory files.
+Enhanced with monitoring and event tracking.
 """
 
 import os
@@ -10,6 +11,14 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
+import sys
+
+# Import SOUL API
+try:
+    from soul_api import add_soul_event, get_soul_instance
+    SOUL_API_AVAILABLE = True
+except ImportError:
+    SOUL_API_AVAILABLE = False
 
 # Configuration constants with justification
 RECENT_COMMITS_LIMIT = 5  # Enough context without overwhelming output
@@ -276,13 +285,16 @@ class SOULTracer:
     def save_all_files(self):
         """Save all generated files with error handling."""
         files_created = []
-        
+
         try:
+            # Analyze git first
+            git_info = self.analyze_git_changes()
+
             # Generate content
             work_log = self.generate_work_log()
             status_json = self.generate_status_json()
             handoff_notes = self.generate_handoff_notes()
-            
+
             # Save work log (append if exists, create if not)
             if self.agent_log.exists():
                 with open(self.agent_log, 'a', encoding='utf-8') as f:
@@ -292,19 +304,41 @@ class SOULTracer:
                 with open(self.agent_log, 'w', encoding='utf-8') as f:
                     f.write(work_log)
             files_created.append(str(self.agent_log))
-            
+
             # Save status JSON (overwrite)
             with open(self.agent_status, 'w', encoding='utf-8') as f:
                 json.dump(status_json, f, indent=2, ensure_ascii=False)
             files_created.append(str(self.agent_status))
-            
+
             # Save handoff notes (overwrite)
             with open(self.agent_handoff, 'w', encoding='utf-8') as f:
                 f.write(handoff_notes)
             files_created.append(str(self.agent_handoff))
-            
+
+            # Record session trace event via SOUL API
+            if SOUL_API_AVAILABLE:
+                try:
+                    total_changes = 0
+                    if git_info.get("has_git"):
+                        changes = git_info["changes"]
+                        total_changes = sum(len(changes[key]) for key in changes)
+
+                    add_soul_event(
+                        "session_traced",
+                        f"SOUL traced session with {total_changes} file changes",
+                        {
+                            "files_changed": total_changes,
+                            "git_clean": total_changes == 0,
+                            "branch": git_info.get("branch", "unknown"),
+                            "commits_analyzed": len(git_info.get("commits", []))
+                        }
+                    )
+                except Exception as e:
+                    # Silent fail - ne pas bloquer si l'API SOUL a un problème
+                    pass
+
             return files_created
-            
+
         except IOError as e:
             print(f"❌ Error saving files: {e}")
             return []
