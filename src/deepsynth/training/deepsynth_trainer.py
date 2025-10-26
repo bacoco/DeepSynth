@@ -9,6 +9,7 @@ This trainer implements the architecture specified in the PRD:
 from __future__ import annotations
 
 import logging
+import math
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -261,18 +262,36 @@ class DeepSynthOCRTrainer:
             weight_decay=self.config.optimizer.weight_decay,
         )
 
-        # Setup learning rate scheduler
-        dataset_list = list(dataset)
-        total_steps = len(dataset_list) // self.config.batch_size * self.config.num_epochs
+        # Setup learning rate scheduler without materialising the whole dataset
+        scheduler = None
+        dataset_length: Optional[int] = None
+        if hasattr(dataset, "__len__"):
+            try:
+                dataset_length = len(dataset)  # type: ignore[arg-type]
+            except TypeError:
+                dataset_length = None
 
-        if get_linear_schedule_with_warmup:
+        if dataset_length is None and hasattr(dataset, "num_rows"):
+            dataset_length = getattr(dataset, "num_rows")  # type: ignore[attr-defined]
+
+        if dataset_length is not None and get_linear_schedule_with_warmup:
+            batches_per_epoch = max(1, math.ceil(dataset_length / self.config.batch_size))
+            optimizer_steps_per_epoch = max(
+                1,
+                math.ceil(batches_per_epoch / self.config.gradient_accumulation_steps),
+            )
+            total_steps = optimizer_steps_per_epoch * self.config.num_epochs
             scheduler = get_linear_schedule_with_warmup(
                 optimizer,
                 num_warmup_steps=self.config.optimizer.warmup_steps,
-                num_training_steps=max(total_steps, 1),
+                num_training_steps=total_steps,
             )
-        else:
-            scheduler = None
+        elif get_linear_schedule_with_warmup and dataset_length is None:
+            LOGGER.warning(
+                "Dataset length could not be determined; skipping learning rate scheduler initialisation."
+            )
+
+        optimizer.zero_grad()
 
         # Training loop
         for epoch in range(self.config.num_epochs):
@@ -280,15 +299,59 @@ class DeepSynthOCRTrainer:
             running_loss = 0.0
             batch_images = []
             batch_summaries = []
+            processed_batches = 0
+            sample_step = 0
 
-            for step, sample in enumerate(dataset_list, start=1):
+            def process_current_batch(current_step: int) -> None:
+                nonlocal running_loss, processed_batches
+
+                try:
+                    batch = self._prepare_batch(batch_images, batch_summaries)
+
+                    loss = self._compute_loss(batch)
+                    loss = loss / self.config.gradient_accumulation_steps
+
+                    loss.backward()
+                    running_loss += loss.item()
+                    processed_batches += 1
+
+                    if processed_batches % self.config.gradient_accumulation_steps == 0:
+                        optimizer.step()
+                        if scheduler:
+                            scheduler.step()
+                        optimizer.zero_grad()
+
+                    if processed_batches % self.config.log_interval == 0:
+                        avg_loss = running_loss / self.config.log_interval
+                        LOGGER.info(
+                            "Epoch %s batch %s - loss: %.4f",
+                            epoch + 1,
+                            processed_batches,
+                            avg_loss,
+                        )
+                        running_loss = 0.0
+
+                    if processed_batches % self.config.save_interval == 0:
+                        checkpoint_dir = f"{self.config.output_dir}/step_{processed_batches}"
+                        self._save_checkpoint(checkpoint_dir)
+
+                except Exception as exc:  # pragma: no cover - logging path
+                    LOGGER.error("Error processing batch at step %s: %s", current_step, exc)
+                finally:
+                    batch_images.clear()
+                    batch_summaries.clear()
+
+            for sample in iter(dataset):
+                sample_step += 1
                 # Collect batch - handle both 'image' and 'image_path' fields
                 # HuggingFace datasets use 'image', local JSONL use 'image_path'
                 image = sample.get('image') or sample.get('image_path')
                 summary = sample.get('summary', '')
 
                 if not image or not summary:
-                    LOGGER.warning("Skipping sample at step %s: missing image or summary", step)
+                    LOGGER.warning(
+                        "Skipping sample at step %s: missing image or summary", sample_step
+                    )
                     continue
 
                 batch_images.append(image)
@@ -297,48 +360,24 @@ class DeepSynthOCRTrainer:
                 if len(batch_images) < self.config.batch_size:
                     continue
 
-                try:
-                    # Prepare batch
-                    batch = self._prepare_batch(batch_images, batch_summaries)
+                process_current_batch(sample_step)
 
-                    # Forward pass and compute loss
-                    loss = self._compute_loss(batch)
-                    loss = loss / self.config.gradient_accumulation_steps
+            if batch_images:
+                LOGGER.debug(
+                    "Processing residual batch with %s samples at epoch %s",
+                    len(batch_images),
+                    epoch + 1,
+                )
+                process_current_batch(sample_step)
 
-                    # Backward pass
-                    loss.backward()
-                    running_loss += loss.item()
-
-                    # Optimizer step
-                    if step % self.config.gradient_accumulation_steps == 0:
-                        optimizer.step()
-                        if scheduler:
-                            scheduler.step()
-                        optimizer.zero_grad()
-
-                    # Logging
-                    if step % self.config.log_interval == 0:
-                        avg_loss = running_loss / self.config.log_interval
-                        LOGGER.info(
-                            "Epoch %s step %s - loss: %.4f",
-                            epoch + 1,
-                            step,
-                            avg_loss
-                        )
-                        running_loss = 0.0
-
-                    # Save checkpoint
-                    if step % self.config.save_interval == 0:
-                        checkpoint_dir = f"{self.config.output_dir}/step_{step}"
-                        self._save_checkpoint(checkpoint_dir)
-
-                except Exception as exc:
-                    LOGGER.error("Error processing batch at step %s: %s", step, exc)
-
-                finally:
-                    # Clear batch
-                    batch_images.clear()
-                    batch_summaries.clear()
+            if (
+                processed_batches
+                and processed_batches % self.config.gradient_accumulation_steps != 0
+            ):
+                optimizer.step()
+                if scheduler:
+                    scheduler.step()
+                optimizer.zero_grad()
 
             # Save epoch checkpoint
             epoch_dir = f"{self.config.output_dir}/epoch_{epoch+1}"
