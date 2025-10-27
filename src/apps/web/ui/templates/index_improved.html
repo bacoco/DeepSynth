@@ -119,33 +119,6 @@
             color: #495057;
         }
 
-        .multi-resolution-options {
-            margin-top: 15px;
-        }
-
-        .resolution-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 10px;
-        }
-
-        .resolution-option {
-            display: flex;
-            align-items: center;
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 6px;
-        }
-
-        .resolution-option input {
-            margin-right: 8px;
-        }
-
-        .multi-resolution-help {
-            display: block;
-            margin-top: 10px;
-            color: #6c757d;
-        }
 
         input[type="text"],
         input[type="number"],
@@ -701,12 +674,6 @@
                     </div>
                 </div>
 
-                <div class="form-section">
-                    <h3>Image Generation</h3>
-                    <div class="info-box">
-                        <strong>ℹ️ Storage Optimization:</strong> Generates original high-quality images only. Resizing and augmentation applied during training via transform pipeline for maximum flexibility.
-                    </div>
-                </div>
 
                 <div class="form-section">
                     <h3>Save to HuggingFace</h3>
@@ -972,6 +939,117 @@
 
                     <div class="warning-box">
                         <strong>⚠️ Performance Note:</strong> Enabling these options improves model quality but increases training time by ~10-30%. Bi-Drop with 3 passes is the most computationally expensive but yields the best generalization.
+                    </div>
+                </div>
+
+                <!-- Image Augmentation Options -->
+                <button type="button" class="collapsible" onclick="toggleCollapsible(this)">
+                    🎨 Advanced: Random Image Augmentation <span class="badge badge-new">NEW</span>
+                </button>
+                <div class="collapsible-content">
+                    <div class="success-box">
+                        <strong>✨ On-the-Fly Augmentation:</strong> Random transformations applied during training for better generalization across different image resolutions and styles. No pre-computed multi-resolution needed!
+                    </div>
+
+                    <div class="form-row-3">
+                        <div class="form-group">
+                            <label for="rotation_degrees">
+                                Rotation Range (degrees)
+                                <span class="tooltip">ℹ️
+                                    <span class="tooltiptext">Random rotation range applied to images. Helps model learn from various text orientations. Range: 0-45. Recommended: 0-10 for production.</span>
+                                </span>
+                            </label>
+                            <input type="number" id="rotation_degrees" name="rotation_degrees"
+                                   value="0" min="0" max="45" step="1">
+                            <small class="help-text">0 = no rotation, 10 = ±10° random</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="perspective_distortion">
+                                Perspective Distortion
+                                <span class="tooltip">ℹ️
+                                    <span class="tooltiptext">Random perspective transformation scale. Simulates viewing documents from different angles. Range: 0.0-0.5. Recommended: 0.0-0.2.</span>
+                                </span>
+                            </label>
+                            <input type="number" id="perspective_distortion" name="perspective_distortion"
+                                   value="0.0" min="0" max="0.5" step="0.05">
+                            <small class="help-text">0 = no distortion, 0.2 = moderate</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="horizontal_flip_prob">
+                                Horizontal Flip Probability
+                                <span class="tooltip">ℹ️
+                                    <span class="tooltiptext">Probability of horizontally flipping images. Use with caution for text documents. Range: 0.0-1.0. Recommended: 0.0 for most cases.</span>
+                                </span>
+                            </label>
+                            <input type="number" id="horizontal_flip_prob" name="horizontal_flip_prob"
+                                   value="0.0" min="0" max="1" step="0.1">
+                            <small class="help-text">0 = disabled, 0.5 = 50% chance</small>
+                        </div>
+                    </div>
+
+                    <div class="form-row-3">
+                        <div class="form-group">
+                            <label for="brightness_factor">
+                                Brightness Variation
+                                <span class="tooltip">ℹ️
+                                    <span class="tooltiptext">Random brightness adjustment range. Helps with varying lighting conditions. Range: 0.0-1.0. Recommended: 0.1-0.3.</span>
+                                </span>
+                            </label>
+                            <input type="number" id="brightness_factor" name="brightness_factor"
+                                   value="0.0" min="0" max="1" step="0.1">
+                            <small class="help-text">0 = no change, 0.2 = ±20%</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="contrast_factor">
+                                Contrast Variation
+                                <span class="tooltip">ℹ️
+                                    <span class="tooltiptext">Random contrast adjustment range. Simulates different display settings. Range: 0.0-1.0. Recommended: 0.1-0.3.</span>
+                                </span>
+                            </label>
+                            <input type="number" id="contrast_factor" name="contrast_factor"
+                                   value="0.0" min="0" max="1" step="0.1">
+                            <small class="help-text">0 = no change, 0.2 = ±20%</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="saturation_factor">
+                                Saturation Variation
+                                <span class="tooltip">ℹ️
+                                    <span class="tooltiptext">Random saturation adjustment range. Helps with color variations. Range: 0.0-1.0. Recommended: 0.0-0.2.</span>
+                                </span>
+                            </label>
+                            <input type="number" id="saturation_factor" name="saturation_factor"
+                                   value="0.0" min="0" max="1" step="0.1">
+                            <small class="help-text">0 = no change, 0.2 = ±20%</small>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="resize_range_min">
+                                Resize Range Min (pixels)
+                                <span class="tooltip">ℹ️
+                                    <span class="tooltiptext">Minimum size for random resizing. Images randomly resized between min and max. Recommended: 512-640 for min.</span>
+                                </span>
+                            </label>
+                            <input type="number" id="resize_range_min" name="resize_range_min"
+                                   value="1024" min="256" max="2048" step="64">
+                            <small class="help-text">Minimum image dimension</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="resize_range_max">
+                                Resize Range Max (pixels)
+                                <span class="tooltip">ℹ️
+                                    <span class="tooltiptext">Maximum size for random resizing. Images randomly resized between min and max. Recommended: 1280-1600 for max.</span>
+                                </span>
+                            </label>
+                            <input type="number" id="resize_range_max" name="resize_range_max"
+                                   value="1024" min="256" max="2048" step="64">
+                            <small class="help-text">Maximum image dimension</small>
+                        </div>
+                    </div>
+
+                    <div class="info-box">
+                        <strong>💡 Pro Tip:</strong> Start with conservative values (rotation: 5°, perspective: 0.1, brightness/contrast: 0.2) and increase gradually if needed. Too much augmentation can hurt performance.
                     </div>
                 </div>
 
@@ -1504,27 +1582,9 @@
             }
         };
 
-        // Handle multi-resolution checkbox toggle
-        document.getElementById('multi_resolution').onchange = function() {
-            const resolutionOptions = document.getElementById('resolution-options');
-            resolutionOptions.hidden = !this.checked;
-        };
-
         // Submit custom dataset form
         document.getElementById('dataset-form').onsubmit = async (e) => {
             e.preventDefault();
-
-            // Get selected resolutions
-            const multiResolution = document.getElementById('multi_resolution').checked;
-            let resolutionSizes = null;
-            if (multiResolution) {
-                const checkedBoxes = document.querySelectorAll('.resolution-checkbox:checked');
-                resolutionSizes = Array.from(checkedBoxes).map(cb => cb.value);
-                // If no checkboxes selected, null means "all sizes"
-                if (resolutionSizes.length === 0) {
-                    resolutionSizes = null;
-                }
-            }
 
             const formData = {
                 source_dataset: document.getElementById('source_dataset').value,
@@ -1536,9 +1596,7 @@
                 max_samples: document.getElementById('max_samples').value || null,
                 hf_username: document.getElementById('hf_username').value,
                 dataset_name: document.getElementById('dataset_name').value,
-                private_dataset: document.getElementById('private_dataset').checked,
-                multi_resolution: multiResolution,
-                resolution_sizes: resolutionSizes
+                private_dataset: document.getElementById('private_dataset').checked
             };
 
             try {
@@ -1620,7 +1678,17 @@
                 expert_dropout_rate: parseFloat(document.getElementById('expert_dropout_rate').value),
                 expert_dropout_min_keep: parseInt(document.getElementById('expert_dropout_min_keep').value),
                 gate_dropout_rate: parseFloat(document.getElementById('gate_dropout_rate').value),
-                bidrop_passes: parseInt(document.getElementById('bidrop_passes').value)
+                bidrop_passes: parseInt(document.getElementById('bidrop_passes').value),
+
+                // Image Augmentation parameters
+                rotation_degrees: parseFloat(document.getElementById('rotation_degrees').value),
+                perspective_distortion: parseFloat(document.getElementById('perspective_distortion').value),
+                horizontal_flip_prob: parseFloat(document.getElementById('horizontal_flip_prob').value),
+                brightness_factor: parseFloat(document.getElementById('brightness_factor').value),
+                contrast_factor: parseFloat(document.getElementById('contrast_factor').value),
+                saturation_factor: parseFloat(document.getElementById('saturation_factor').value),
+                resize_range_min: parseInt(document.getElementById('resize_range_min').value),
+                resize_range_max: parseInt(document.getElementById('resize_range_max').value)
             };
 
             try {

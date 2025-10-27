@@ -17,8 +17,8 @@ tags:
 - vision
 - DeepSeek-OCR
 - multilingual
-- multi-resolution
 - visual-text-encoding
+- random-augmentation
 library_name: datasets
 license: {license}
 pretty_name: "{pretty_name}"
@@ -29,16 +29,6 @@ dataset_info:
   - name: summary
     dtype: string
   - name: image
-    dtype: image
-  - name: image_tiny
-    dtype: image
-  - name: image_small
-    dtype: image
-  - name: image_base
-    dtype: image
-  - name: image_large
-    dtype: image
-  - name: image_gundam
     dtype: image
   - name: source_dataset
     dtype: string
@@ -61,7 +51,8 @@ This dataset is part of the **DeepSynth** project, which uses visual text encodi
 
 ### Key Features
 
-- **Multi-Resolution Images**: Each sample includes 6 different image resolutions optimized for DeepSeek-OCR training
+- **Original High-Quality Images**: Full-resolution images stored once, augmented on-the-fly during training
+- **Random Augmentation Pipeline**: Rotation, perspective, color jitter, and resize transforms for better generalization
 - **Visual Text Encoding**: 20x compression ratio (1 visual token ≈ 20 text tokens)
 - **Document Structure Preservation**: Layout and formatting maintained through image representation
 - **Human-Written Summaries**: High-quality reference summaries for each document
@@ -79,20 +70,22 @@ This dataset is part of the **DeepSynth** project, which uses visual text encodi
 
 {source_info}
 
-## Multi-Resolution Image Format
+## Image Augmentation Pipeline
 
-Each sample contains **6 image representations** of the same text document at different resolutions:
+Images are stored at **original resolution** (up to 1600×2200) and augmented during training for better generalization:
 
-| Field Name | Resolution | Use Case |
-|------------|-----------|----------|
-| `image` | Original (1600×2200 max) | Full document, highest quality |
-| `image_tiny` | 512×512 | Fast training, mobile inference |
-| `image_small` | 640×640 | Balanced speed/quality |
-| `image_base` | 1024×1024 | Standard DeepSeek-OCR training |
-| `image_large` | 1280×1280 | High-quality inference |
-| `image_gundam` | 1600×1600 | Maximum quality, research |
+### Available Augmentation Transforms
 
-All images use aspect-ratio preservation with padding to maintain text readability.
+- **Random Rotation**: ±10° rotation for orientation invariance
+- **Random Perspective**: 0.1-0.2 distortion to simulate viewing angles
+- **Random Resize**: 512-1600px range for multi-scale learning
+- **Color Jitter**: Brightness, contrast, saturation adjustments (±20%)
+- **Random Horizontal Flip**: Optional (use with caution for text)
+
+All transforms preserve aspect ratio with padding to maintain text readability. This approach:
+- **Reduces storage**: 6x less disk space (single image vs 6 resolutions)
+- **Increases flexibility**: Any resolution on-the-fly vs pre-computed fixed sizes
+- **Improves generalization**: Random transforms prevent overfitting to specific resolutions
 
 ## Dataset Structure
 
@@ -100,12 +93,7 @@ All images use aspect-ratio preservation with padding to maintain text readabili
 
 - `text` (string): Original document text
 - `summary` (string): Human-written summary
-- `image` (PIL.Image): Original full-size rendered document image
-- `image_tiny` (PIL.Image): 512×512 resolution
-- `image_small` (PIL.Image): 640×640 resolution
-- `image_base` (PIL.Image): 1024×1024 resolution
-- `image_large` (PIL.Image): 1280×1280 resolution
-- `image_gundam` (PIL.Image): 1600×1600 resolution
+- `image` (PIL.Image): Original full-size rendered document image (up to 1600×2200)
 - `source_dataset` (string): Origin dataset name
 - `original_split` (string): Source split (train/validation/test)
 - `original_index` (int): Original sample index for deduplication
@@ -116,12 +104,7 @@ All images use aspect-ratio preservation with padding to maintain text readabili
 {{
     'text': '{example_text}',
     'summary': '{example_summary}',
-    'image': <PIL.Image>,
-    'image_tiny': <PIL.Image (512×512)>,
-    'image_small': <PIL.Image (640×640)>,
-    'image_base': <PIL.Image (1024×1024)>,
-    'image_large': <PIL.Image (1280×1280)>,
-    'image_gundam': <PIL.Image (1600×1600)>,
+    'image': <PIL.Image>,  # Original resolution (up to 1600×2200)
     'source_dataset': '{source_dataset}',
     'original_split': 'train',
     'original_index': 0
@@ -138,30 +121,38 @@ from datasets import load_dataset
 # Load full dataset
 dataset = load_dataset("{repo_id}")
 
-# Load specific resolution only (faster, less memory)
-dataset = load_dataset("{repo_id}", columns=['text', 'summary', 'image_base'])
-
 # Streaming for large datasets
 dataset = load_dataset("{repo_id}", streaming=True)
 ```
 
-### Training Example with DeepSeek-OCR
+### Training Example with DeepSeek-OCR and Augmentation
 
 ```python
 from transformers import AutoProcessor, AutoModelForVision2Seq
 from datasets import load_dataset
+from deepsynth.data.transforms import create_training_transform
 
 # Load model and processor
 model = AutoModelForVision2Seq.from_pretrained("deepseek-ai/DeepSeek-OCR")
 processor = AutoProcessor.from_pretrained("deepseek-ai/DeepSeek-OCR")
 
-# Load dataset (use appropriate resolution)
+# Load dataset
 dataset = load_dataset("{repo_id}")
 
-# Process sample
+# Create augmentation pipeline (random rotation, perspective, resize, color jitter)
+transform = create_training_transform(
+    target_size_range=(512, 1600),  # Random resize range
+    rotation_degrees=10,             # ±10° rotation
+    perspective_distortion=0.1,      # Perspective transform
+    brightness_factor=0.2,           # ±20% brightness
+    contrast_factor=0.2,             # ±20% contrast
+)
+
+# Process sample with augmentation
 sample = dataset['train'][0]
+augmented_image = transform(sample['image'])  # Apply random transforms
 inputs = processor(
-    images=sample['image_base'],  # Use base resolution for training
+    images=augmented_image,
     text=sample['text'],
     return_tensors="pt"
 )
@@ -170,25 +161,15 @@ inputs = processor(
 for param in model.encoder.parameters():
     param.requires_grad = False
 
-# Training loop...
+# Training loop with on-the-fly augmentation...
 ```
-
-### Resolution Selection Guidelines
-
-| Training Stage | Recommended Resolution | Rationale |
-|----------------|----------------------|-----------|
-| Initial training | `image_small` (640×640) | Fast iteration, baseline |
-| Standard training | `image_base` (1024×1024) | Best speed/quality balance |
-| High-quality training | `image_large` (1280×1280) | Better detail capture |
-| Research/SOTA | `image_gundam` (1600×1600) | Maximum quality |
-| Mobile deployment | `image_tiny` (512×512) | Inference speed |
 
 ## Training Recommendations
 
 ### DeepSeek-OCR Fine-Tuning
 
 ```python
-# Recommended hyperparameters
+# Recommended hyperparameters with augmentation
 training_args = {{
     "learning_rate": 2e-5,
     "batch_size": 4,
@@ -196,7 +177,13 @@ training_args = {{
     "num_epochs": 3,
     "mixed_precision": "bf16",
     "freeze_encoder": True,  # IMPORTANT: Only fine-tune decoder
-    "image_resolution": "base"  # Use image_base field
+
+    # Augmentation parameters
+    "rotation_degrees": 10,           # Random rotation ±10°
+    "perspective_distortion": 0.1,    # Perspective transform
+    "resize_range": (512, 1600),      # Random resize 512-1600px
+    "brightness_factor": 0.2,         # ±20% brightness
+    "contrast_factor": 0.2,           # ±20% contrast
 }}
 ```
 
@@ -213,9 +200,11 @@ This dataset was created using the **DeepSynth** pipeline:
 
 1. **Source Loading**: Original text documents from {source_dataset}
 2. **Text-to-Image Conversion**: Documents rendered as PNG images (DejaVu Sans 12pt, Unicode support)
-3. **Multi-Resolution Generation**: 6 resolutions generated with aspect-ratio preservation
+3. **Original Resolution Storage**: Full-quality images stored once (up to 1600×2200)
 4. **Incremental Upload**: Batches of 5,000 samples uploaded to HuggingFace Hub
 5. **Deduplication**: Source tracking prevents duplicate samples
+
+**Note**: Images are augmented on-the-fly during training using random transformations (rotation, perspective, resize, color jitter) for better generalization across different resolutions and conditions.
 
 ### Rendering Specifications
 
@@ -232,7 +221,7 @@ If you use this dataset in your research, please cite:
 
 ```bibtex
 @misc{{deepsynth-{dataset_id},
-    title={{{{DeepSynth {pretty_name}: Multi-Resolution Visual Text Encoding for Summarization}}}},
+    title={{{{DeepSynth {pretty_name}: Visual Text Encoding with Random Augmentation for Summarization}}}},
     author={{Baconnier}},
     year={{2025}},
     publisher={{HuggingFace}},

@@ -69,10 +69,7 @@ def _register_routes(
     def index():
         """Render the main UI."""
 
-        return render_template(
-            "index_improved.html",
-            resolution_options=list(DEEPSEEK_OCR_RESOLUTIONS.items()),
-        )
+        return render_template("index_improved.html")
 
     @app.route("/api/jobs", methods=["GET"])
     def list_jobs():
