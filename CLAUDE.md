@@ -37,7 +37,7 @@ make clean                          # Remove __pycache__, *.pyc files
 **🚀 RECOMMENDED: Simple One-Command Workflow**
 ```bash
 # Generate ALL 7 datasets in parallel (1.29M+ samples across 7 languages)
-# ✅ Multi-resolution ALWAYS enabled by default (6 image formats per sample)
+# ✅ Stores original high-quality images, augmented during training
 ./generate_all_datasets.sh          # Automatic resumption, 7 workers
 # This is the EASIEST way to generate all datasets. Just run it and wait 6-12 hours.
 
@@ -54,33 +54,15 @@ python scripts/cli/run_parallel_processing.py  # Choose specific datasets, worke
 ./scripts/run_global_pipeline.sh    # Use generate_all_datasets.sh instead
 ```
 
-**Multi-Resolution Image Generation (DeepSeek OCR):**
-```bash
-# ✅ Multi-resolution is NOW ENABLED BY DEFAULT
-# All datasets automatically include 6 image formats per sample:
-#   - image (original), image_tiny (512×512), image_small (640×640),
-#   - image_base (1024×1024), image_large (1280×1280), image_gundam (1600×1600)
+**Image Augmentation Pipeline:**
+Images are stored at original resolution and augmented during training:
+- **Random Rotation**: ±10° for orientation invariance
+- **Random Perspective**: 0.1-0.2 distortion for viewing angles
+- **Random Resize**: 512-1600px range for multi-scale learning
+- **Color Jitter**: Brightness, contrast, saturation ±20%
+- **Random Flip**: Optional horizontal flip (use with caution)
 
-# Disable multi-resolution (single resolution only)
-python run_full_pipeline.py --single-resolution
-
-# Select specific resolutions only
-python run_full_pipeline.py --resolution-sizes tiny base gundam
-
-# Interactive CLI (multi-resolution always enabled)
-python scripts/cli/run_parallel_processing.py
-```
-
-**Multi-Resolution Dataset Schema:**
-When multi-resolution is enabled, datasets include additional image columns:
-- `image`: Original full-size image (backward compatible)
-- `image_tiny`: 512×512 version
-- `image_small`: 640×640 version
-- `image_base`: 1024×1024 version
-- `image_large`: 1280×1280 version
-- `image_gundam`: 1600×1600 version
-
-All resized images preserve aspect ratio with proper padding.
+**Benefits**: 6x less storage, unlimited flexibility, better generalization
 
 ### Training
 ```bash
@@ -123,10 +105,10 @@ python scripts/cli/run_benchmark.py --model ./model --benchmark xsum --max-sampl
 ```bash
 make web                            # Launch dataset generation UI (http://localhost:5000)
 # Features:
-# - Dataset generation with multi-resolution support
-# - Model training configuration
+# - Dataset generation with augmentation configuration
+# - Model training configuration with dropout controls
 # - Job monitoring and progress tracking
-# - Multi-resolution image selection UI
+# - Augmentation parameter tuning UI
 ```
 
 ### Docker Deployment
@@ -140,8 +122,7 @@ docker-compose -f deploy/docker-compose.gpu.yml up
 # Full stack (both services)
 ./deploy/start-all.sh
 
-# Note: Multi-resolution image generation is fully supported in Docker
-# All necessary fonts and dependencies (DejaVu Sans) are included in the images
+# Note: All necessary fonts and dependencies (DejaVu Sans) are included in the images
 ```
 
 ## Architecture
@@ -218,19 +199,14 @@ All processed datasets follow this structure:
 {
     'text': str,              # Original document
     'summary': str,           # Human-written summary
-    'image': PIL.Image,       # PNG-rendered text (original size, backward compatible)
+    'image': PIL.Image,       # PNG-rendered text (original resolution, up to 1600×2200)
     'source_dataset': str,    # Origin tracking (e.g., "mlsum_fr")
     'original_split': str,    # train/validation/test
     'original_index': int,    # For duplicate prevention
-
-    # Multi-resolution columns (optional, when multi_resolution=True):
-    'image_tiny': PIL.Image,   # 512×512 version
-    'image_small': PIL.Image,  # 640×640 version
-    'image_base': PIL.Image,   # 1024×1024 version
-    'image_large': PIL.Image,  # 1280×1280 version
-    'image_gundam': PIL.Image  # 1600×1600 version
 }
 ```
+
+**Note**: Images are augmented on-the-fly during training using the transform pipeline (`deepsynth.data.transforms.create_training_transform()`) for random rotation, perspective, resize, and color jitter.
 
 #### 4. Training Architecture
 **DeepSynthOCRTrainer** (`src/deepsynth/training/deepsynth_trainer.py`):

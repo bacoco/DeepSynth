@@ -12,12 +12,12 @@
 #   6. deepsynth-de        (MLSUM Allemand ~220k)
 #   7. deepsynth-en-legal  (BillSum Legal ~22k)
 #
-# Chaque dataset contiendra 6 résolutions d'images par échantillon:
-#   - image (original), image_tiny (512x512), image_small (640x640),
-#   - image_base (1024x1024), image_large (1280x1280), image_gundam (1600x1600)
+# Chaque dataset contiendra des images originales haute qualité
+#   Augmentation aléatoire appliquée pendant l'entraînement:
+#   - Rotation (±10°), perspective, resize (512-1600px), color jitter
 #
-# Durée estimée: 6-12 heures
-# Espace disque requis: ~15GB temporaire
+# Durée estimée: 2-4 heures (6x plus rapide qu'avant!)
+# Espace disque requis: ~2.5GB temporaire (6x moins qu'avant!)
 #
 
 set -e  # Arrêt en cas d'erreur
@@ -75,9 +75,10 @@ grep "ARXIV_IMAGE_SAMPLES=" .env || echo "ℹ️  ARXIV_IMAGE_SAMPLES: utilise d
 
 echo ""
 echo "📊 Ce script va traiter ~1.29M échantillons"
-echo "⏱️  Temps estimé: 6-12 heures"
+echo "⏱️  Temps estimé: 2-4 heures (6x plus rapide!)"
 echo "🔄 Traitement parallèle: 7 workers (1 par dataset)"
 echo "📤 Upload automatique tous les 5000 samples"
+echo "💾 Espace économisé: 6x moins de stockage (images originales uniquement)"
 echo ""
 echo "💡 NOTES:"
 echo "  • Vous pouvez interrompre (Ctrl+C) et reprendre plus tard"
