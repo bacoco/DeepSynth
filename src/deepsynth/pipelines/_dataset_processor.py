@@ -123,7 +123,13 @@ class OptimizedDatasetPipeline:
         self.converter = OptimizedConverter()
         self.progress = self.load_progress()
 
-        self.batch_size = batch_size  # Samples per local batch file (5000 = 1 upload batch)
+        # Reduce batch size for multi-resolution to avoid memory issues (6x images)
+        if multi_resolution:
+            self.batch_size = min(batch_size, 1000)  # Max 1000 samples = 6000 images
+            print(f"    ℹ️  Multi-resolution enabled: reduced batch size to {self.batch_size} (memory optimization)")
+        else:
+            self.batch_size = batch_size
+
         self.current_batch = []
         self.batch_counter = 0
 
@@ -227,14 +233,24 @@ class OptimizedDatasetPipeline:
                 print(f"      ⚠️  Upload warning: {e} (will retry later)")
 
         self.batch_counter += 1
+
+        # Clear batch and force garbage collection to free memory
+        self.current_batch.clear()
         self.current_batch = []
+
+        # Force garbage collection for multi-resolution (6x images per sample)
+        import gc
+        gc.collect()
 
     def _ensure_uploader(self, repo_name):
         """Initialize uploader with correct dataset_name if not already done"""
         if self.auto_upload and self.uploader is None:
+            # For multi-resolution: upload every 5 batches (5×1000=5000 samples)
+            # For single-resolution: upload every batch (1×5000=5000 samples)
+            batches_per_upload = 5 if self.batch_size <= 1000 else 1
             self.uploader = EfficientIncrementalUploader(
                 work_dir=str(self.work_dir),
-                batches_per_upload=1,  # Upload IMMEDIATELY when 1 batch ready (5000 samples)
+                batches_per_upload=batches_per_upload,
                 dataset_name=repo_name
             )
 
@@ -351,10 +367,14 @@ class OptimizedDatasetPipeline:
                 print(f"    📊 {len(remaining)}/{limit} samples to process ({len(processed_keys)} already done)")
 
                 # Process samples
+                # Progress reporting: every batch_size samples
+                progress_interval = self.batch_size
                 for count, idx in enumerate(remaining, 1):
-                    if count % 5000 == 0:
+                    if count % progress_interval == 0:
                         print(f"      📈 {count}/{len(remaining)} ({count/len(remaining)*100:.1f}%)")
-                        self.save_batch_to_disk()  # Save every 5000
+                        # Batch is automatically saved when full, but force save at intervals
+                        if self.current_batch:
+                            self.save_batch_to_disk()
 
                     example = dataset[idx]
                     text, summary = self._extract_text_and_summary(example, name, text_field, summary_field)
@@ -436,16 +456,10 @@ class OptimizedDatasetPipeline:
 
         # Upload comprehensive dataset card
         if self.auto_upload:
-            # Get actual total count from HuggingFace
-            try:
-                existing_dataset = load_dataset(repo_name, split='train', streaming=True)
-                # Count samples (this is fast with streaming)
-                actual_count = sum(1 for _ in existing_dataset)
-                self._upload_dataset_card(repo_name, output_name, actual_count)
-            except:
-                # Fallback to total_new if we can't get actual count
-                if total_new > 0:
-                    self._upload_dataset_card(repo_name, output_name, total_new)
+            # Use processed_keys count (already know the total from checking at start)
+            total_existing = len(processed_keys) + total_new if 'processed_keys' in locals() else total_new
+            if total_existing > 0 or total_new > 0:
+                self._upload_dataset_card(repo_name, output_name, max(total_existing, total_new))
 
         # Mark as completed
         self.progress['completed_datasets'].append(dataset_key)
