@@ -138,19 +138,16 @@ class DeepSynthLoRATrainer:
         self.api = HfApi()
 
     def _freeze_vision_encoder(self):
-        """Freeze vision encoder parameters."""
-        frozen_count = 0
-        trainable_count = 0
+        """Freeze vision encoder parameters using robust freezing utilities."""
+        from .model_utils import freeze_vision_encoder as robust_freeze
 
-        for name, param in self.model.named_parameters():
-            # Freeze vision/encoder components
-            if any(kw in name.lower() for kw in ["vision", "encoder", "vit", "embed"]):
-                param.requires_grad = False
-                frozen_count += param.numel()
-            else:
-                trainable_count += param.numel()
+        freeze_stats = robust_freeze(self.model)
 
-        LOGGER.info(f"Frozen vision encoder: {frozen_count:,} params ({frozen_count/1e6:.1f}M)")
+        if freeze_stats['frozen_params'] == 0:
+            LOGGER.warning("⚠️ Failed to freeze vision encoder! No parameters frozen")
+        else:
+            LOGGER.info(f"✓ Frozen vision encoder: {freeze_stats['frozen_params']:,} params ({freeze_stats['frozen_params']/1e6:.1f}M)")
+            LOGGER.info(f"✓ Trainable parameters: {freeze_stats['trainable_params']:,} ({freeze_stats['trainable_params']/1e6:.1f}M)")
 
     def _apply_lora(self):
         """Apply LoRA adapters to the model."""
@@ -373,20 +370,36 @@ class DeepSynthLoRATrainer:
                     if not images:
                         continue
 
-                    # Forward pass through vision encoder
-                    with torch.no_grad() if not self.model.training else torch.enable_grad():
-                        # TODO: Implement actual forward pass with model
-                        # This is a placeholder - actual implementation depends on model architecture
-                        # vision_tokens = self.model.encode_image(images)
-                        # if text_embeddings is not None:
-                        #     combined = torch.cat([vision_tokens, text_embeddings.unsqueeze(1)], dim=1)
-                        # outputs = self.model.generate(combined, labels=summaries)
+                    # Tokenize summaries
+                    tokens = self.tokenizer(
+                        summaries,
+                        max_length=self.config.max_length,
+                        truncation=True,
+                        padding="max_length",
+                        return_tensors="pt",
+                    )
 
-                        # For now, placeholder loss
-                        loss = torch.tensor(0.0, device=self.device, requires_grad=True)
+                    input_ids = tokens["input_ids"].to(self.device)
+                    attention_mask = tokens["attention_mask"].to(self.device)
+                    labels = input_ids.clone()
+                    labels[labels == self.tokenizer.pad_token_id] = -100
+
+                    # Forward pass with images (DeepSeek-OCR API)
+                    outputs = self.model(
+                        images=images,
+                        input_ids=input_ids,
+                        attention_mask=attention_mask,
+                        labels=labels,
+                        return_dict=True,
+                    )
+
+                    loss = outputs.loss if hasattr(outputs, "loss") else outputs[0]
+
+                    # Scale loss by gradient accumulation steps
+                    scaled_loss = loss / self.config.gradient_accumulation_steps
 
                     # Backward pass
-                    loss.backward()
+                    scaled_loss.backward()
 
                     # Gradient accumulation
                     if (batch_idx + 1) % self.config.gradient_accumulation_steps == 0:
@@ -471,6 +484,67 @@ class DeepSynthLoRATrainer:
             text_encoder_path.mkdir(exist_ok=True)
             # TODO: Save text encoder state
             LOGGER.info(f"Saved text encoder to {text_encoder_path}")
+
+    def push_adapters_to_hub(self, repo_id: str):
+        """Push LoRA adapters to HuggingFace Hub.
+
+        Args:
+            repo_id: HuggingFace repository ID (e.g., "username/model-lora")
+        """
+        if not self.config.use_lora:
+            LOGGER.warning("LoRA not enabled, cannot push adapters")
+            return
+
+        try:
+            LOGGER.info(f"Pushing LoRA adapters to Hub: {repo_id}")
+
+            # Create repo if needed
+            try:
+                create_repo(
+                    repo_id=repo_id,
+                    repo_type="model",
+                    private=self.config.hub_private,
+                    token=self.config.hub_token,
+                    exist_ok=True,
+                )
+            except Exception as e:
+                LOGGER.warning(f"Repo creation warning: {e}")
+
+            # Push adapters (PEFT saves only adapter weights, not base model)
+            self.model.push_to_hub(
+                repo_id=repo_id,
+                token=self.config.hub_token,
+                private=self.config.hub_private,
+            )
+
+            LOGGER.info(f"✓ LoRA adapters pushed to Hub: https://huggingface.co/{repo_id}")
+            LOGGER.info(f"✓ Adapter size: ~{sum(p.numel() for n, p in self.model.named_parameters() if 'lora' in n.lower()) / 1e6:.1f}M parameters")
+
+        except Exception as e:
+            LOGGER.error(f"Failed to push adapters to Hub: {e}")
+
+    def merge_and_unload_adapters(self):
+        """Merge LoRA adapters into base model and unload adapters.
+
+        This creates a standalone model with adapter weights merged in.
+        Useful for inference without PEFT overhead.
+
+        Returns:
+            Merged model (or original model if LoRA not enabled)
+        """
+        if not self.config.use_lora:
+            LOGGER.warning("LoRA not enabled, returning original model")
+            return self.model
+
+        if not hasattr(self.model, 'merge_and_unload'):
+            LOGGER.warning("Model doesn't support merge_and_unload, returning original model")
+            return self.model
+
+        LOGGER.info("Merging LoRA adapters into base model...")
+        merged_model = self.model.merge_and_unload()
+        LOGGER.info("✓ Adapters merged successfully")
+
+        return merged_model
 
 
 __all__ = ["DeepSynthLoRATrainer"]
