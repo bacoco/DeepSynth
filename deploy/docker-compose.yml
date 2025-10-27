@@ -32,6 +32,9 @@ services:
       # Python Configuration
       - PYTHONUNBUFFERED=1
 
+      # State directory configuration
+      - DEEPSYNTH_UI_STATE_DIR=/app/web_ui/state
+
     deploy:
       resources:
         reservations:
@@ -42,7 +45,7 @@ services:
 
     restart: unless-stopped
 
-    command: python3 -m web_ui.app
+    command: python3 -m apps.web
 
 networks:
   default:

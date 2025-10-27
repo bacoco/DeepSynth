@@ -1314,7 +1314,7 @@
     <script>
         // Global state
         let selectedBenchmark = null;
-        let selectedPreset = 'default';
+        let selectedPreset = null;
         let selectedTrainerType = 'production';
         let benchmarkDatasets = {};
         let trainingPresets = {};
@@ -1679,21 +1679,27 @@
         // Load benchmark datasets
         async function loadBenchmarkDatasets() {
             try {
-                const response = await fetch('/api/datasets/presets');
+                const response = await fetch('/api/datasets/benchmarks');
                 const data = await response.json();
-                benchmarkDatasets = data.datasets;
+                benchmarkDatasets = data.benchmarks || {};
 
                 const container = document.getElementById('benchmark-presets');
                 container.innerHTML = '';
 
+                if (Object.keys(benchmarkDatasets).length === 0) {
+                    container.innerHTML = '<p style="color: #6c757d;">No benchmark presets available.</p>';
+                    return;
+                }
+
                 for (const [key, dataset] of Object.entries(benchmarkDatasets)) {
                     const card = document.createElement('div');
                     card.className = 'preset-card';
-                    card.onclick = () => selectBenchmark(key);
+                    card.dataset.benchmarkKey = key;
+                    card.onclick = (event) => selectBenchmark(key, event);
                     card.innerHTML = `
                         <h4>${key.toUpperCase()}</h4>
-                        <p>${dataset.description}</p>
-                        <p style="font-size: 0.8em; color: #999;">${dataset.size}</p>
+                        <p>${dataset.description || 'Benchmark configuration'}</p>
+                        <p style="font-size: 0.8em; color: #999;">${dataset.size || ''}</p>
                     `;
                     container.appendChild(card);
                 }
@@ -1703,14 +1709,23 @@
         }
 
         // Select benchmark
-        function selectBenchmark(key) {
+        function selectBenchmark(key, evt) {
             selectedBenchmark = key;
             document.getElementById('selected_benchmark').value = key;
 
             document.querySelectorAll('#benchmark-presets .preset-card').forEach(card => {
                 card.classList.remove('selected');
             });
-            event.target.closest('.preset-card').classList.add('selected');
+            const target = evt?.currentTarget || evt?.target || null;
+            if (target) {
+                target.classList.add('selected');
+                return;
+            }
+
+            const fallbackCard = document.querySelector(`#benchmark-presets .preset-card[data-benchmark-key="${key}"]`);
+            if (fallbackCard) {
+                fallbackCard.classList.add('selected');
+            }
         }
 
         // Load training presets
@@ -1723,11 +1738,19 @@
                 const container = document.getElementById('training-presets');
                 container.innerHTML = '';
 
+                let hasSelectedPreset = false;
+                let firstPresetKey = null;
+
                 for (const [key, config] of Object.entries(trainingPresets)) {
                     const card = document.createElement('div');
                     card.className = 'preset-card';
-                    if (key === 'default') card.classList.add('selected');
-                    card.onclick = () => selectTrainingPreset(key);
+                    card.dataset.trainingPresetKey = key;
+                    if (!hasSelectedPreset) {
+                        card.classList.add('selected');
+                        hasSelectedPreset = true;
+                        firstPresetKey = key;
+                    }
+                    card.onclick = (event) => selectTrainingPreset(key, event);
                     card.innerHTML = `
                         <h4>${key.replace('_', ' ').toUpperCase()}</h4>
                         <p>Batch: ${config.batch_size} × ${config.gradient_accumulation_steps}</p>
@@ -1735,28 +1758,51 @@
                     `;
                     container.appendChild(card);
                 }
+
+                if (firstPresetKey) {
+                    applyTrainingPreset(firstPresetKey);
+                }
             } catch (error) {
                 console.error('Error loading training presets:', error);
             }
         }
 
-        // Select training preset
-        function selectTrainingPreset(key) {
+        function applyTrainingPreset(key) {
             selectedPreset = key;
             document.getElementById('selected_preset').value = key;
 
             const config = trainingPresets[key];
+            if (!config) return;
+
             document.getElementById('batch_size').value = config.batch_size;
             document.getElementById('num_epochs').value = config.num_epochs;
             document.getElementById('learning_rate').value = config.learning_rate;
-            document.getElementById('max_length').value = config.max_length;
+            if (config.max_length !== undefined) {
+                document.getElementById('max_length').value = config.max_length;
+            }
             document.getElementById('gradient_accumulation_steps').value = config.gradient_accumulation_steps;
-            document.getElementById('mixed_precision').value = config.mixed_precision;
+            if (config.mixed_precision !== undefined) {
+                document.getElementById('mixed_precision').value = config.mixed_precision;
+            }
+        }
+
+        // Select training preset
+        function selectTrainingPreset(key, evt) {
+            applyTrainingPreset(key);
 
             document.querySelectorAll('#training-presets .preset-card').forEach(card => {
                 card.classList.remove('selected');
             });
-            event.target.closest('.preset-card').classList.add('selected');
+            const target = evt?.currentTarget || evt?.target || null;
+            if (target) {
+                target.classList.add('selected');
+                return;
+            }
+
+            const fallbackCard = document.querySelector(`#training-presets .preset-card[data-training-preset-key="${key}"]`);
+            if (fallbackCard) {
+                fallbackCard.classList.add('selected');
+            }
         }
 
         // Show toast notification
