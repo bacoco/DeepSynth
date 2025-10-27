@@ -163,6 +163,8 @@ def _register_routes(
                 "hf_dataset_repo": data.get("hf_dataset_repo"),
                 "private_dataset": data.get("private_dataset", False),
                 "hf_token": data.get("hf_token", os.environ.get("HF_TOKEN")),
+                "multi_resolution": data.get("multi_resolution", False),
+                "resolution_sizes": data.get("resolution_sizes", None),
             }
 
             job_id = state_manager.create_job("dataset_generation", config)

@@ -6,6 +6,7 @@ IMPROVED VERSION: Added multi-trainer support with MoE dropout configuration.
 """
 
 import os
+from pathlib import Path
 from typing import Callable, Dict, Optional
 import logging
 from datasets import Dataset, DatasetDict, Features, Value, load_dataset
@@ -97,24 +98,58 @@ class IncrementalDatasetGenerator:
                         logger.debug(f"Skipping duplicate sample {idx}")
                         continue
 
-                    # Generate image
-                    image_filename = f"image_{job.processed_samples:06d}.png"
-                    image_path = Path(config['output_dir']) / image_filename
-
                     # Ensure output directory exists
-                    image_path.parent.mkdir(parents=True, exist_ok=True)
+                    output_dir = Path(config['output_dir'])
+                    output_dir.mkdir(parents=True, exist_ok=True)
 
-                    # Convert text to image
-                    self.converter.text_to_image(text_content, str(image_path))
+                    # Check if multi-resolution is enabled
+                    multi_resolution = config.get('multi_resolution', False)
+                    resolution_sizes = config.get('resolution_sizes', None)
 
-                    # Create processed sample
-                    processed_sample = {
-                        'text': text_content,
-                        'summary': sample.get(summary_field, ''),
-                        'image_path': str(image_path),
-                        'image': str(image_path),
-                        'source_index': idx
-                    }
+                    # Generate images
+                    if multi_resolution:
+                        # Generate base image (for backward compatibility)
+                        base_image = self.converter.convert(text_content)
+
+                        # Generate multi-resolution images
+                        sizes_dict = None
+                        if resolution_sizes:
+                            # Build sizes dict for selected resolutions
+                            all_sizes = {
+                                'tiny': (512, 512),
+                                'small': (640, 640),
+                                'base': (1024, 1024),
+                                'large': (1280, 1280),
+                                'gundam': (1600, 1600)
+                            }
+                            sizes_dict = {k: v for k, v in all_sizes.items() if k in resolution_sizes}
+
+                        multi_res_images = self.converter.convert_multi_resolution(text_content, sizes=sizes_dict)
+
+                        # Create processed sample with multi-resolution images
+                        processed_sample = {
+                            'text': text_content,
+                            'summary': sample.get(summary_field, ''),
+                            'image': base_image,  # Base image for backward compatibility
+                            'source_index': idx
+                        }
+
+                        # Add resolution images
+                        for res_name, res_image in multi_res_images.items():
+                            processed_sample[f'image_{res_name}'] = res_image
+
+                    else:
+                        # Single resolution mode
+                        image = self.converter.convert(text_content)
+
+                        # Create processed sample
+                        processed_sample = {
+                            'text': text_content,
+                            'summary': sample.get(summary_field, ''),
+                            'image': image,
+                            'source_index': idx
+                        }
+
                     processed_data.append(processed_sample)
 
                     # Mark as processed
@@ -188,16 +223,22 @@ class IncrementalDatasetGenerator:
             return
 
         try:
-            # Create dataset with explicit image feature so files are uploaded to HF
-            features = Features(
-                {
-                    'text': Value('string'),
-                    'summary': Value('string'),
-                    'image_path': Value('string'),
-                    'image': HFImage(),
-                    'source_index': Value('int32'),
-                }
-            )
+            # Build features dict based on multi-resolution setting
+            multi_resolution = config.get('multi_resolution', False)
+
+            features_dict = {
+                'text': Value('string'),
+                'summary': Value('string'),
+                'image': HFImage(),
+                'source_index': Value('int32'),
+            }
+
+            # Add multi-resolution image features if enabled
+            if multi_resolution:
+                for res_name in ['tiny', 'small', 'base', 'large', 'gundam']:
+                    features_dict[f'image_{res_name}'] = HFImage()
+
+            features = Features(features_dict)
 
             dataset = Dataset.from_list(data, features=features)
 
