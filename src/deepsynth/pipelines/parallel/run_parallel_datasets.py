@@ -37,18 +37,59 @@ def run_parallel_datasets_cli():
         max_workers = 3
     
     print(f"✅ Utilisation de {max_workers} processus parallèles")
-    
+
+    # Multi-resolution options
+    print("\n🔍 OPTIONS MULTI-RÉSOLUTION (DeepSeek OCR)")
+    print("-" * 30)
+    multi_res_choice = input("Générer plusieurs résolutions d'images? (o/N): ").strip().lower()
+
+    multi_resolution = multi_res_choice in ['o', 'oui', 'y', 'yes']
+    resolution_sizes = None
+
+    if multi_resolution:
+        print("\n📏 Résolutions disponibles (DeepSeek OCR):")
+        print("  1. tiny    (512×512)")
+        print("  2. small   (640×640)")
+        print("  3. base    (1024×1024)")
+        print("  4. large   (1280×1280)")
+        print("  5. gundam  (1600×1600)")
+        print("  6. Toutes les résolutions")
+
+        res_choice = input("\nSélectionnez les résolutions (ex: 1,3,5 ou 6 pour toutes): ").strip()
+
+        if res_choice == "6":
+            resolution_sizes = None  # All sizes
+            print("✅ Toutes les résolutions seront générées")
+        else:
+            try:
+                res_map = {1: 'tiny', 2: 'small', 3: 'base', 4: 'large', 5: 'gundam'}
+                res_indices = [int(x.strip()) for x in res_choice.split(",")]
+                resolution_sizes = [res_map[i] for i in res_indices if i in res_map]
+
+                if not resolution_sizes:
+                    print("⚠️ Aucune résolution valide sélectionnée, utilisation de toutes les résolutions")
+                    resolution_sizes = None
+                else:
+                    print(f"✅ Résolutions sélectionnées: {', '.join(resolution_sizes)}")
+            except ValueError:
+                print("⚠️ Format invalide, utilisation de toutes les résolutions")
+                resolution_sizes = None
+
     # Options de traitement
     print("\n📋 OPTIONS DE TRAITEMENT")
     print("-" * 30)
     print("1. Traiter tous les datasets (recommandé)")
     print("2. Traiter des datasets spécifiques")
     print("3. Mode test rapide (500 échantillons par dataset)")
-    
+
     choice = input("\nVotre choix (1-3): ").strip()
-    
+
     # Créer le pipeline
-    pipeline = ParallelDatasetsPipeline(max_workers=max_workers)
+    pipeline = ParallelDatasetsPipeline(
+        max_workers=max_workers,
+        multi_resolution=multi_resolution,
+        resolution_sizes=resolution_sizes
+    )
     
     print(f"\n📊 DATASETS DISPONIBLES ({len(pipeline.datasets_config)} au total)")
     print("-" * 50)

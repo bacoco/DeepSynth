@@ -8,7 +8,7 @@ fonts that might not be available in the execution environment.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -131,6 +131,80 @@ class TextToImageConverter:
             y += self.line_height
             # REMOVED: Text clipping - now ALL text will be included in the image
         return image
+
+    def _resize_with_padding(self, image: Image.Image, target_size: Tuple[int, int]) -> Image.Image:
+        """Resize image to target size with aspect ratio preservation and padding.
+
+        Args:
+            image: Source PIL Image
+            target_size: Target (width, height) tuple
+
+        Returns:
+            Resized image with padding to exactly match target_size
+        """
+        target_width, target_height = target_size
+        orig_width, orig_height = image.size
+
+        # Calculate scaling factor to fit within target while preserving aspect ratio
+        scale = min(target_width / orig_width, target_height / orig_height)
+
+        # Calculate new dimensions
+        new_width = int(orig_width * scale)
+        new_height = int(orig_height * scale)
+
+        # Resize image using high-quality LANCZOS filter
+        resized = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+        # Create new image with target size and background color
+        result = Image.new("RGB", target_size, color=self.background_color)
+
+        # Calculate position to paste resized image (center it)
+        paste_x = (target_width - new_width) // 2
+        paste_y = (target_height - new_height) // 2
+
+        # Paste resized image onto padded background
+        result.paste(resized, (paste_x, paste_y))
+
+        return result
+
+    def convert_multi_resolution(
+        self,
+        text: str,
+        sizes: Optional[Dict[str, Tuple[int, int]]] = None
+    ) -> Dict[str, Image.Image]:
+        """Convert text to multiple resolution images for DeepSeek OCR training.
+
+        Args:
+            text: Text to convert to images
+            sizes: Dictionary mapping resolution names to (width, height) tuples.
+                   Defaults to DeepSeek OCR standard sizes:
+                   - tiny: 512×512
+                   - small: 640×640
+                   - base: 1024×1024
+                   - large: 1280×1280
+                   - gundam: 1600×1600
+
+        Returns:
+            Dictionary mapping resolution names to PIL Image objects
+        """
+        if sizes is None:
+            sizes = {
+                'tiny': (512, 512),
+                'small': (640, 640),
+                'base': (1024, 1024),
+                'large': (1280, 1280),
+                'gundam': (1600, 1600)
+            }
+
+        # Generate base image from text
+        base_image = self.convert(text)
+
+        # Generate resized versions for each target size
+        result = {}
+        for name, target_size in sizes.items():
+            result[name] = self._resize_with_padding(base_image, target_size)
+
+        return result
 
     def save(self, text: str, output_path: str, **save_kwargs: object) -> str:
         """Convert ``text`` to an image and save it to ``output_path``."""
