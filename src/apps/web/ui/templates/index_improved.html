@@ -674,6 +674,47 @@
                 </div>
 
                 <div class="form-section">
+                    <h3>Multi-Resolution Images (DeepSeek OCR)</h3>
+                    <div class="info-box">
+                        <strong>ℹ️ DeepSeek OCR Training:</strong> Generate images at multiple resolutions for comprehensive model training.
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="multi_resolution" name="multi_resolution">
+                            Enable multi-resolution image generation
+                        </label>
+                    </div>
+                    <div id="resolution-options" style="display: none; margin-top: 15px;">
+                        <label style="display: block; margin-bottom: 10px; font-weight: 600;">Select Resolutions:</label>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
+                            <label style="display: flex; align-items: center; padding: 10px; background: #f8f9fa; border-radius: 6px;">
+                                <input type="checkbox" class="resolution-checkbox" value="tiny" checked style="margin-right: 8px;">
+                                <span>Tiny (512×512)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; padding: 10px; background: #f8f9fa; border-radius: 6px;">
+                                <input type="checkbox" class="resolution-checkbox" value="small" checked style="margin-right: 8px;">
+                                <span>Small (640×640)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; padding: 10px; background: #f8f9fa; border-radius: 6px;">
+                                <input type="checkbox" class="resolution-checkbox" value="base" checked style="margin-right: 8px;">
+                                <span>Base (1024×1024)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; padding: 10px; background: #f8f9fa; border-radius: 6px;">
+                                <input type="checkbox" class="resolution-checkbox" value="large" checked style="margin-right: 8px;">
+                                <span>Large (1280×1280)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; padding: 10px; background: #f8f9fa; border-radius: 6px;">
+                                <input type="checkbox" class="resolution-checkbox" value="gundam" checked style="margin-right: 8px;">
+                                <span>Gundam (1600×1600)</span>
+                            </label>
+                        </div>
+                        <small class="help-text" style="display: block; margin-top: 10px; color: #6c757d;">
+                            Select one or more resolutions. All sizes will be generated if none selected.
+                        </small>
+                    </div>
+                </div>
+
+                <div class="form-section">
                     <h3>Save to HuggingFace</h3>
                     <div class="form-row">
                         <div class="form-group">
@@ -1469,9 +1510,27 @@
             }
         };
 
+        // Handle multi-resolution checkbox toggle
+        document.getElementById('multi_resolution').onchange = function() {
+            const resolutionOptions = document.getElementById('resolution-options');
+            resolutionOptions.style.display = this.checked ? 'block' : 'none';
+        };
+
         // Submit custom dataset form
         document.getElementById('dataset-form').onsubmit = async (e) => {
             e.preventDefault();
+
+            // Get selected resolutions
+            const multiResolution = document.getElementById('multi_resolution').checked;
+            let resolutionSizes = null;
+            if (multiResolution) {
+                const checkedBoxes = document.querySelectorAll('.resolution-checkbox:checked');
+                resolutionSizes = Array.from(checkedBoxes).map(cb => cb.value);
+                // If no checkboxes selected, null means "all sizes"
+                if (resolutionSizes.length === 0) {
+                    resolutionSizes = null;
+                }
+            }
 
             const formData = {
                 source_dataset: document.getElementById('source_dataset').value,
@@ -1483,7 +1542,9 @@
                 max_samples: document.getElementById('max_samples').value || null,
                 hf_username: document.getElementById('hf_username').value,
                 dataset_name: document.getElementById('dataset_name').value,
-                private_dataset: document.getElementById('private_dataset').checked
+                private_dataset: document.getElementById('private_dataset').checked,
+                multi_resolution: multiResolution,
+                resolution_sizes: resolutionSizes
             };
 
             try {
