@@ -702,29 +702,9 @@
                 </div>
 
                 <div class="form-section">
-                    <h3>Multi-Resolution Images (DeepSeek OCR)</h3>
+                    <h3>Image Generation</h3>
                     <div class="info-box">
-                        <strong>ℹ️ DeepSeek OCR Training:</strong> Generate images at multiple resolutions for comprehensive model training.
-                    </div>
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="multi_resolution" name="multi_resolution">
-                            Enable multi-resolution image generation
-                        </label>
-                    </div>
-                    <div id="resolution-options" class="multi-resolution-options" hidden>
-                        <label class="resolution-options-label">Select Resolutions:</label>
-                        <div class="resolution-grid">
-                            {% for name, size in resolution_options or [] %}
-                            <label class="resolution-option">
-                                <input type="checkbox" class="resolution-checkbox" value="{{ name }}" checked>
-                                <span>{{ name.title() }} ({{ size[0] }}×{{ size[1] }})</span>
-                            </label>
-                            {% endfor %}
-                        </div>
-                        <small class="multi-resolution-help help-text">
-                            Select one or more resolutions. All sizes will be generated if none selected.
-                        </small>
+                        <strong>ℹ️ Storage Optimization:</strong> Generates original high-quality images only. Resizing and augmentation applied during training via transform pipeline for maximum flexibility.
                     </div>
                 </div>
 
