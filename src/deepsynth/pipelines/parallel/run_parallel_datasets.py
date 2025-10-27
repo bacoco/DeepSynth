@@ -6,8 +6,6 @@ Script de lancement pour le traitement parallèle des datasets
 import os
 import sys
 
-from deepsynth.data.transforms.text_to_image import DEEPSEEK_OCR_RESOLUTIONS
-
 from .parallel_datasets_builder import ParallelDatasetsPipeline
 
 def run_parallel_datasets_cli():
@@ -41,17 +39,6 @@ def run_parallel_datasets_cli():
     
     print(f"✅ Utilisation de {max_workers} processus parallèles")
 
-    # Multi-resolution: Always enabled with all sizes
-    print("\n🔍 MULTI-RÉSOLUTION (DeepSeek OCR)")
-    print("-" * 30)
-    print("✅ Multi-résolution activée: TOUTES les résolutions seront générées")
-    sizes_list = list(DEEPSEEK_OCR_RESOLUTIONS.items())
-    for idx, (name, size) in enumerate(sizes_list, start=1):
-        print(f"  {idx}. {name:<6} ({size[0]}×{size[1]})")
-
-    multi_resolution = True
-    resolution_sizes = None  # All sizes
-
     # Options de traitement
     print("\n📋 OPTIONS DE TRAITEMENT")
     print("-" * 30)
@@ -63,9 +50,7 @@ def run_parallel_datasets_cli():
 
     # Créer le pipeline
     pipeline = ParallelDatasetsPipeline(
-        max_workers=max_workers,
-        multi_resolution=multi_resolution,
-        resolution_sizes=resolution_sizes
+        max_workers=max_workers
     )
     
     print(f"\n📊 DATASETS DISPONIBLES ({len(pipeline.datasets_config)} au total)")

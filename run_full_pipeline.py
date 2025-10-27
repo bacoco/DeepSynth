@@ -3,15 +3,14 @@
 Script de production pour traiter TOUS les datasets en parallèle
 Crée les 7 datasets séparés sur HuggingFace
 
-Supports multi-resolution image generation for DeepSeek OCR training.
+Stores original high-quality images only. Resizing to target resolution is done
+via transform pipeline during training for maximum flexibility.
 """
 import os
 import sys
 import argparse
 from pathlib import Path
 from dotenv import load_dotenv
-
-from deepsynth.data.transforms.text_to_image import DEEPSEEK_OCR_RESOLUTIONS
 
 # Charger .env
 env_path = Path(__file__).parent / '.env'
@@ -20,18 +19,7 @@ load_dotenv(env_path)
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Process all datasets with multi-resolution image generation (always enabled)"
-    )
-    parser.add_argument(
-        '--single-resolution',
-        action='store_true',
-        help='Generate ONLY single resolution images (disables multi-resolution)'
-    )
-    parser.add_argument(
-        '--resolution-sizes',
-        nargs='+',
-        choices=list(DEEPSEEK_OCR_RESOLUTIONS.keys()),
-        help='Specific resolution sizes to generate (default: all)'
+        description="Process all datasets - generates original images only (resize via pipeline during training)"
     )
     parser.add_argument(
         '--max-workers',
@@ -67,23 +55,8 @@ def main():
     print("🔄 Reprise automatique si dataset existant détecté")
     print("📤 Upload automatique tous les 5000 échantillons")
 
-    # Multi-resolution info (always enabled unless --single-resolution flag)
-    multi_resolution = not args.single_resolution
-
-    if multi_resolution:
-        if args.resolution_sizes:
-            sizes_str = ', '.join(args.resolution_sizes)
-            print(f"🔍 Multi-résolution activée: {sizes_str}")
-        else:
-            all_sizes = "/".join(DEEPSEEK_OCR_RESOLUTIONS.keys())
-            print(f"🔍 Multi-résolution activée: toutes les tailles ({all_sizes})")
-    else:
-        print("📸 Mode résolution unique (image standard)")
-
     pipeline = ParallelDatasetsPipeline(
-        max_workers=args.max_workers,
-        multi_resolution=multi_resolution,
-        resolution_sizes=args.resolution_sizes
+        max_workers=args.max_workers
     )
 
     # Afficher les datasets à traiter
