@@ -731,6 +731,59 @@ def _register_routes(
             logger.exception("Failed to start benchmark")
             return jsonify({"error": str(e)}), 500
 
+    @app.route("/api/inference/instruct", methods=["POST"])
+    def inference_instruct():
+        """Run instruction-based inference (Q&A, custom instructions)."""
+
+        try:
+            data = request.get_json()
+
+            # Validate required fields
+            if not data.get("document"):
+                return jsonify({"error": "document field is required"}), 400
+            if not data.get("instruction"):
+                return jsonify({"error": "instruction field is required"}), 400
+
+            document = data["document"]
+            instruction = data["instruction"]
+            model_path = data.get("model_path", "./models/deepsynth-qa")
+
+            # Generation parameters
+            max_length = data.get("max_length", 256)
+            temperature = data.get("temperature", 0.7)
+            top_p = data.get("top_p", 0.9)
+            num_beams = data.get("num_beams", 4)
+
+            # Load inference engine (lazy load, could be cached)
+            from deepsynth.inference.instruction_engine import InstructionEngine, GenerationParams
+
+            logger.info(f"Loading instruction engine from: {model_path}")
+            engine = InstructionEngine(model_path=model_path)
+
+            # Create generation params
+            params = GenerationParams(
+                max_length=max_length,
+                temperature=temperature,
+                top_p=top_p,
+                num_beams=num_beams,
+            )
+
+            # Generate answer
+            logger.info(f"Generating answer for instruction: {instruction[:50]}...")
+            result = engine.generate(document, instruction, params)
+
+            return jsonify({
+                "answer": result.answer,
+                "tokens_generated": result.tokens_generated,
+                "inference_time_ms": round(result.inference_time_ms, 2),
+                "confidence": result.confidence,
+                "metadata": result.metadata,
+            })
+
+        except Exception as e:
+            logger.exception("Inference failed")
+            return jsonify({"error": str(e)}), 500
+
 
 def _run_dataset_generation(
     generator: IncrementalDatasetGenerator,

@@ -18,7 +18,7 @@ from tqdm import tqdm
 from .config import TrainerConfig
 from .lora_config import LoRAConfig, QLoRAConfig
 from .moe_dropout import ExpertGradientDropout, GateGradientDropout
-from ..models.text_encoders import ProjectionLayer, create_text_encoder
+from .text_encoder import TextEncoderModule
 
 try:
     from transformers import AutoModel, AutoTokenizer, BitsAndBytesConfig
@@ -122,12 +122,10 @@ class DeepSynthLoRATrainer:
 
         # Setup optimizer
         trainable_params = [p for p in self.model.parameters() if p.requires_grad]
-        if self.text_encoder is not None:
-            trainable_params.extend(
-                [p for p in self.text_encoder.model.parameters() if p.requires_grad]
-            )
-        if self.text_projection is not None:
-            trainable_params.extend(self.text_projection.parameters())
+        if self.text_encoder is not None and self.config.text_encoder_trainable:
+            text_encoder_params = [p for p in self.text_encoder.parameters() if p.requires_grad]
+            trainable_params.extend(text_encoder_params)
+            LOGGER.info(f"Added {len(text_encoder_params)} text encoder parameters to optimizer")
 
         self.optimizer = torch.optim.AdamW(
             trainable_params,
@@ -185,38 +183,30 @@ class DeepSynthLoRATrainer:
 
     def _setup_text_encoder(self):
         """Setup optional text encoder for instruction/query encoding."""
-        LOGGER.info(f"Setting up text encoder: {self.config.text_encoder_type}")
-
-        self.text_encoder = create_text_encoder(
-            encoder_type=self.config.text_encoder_type,
-            model_name=self.config.text_encoder_model,
-            device=self.device,
-            torch_dtype=torch.bfloat16 if self.config.mixed_precision == "bf16" else torch.float16,
-        )
-
-        if self.text_encoder is None:
+        if not self.config.text_encoder_model:
+            LOGGER.warning("text_encoder_model not specified, skipping text encoder setup")
             return
 
-        # Set trainable status
-        self.text_encoder.requires_grad_(self.config.text_encoder_trainable)
-        LOGGER.info(f"Text encoder trainable: {self.config.text_encoder_trainable}")
+        LOGGER.info("=" * 80)
+        LOGGER.info("Setting up Text Encoder for Instruction Prompting")
+        LOGGER.info("=" * 80)
 
-        # Setup projection layer if needed
-        if self.config.use_text_projection:
-            text_hidden_size = self.text_encoder.get_hidden_size()
-            # Assume vision encoder outputs 4096-dim embeddings (DeepSeek-OCR standard)
-            vision_hidden_size = 4096
+        dtype = torch.bfloat16 if self.config.mixed_precision == "bf16" else torch.float16
 
-            if text_hidden_size != vision_hidden_size:
-                LOGGER.info(
-                    f"Adding projection layer: {text_hidden_size} → {vision_hidden_size}"
-                )
-                self.text_projection = ProjectionLayer(
-                    input_dim=text_hidden_size,
-                    output_dim=vision_hidden_size,
-                ).to(self.device)
-            else:
-                LOGGER.info("Text and vision dimensions match, no projection needed")
+        self.text_encoder = TextEncoderModule(
+            model_name=self.config.text_encoder_model,
+            trainable=self.config.text_encoder_trainable,
+            dtype=dtype,
+            device=self.device,
+        )
+
+        LOGGER.info("✅ Text encoder initialized successfully")
+        LOGGER.info("  Model: %s", self.config.text_encoder_model)
+        LOGGER.info("  Trainable: %s", self.config.text_encoder_trainable)
+        LOGGER.info("  Output dim: 4096 (matches vision encoder)")
+
+        # No projection needed since Qwen outputs 4096-dim natively
+        self.text_projection = None
 
     def _log_parameters(self):
         """Log model parameters."""
@@ -307,11 +297,11 @@ class DeepSynthLoRATrainer:
         # Encode text if text encoder is enabled
         text_embeddings = None
         if self.text_encoder is not None and instructions:
-            text_embeddings = self.text_encoder.encode(instructions)
-
-            # Apply projection if needed
-            if self.text_projection is not None:
-                text_embeddings = self.text_projection(text_embeddings)
+            text_embeddings = self.text_encoder.encode(
+                instructions,
+                max_length=128,  # Instructions are typically short
+            )
+            # text_embeddings shape: (batch_size, 4096) - matches vision encoder
 
         return images, text_embeddings, summaries
 

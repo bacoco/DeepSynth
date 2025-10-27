@@ -1,0 +1,323 @@
+<!--
+  Instruction Prompting Tab for DeepSynth Web UI
+
+  INSTALLATION INSTRUCTIONS:
+  1. Add tab button after line 554 in index_improved.html:
+     <button class="tab-btn" onclick="switchTab('instruct')">💬 Q&A / Instructions</button>
+
+  2. Add this tab content after the "jobs" tab content (around line 800+)
+
+  3. Add the JavaScript code at the bottom of the file (before </script>)
+-->
+
+<!-- ============================================================================ -->
+<!--                    INSTRUCTION PROMPTING TAB CONTENT                         -->
+<!-- ============================================================================ -->
+
+<div id="instruct-tab" class="tab-content">
+    <h2>💬 Instruction Prompting (Q&A, Custom Instructions)</h2>
+
+    <div class="info-box">
+        <strong>✨ What's New:</strong> Ask questions about documents, create custom summaries, or extract specific information!
+    </div>
+
+    <form id="instruct-form">
+        <!-- Document Input Section -->
+        <div class="form-section">
+            <h3>📄 Document Input</h3>
+
+            <div class="form-group">
+                <label for="instruct_document">Document Text</label>
+                <textarea id="instruct_document" name="document" rows="10"
+                          placeholder="Paste your document here...&#10;&#10;Example:&#10;Artificial intelligence has transformed healthcare by improving diagnostic accuracy and enabling personalized treatment recommendations..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="instruct_document_file">Or Upload Document</label>
+                <input type="file" id="instruct_document_file" accept=".txt,.pdf,.docx">
+                <small style="color: #6c757d;">Supported formats: TXT, PDF, DOCX</small>
+            </div>
+        </div>
+
+        <!-- Instruction/Question Section -->
+        <div class="form-section">
+            <h3>❓ Instruction or Question</h3>
+
+            <div class="form-group">
+                <label for="instruct_template">Quick Templates</label>
+                <select id="instruct_template" onchange="applyInstructionTemplate()">
+                    <option value="">-- Select a template --</option>
+                    <option value="summarize">Summarize this document</option>
+                    <option value="key_points">What are the key points?</option>
+                    <option value="main_findings">What are the main findings?</option>
+                    <option value="extract_facts">Extract important facts and figures</option>
+                    <option value="financial">Summarize financial aspects only</option>
+                    <option value="action_items">List all action items</option>
+                    <option value="timeline">Create a timeline of events</option>
+                    <option value="pros_cons">What are the pros and cons?</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="instruct_instruction">Custom Instruction</label>
+                <input type="text" id="instruct_instruction" name="instruction"
+                       placeholder="What are the main benefits of AI in healthcare?"
+                       style="font-size: 1.1em; padding: 12px;">
+            </div>
+        </div>
+
+        <!-- Model Selection Section -->
+        <div class="form-section">
+            <h3>🤖 Model Configuration</h3>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="instruct_model_path">Model Path</label>
+                    <input type="text" id="instruct_model_path" name="model_path"
+                           value="./models/deepsynth-qa"
+                           placeholder="./models/deepsynth-qa">
+                    <small style="color: #6c757d;">Path to trained instruction-following model</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Generation Parameters Section (Collapsible) -->
+        <div class="form-section" style="background: #ffffff; border: 1px solid #dee2e6;">
+            <h3 style="cursor: pointer;" onclick="toggleAdvanced()">
+                ⚙️ Advanced Parameters
+                <span id="advanced-toggle" style="float: right; font-size: 0.8em;">▼ Show</span>
+            </h3>
+
+            <div id="advanced-params" style="display: none; margin-top: 15px;">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="instruct_max_length">Max Length</label>
+                        <input type="number" id="instruct_max_length" name="max_length"
+                               value="256" min="50" max="1024">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="instruct_temperature">Temperature</label>
+                        <input type="number" id="instruct_temperature" name="temperature"
+                               value="0.7" min="0.1" max="2.0" step="0.1">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="instruct_top_p">Top P</label>
+                        <input type="number" id="instruct_top_p" name="top_p"
+                               value="0.9" min="0.1" max="1.0" step="0.05">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="instruct_num_beams">Num Beams</label>
+                        <input type="number" id="instruct_num_beams" name="num_beams"
+                               value="4" min="1" max="10">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Generate Button -->
+        <button type="submit" class="btn-primary" style="width: 100%; padding: 18px; font-size: 1.2em;">
+            🚀 Generate Answer
+        </button>
+    </form>
+
+    <!-- Output Section -->
+    <div id="instruct-output" class="form-section" style="display: none; margin-top: 30px; background: #e7f5ff;">
+        <h3 style="color: #1971c2;">💡 Answer</h3>
+
+        <div id="instruct-answer" class="output-box" style="background: white; padding: 20px; border-radius: 8px; min-height: 100px; font-size: 1.1em; line-height: 1.6; white-space: pre-wrap;">
+            <!-- Answer will appear here -->
+        </div>
+
+        <div class="metrics" style="margin-top: 15px; padding: 15px; background: white; border-radius: 8px;">
+            <span><strong>Tokens:</strong> <span id="instruct-tokens">--</span></span>
+            <span style="margin-left: 30px;"><strong>Time:</strong> <span id="instruct-time">--</span>ms</span>
+        </div>
+
+        <!-- Copy Button -->
+        <button onclick="copyAnswer()" class="btn-secondary" style="margin-top: 15px;">
+            📋 Copy Answer
+        </button>
+    </div>
+
+    <!-- Error Display -->
+    <div id="instruct-error" class="alert alert-danger" style="display: none; margin-top: 20px;">
+        <!-- Error message will appear here -->
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="instruct-loading" class="loading" style="display: none; text-align: center; padding: 30px;">
+        <div class="spinner"></div>
+        <p style="margin-top: 15px; font-size: 1.1em;">Generating answer...</p>
+    </div>
+</div>
+
+<!-- ============================================================================ -->
+<!--                           JAVASCRIPT HANDLERS                                -->
+<!-- ============================================================================ -->
+
+<script>
+// Add this JavaScript code to your existing script section
+
+/**
+ * Apply instruction template to input field
+ */
+function applyInstructionTemplate() {
+    const template = document.getElementById('instruct_template').value;
+    const instructionInput = document.getElementById('instruct_instruction');
+
+    const templates = {
+        'summarize': 'Summarize this document',
+        'key_points': 'What are the key points?',
+        'main_findings': 'What are the main findings?',
+        'extract_facts': 'Extract all important facts and figures',
+        'financial': 'Summarize the financial aspects only',
+        'action_items': 'List all action items with their deadlines',
+        'timeline': 'Create a chronological timeline of events',
+        'pros_cons': 'What are the advantages and disadvantages discussed?',
+    };
+
+    if (template && templates[template]) {
+        instructionInput.value = templates[template];
+    }
+}
+
+/**
+ * Toggle advanced parameters visibility
+ */
+function toggleAdvanced() {
+    const advancedDiv = document.getElementById('advanced-params');
+    const toggleSpan = document.getElementById('advanced-toggle');
+
+    if (advancedDiv.style.display === 'none') {
+        advancedDiv.style.display = 'block';
+        toggleSpan.textContent = '▲ Hide';
+    } else {
+        advancedDiv.style.display = 'none';
+        toggleSpan.textContent = '▼ Show';
+    }
+}
+
+/**
+ * Copy answer to clipboard
+ */
+function copyAnswer() {
+    const answer = document.getElementById('instruct-answer').textContent;
+    navigator.clipboard.writeText(answer).then(() => {
+        alert('✓ Answer copied to clipboard!');
+    });
+}
+
+/**
+ * Handle instruction form submission
+ */
+document.getElementById('instruct-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    // Get form data
+    const document = document.getElementById('instruct_document').value.trim();
+    const instruction = document.getElementById('instruct_instruction').value.trim();
+    const modelPath = document.getElementById('instruct_model_path').value.trim();
+
+    // Validate
+    if (!document) {
+        showInstructError('Please provide a document');
+        return;
+    }
+    if (!instruction) {
+        showInstructError('Please provide an instruction or question');
+        return;
+    }
+
+    // Hide output/error, show loading
+    document.getElementById('instruct-output').style.display = 'none';
+    document.getElementById('instruct-error').style.display = 'none';
+    document.getElementById('instruct-loading').style.display = 'block';
+
+    try {
+        // Call API
+        const response = await fetch('/api/inference/instruct', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                document: document,
+                instruction: instruction,
+                model_path: modelPath,
+                max_length: parseInt(document.getElementById('instruct_max_length').value),
+                temperature: parseFloat(document.getElementById('instruct_temperature').value),
+                top_p: parseFloat(document.getElementById('instruct_top_p').value),
+                num_beams: parseInt(document.getElementById('instruct_num_beams').value),
+            }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            // Display answer
+            document.getElementById('instruct-answer').textContent = data.answer;
+            document.getElementById('instruct-tokens').textContent = data.tokens_generated;
+            document.getElementById('instruct-time').textContent = data.inference_time_ms.toFixed(2);
+
+            document.getElementById('instruct-output').style.display = 'block';
+        } else {
+            showInstructError(data.error || 'Unknown error occurred');
+        }
+    } catch (error) {
+        showInstructError('Failed to connect to server: ' + error.message);
+    } finally {
+        document.getElementById('instruct-loading').style.display = 'none';
+    }
+});
+
+/**
+ * Show error message
+ */
+function showInstructError(message) {
+    const errorDiv = document.getElementById('instruct-error');
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+}
+
+/**
+ * Handle document file upload
+ */
+document.getElementById('instruct_document_file').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        document.getElementById('instruct_document').value = event.target.result;
+        alert('✓ Document loaded: ' + file.name);
+    };
+    reader.readAsText(file);
+});
+
+// Note: Make sure to update the switchTab function to include 'instruct' case
+// Add this to your existing switchTab function:
+// case 'instruct':
+//     activateTab('instruct-tab');
+//     break;
+</script>
+
+<!--
+  INTEGRATION CHECKLIST:
+
+  ✅ 1. Add tab button to line 554 area
+  ✅ 2. Add tab content section (this HTML) after jobs tab
+  ✅ 3. Add JavaScript handlers to existing script section
+  ✅ 4. Update switchTab() function to handle 'instruct' case
+  ✅ 5. Test API endpoint with curl or Postman first
+  ✅ 6. Test UI end-to-end
+
+  DEPENDENCIES:
+  - REST API endpoint /api/inference/instruct (already implemented)
+  - InstructionEngine class (already implemented)
+  - Trained instruction-following model (user must train first)
+-->
