@@ -28,14 +28,20 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class ParallelDatasetsPipeline:
-    def __init__(self, max_workers=7):
+    def __init__(self, max_workers=7, multi_resolution=False, resolution_sizes=None):
         """
         Initialise le builder parallèle
 
         Args:
             max_workers: Nombre maximum de processus parallèles
+            multi_resolution: If True, generate multiple resolution images
+            resolution_sizes: List of resolution names to generate.
+                             Options: ['tiny', 'small', 'base', 'large', 'gundam']
+                             None means all sizes. Only used if multi_resolution=True.
         """
         self.max_workers = max_workers  # 7 = one per dataset for full parallelism
+        self.multi_resolution = multi_resolution
+        self.resolution_sizes = resolution_sizes
         # Get arXiv limit from environment
         try:
             arxiv_limit = int(os.getenv('ARXIV_IMAGE_SAMPLES', '50000'))
@@ -148,7 +154,17 @@ class ParallelDatasetsPipeline:
             # Créer le builder avec un work_dir unique pour ce dataset
             # auto_upload=True: Upload immediately when batch is ready
             work_dir = f"./work_separate_{dataset_config['output_name']}"
-            builder = OptimizedDatasetPipeline(work_dir=work_dir, auto_upload=True)
+
+            # Get multi-resolution settings from dataset_config (passed from run_parallel_processing)
+            multi_resolution = dataset_config.get('multi_resolution', False)
+            resolution_sizes = dataset_config.get('resolution_sizes', None)
+
+            builder = OptimizedDatasetPipeline(
+                work_dir=work_dir,
+                auto_upload=True,
+                multi_resolution=multi_resolution,
+                resolution_sizes=resolution_sizes
+            )
 
             # Traitement du dataset
             start_time = time.time()
@@ -245,7 +261,15 @@ class ParallelDatasetsPipeline:
                 if d['name'] in selected_datasets or d['output_name'] in selected_datasets
             ]
 
+        # Add multi-resolution settings to each dataset config
+        for dataset in datasets_to_process:
+            dataset['multi_resolution'] = self.multi_resolution
+            dataset['resolution_sizes'] = self.resolution_sizes
+
         logger.info(f"📋 Datasets à traiter: {len(datasets_to_process)}")
+        if self.multi_resolution:
+            sizes_str = ', '.join(self.resolution_sizes or ['tiny', 'small', 'base', 'large', 'gundam'])
+            logger.info(f"🔍 Multi-resolution enabled: {sizes_str}")
         for dataset in datasets_to_process:
             logger.info(f"  - {dataset['name']} (priorité {dataset['priority']})")
 
