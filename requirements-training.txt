@@ -5,3 +5,7 @@
 # GPU-optimized libraries (require CUDA and proper compiler)
 xformers>=0.0.22
 # flash-attn>=2.3.0  # Uncomment if you have CUDA dev tools
+
+# LoRA/PEFT fine-tuning
+peft>=0.11.1
+bitsandbytes==0.43.1  # 4-bit quantization for QLoRA (requires CUDA, pinned for compatibility)

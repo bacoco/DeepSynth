@@ -133,6 +133,81 @@ def _register_routes(
 
         return jsonify(progress)
 
+    @app.route("/api/jobs/<job_id>/pause", methods=["POST"])
+    def pause_job(job_id: str):
+        """Pause a running job."""
+
+        job = state_manager.get_job(job_id)
+        if not job:
+            return jsonify({"error": "Job not found"}), 404
+
+        if job.status != JobStatus.IN_PROGRESS.value:
+            return jsonify({"error": "Job is not running"}), 400
+
+        job.status = JobStatus.PAUSED.value
+        state_manager.update_job(job)
+
+        return jsonify({
+            "job_id": job_id,
+            "status": "paused",
+            "message": "Job paused successfully"
+        })
+
+    @app.route("/api/jobs/<job_id>/resume", methods=["POST"])
+    def resume_job(job_id: str):
+        """Resume a paused job."""
+
+        job = state_manager.get_job(job_id)
+        if not job:
+            return jsonify({"error": "Job not found"}), 404
+
+        if job.status != JobStatus.PAUSED.value:
+            return jsonify({"error": "Job is not paused"}), 400
+
+        job.status = JobStatus.IN_PROGRESS.value
+        state_manager.update_job(job)
+
+        # Restart the background thread based on job type
+        if job.job_type == "dataset_generation":
+            thread = Thread(
+                target=_run_dataset_generation,
+                args=(dataset_generator, state_manager, job_id),
+                daemon=True,
+            )
+            thread.start()
+        elif job.job_type == "model_training":
+            thread = Thread(
+                target=_run_model_training,
+                args=(model_trainer, state_manager, job_id),
+                daemon=True,
+            )
+            thread.start()
+
+        return jsonify({
+            "job_id": job_id,
+            "status": "in_progress",
+            "message": "Job resumed successfully"
+        })
+
+    @app.route("/api/jobs/<job_id>", methods=["DELETE"])
+    def delete_job(job_id: str):
+        """Delete a job and its associated data."""
+
+        job = state_manager.get_job(job_id)
+        if not job:
+            return jsonify({"error": "Job not found"}), 404
+
+        if job.status == JobStatus.IN_PROGRESS.value:
+            return jsonify({"error": "Cannot delete running job. Pause it first."}), 400
+
+        # Delete job files and metadata
+        state_manager.delete_job(job_id)
+
+        return jsonify({
+            "job_id": job_id,
+            "message": "Job deleted successfully"
+        })
+
     @app.route("/api/dataset/generate", methods=["POST"])
     def generate_dataset():
         """Start a dataset generation job."""
@@ -167,6 +242,8 @@ def _register_routes(
                 "hf_token": data.get("hf_token", os.environ.get("HF_TOKEN")),
                 "multi_resolution": data.get("multi_resolution", False),
                 "resolution_sizes": data.get("resolution_sizes", None),
+                # Instruction prompting for LoRA training
+                "instruction_prompt": data.get("instruction_prompt", ""),
             }
 
             job_id = state_manager.create_job("dataset_generation", config)
@@ -247,6 +324,96 @@ def _register_routes(
 
         return jsonify({"status": "ok"})
 
+    @app.route("/api/lora/presets", methods=["GET"])
+    def get_lora_presets():
+        """Return available LoRA preset configurations."""
+        from deepsynth.training.lora_config import LORA_PRESETS
+
+        presets = {}
+        for name, config in LORA_PRESETS.items():
+            presets[name] = config.to_dict()
+
+        return jsonify({"presets": presets})
+
+    @app.route("/api/lora/estimate", methods=["POST"])
+    def estimate_lora_resources():
+        """Estimate memory and training time for LoRA configuration."""
+        try:
+            data = request.json or {}
+
+            lora_rank = data.get("lora_rank", 16)
+            use_qlora = data.get("use_qlora", False)
+            qlora_bits = data.get("qlora_bits", 4)
+            use_text_encoder = data.get("use_text_encoder", False)
+            batch_size = data.get("batch_size", 8)
+
+            # Base memory estimation
+            base_memory = 16.0  # GB for full model
+
+            # LoRA reduction
+            if use_qlora:
+                if qlora_bits == 4:
+                    memory = base_memory * 0.25  # 75% reduction
+                elif qlora_bits == 8:
+                    memory = base_memory * 0.5  # 50% reduction
+                else:
+                    memory = base_memory
+            else:
+                memory = base_memory * 0.5  # Standard LoRA ~50% reduction
+
+            # Add text encoder overhead
+            if use_text_encoder:
+                memory += 4.0  # Additional 4GB for text encoder
+
+            # Adjust for batch size
+            memory += (batch_size - 8) * 0.5  # ~500MB per additional batch item
+
+            # Estimate trainable parameters
+            if lora_rank <= 8:
+                trainable_params_m = 2.0
+            elif lora_rank <= 16:
+                trainable_params_m = 4.0
+            elif lora_rank <= 32:
+                trainable_params_m = 8.0
+            else:
+                trainable_params_m = 16.0
+
+            if use_text_encoder:
+                trainable_params_m += 8.0  # Text encoder params
+
+            # GPU compatibility
+            gpu_fit = {
+                "T4 (16GB)": memory <= 16.0,
+                "RTX 3090 (24GB)": memory <= 24.0,
+                "A100 (40GB)": memory <= 40.0,
+                "A100 (80GB)": memory <= 80.0,
+            }
+
+            # Speed estimate (relative to full fine-tuning)
+            if use_qlora and qlora_bits == 4:
+                speed_multiplier = 1.0  # Same speed as full
+            elif use_qlora and qlora_bits == 8:
+                speed_multiplier = 1.2
+            else:
+                speed_multiplier = 1.5
+
+            return jsonify({
+                "estimated_vram_gb": round(memory, 1),
+                "trainable_params_millions": round(trainable_params_m, 1),
+                "gpu_fit": gpu_fit,
+                "speed_multiplier": round(speed_multiplier, 2),
+                "configuration": {
+                    "lora_rank": lora_rank,
+                    "use_qlora": use_qlora,
+                    "qlora_bits": qlora_bits if use_qlora else None,
+                    "use_text_encoder": use_text_encoder,
+                }
+            })
+
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Error estimating LoRA resources")
+            return jsonify({"error": str(exc)}), 500
+
     @app.route("/api/datasets/benchmarks", methods=["GET"])
     def list_benchmarks():
         """Return available benchmark datasets."""
@@ -258,6 +425,107 @@ def _register_routes(
         """Return available preset configurations."""
 
         return jsonify({"presets": PRESET_CONFIGS})
+
+    @app.route("/api/training/presets", methods=["GET"])
+    def list_training_presets():
+        """Return available training configuration presets."""
+
+        # Training presets with recommended hyperparameters
+        training_presets = {
+            "quick_test": {
+                "name": "Quick Test",
+                "description": "Fast training for testing (1 epoch, small batch)",
+                "batch_size": 4,
+                "num_epochs": 1,
+                "learning_rate": 3e-5,
+                "gradient_accumulation_steps": 2,
+                "warmup_steps": 100,
+                "save_steps": 1000,
+            },
+            "standard": {
+                "name": "Standard Training",
+                "description": "Balanced training (3 epochs, moderate batch)",
+                "batch_size": 8,
+                "num_epochs": 3,
+                "learning_rate": 2e-5,
+                "gradient_accumulation_steps": 4,
+                "warmup_steps": 500,
+                "save_steps": 1000,
+            },
+            "high_quality": {
+                "name": "High Quality",
+                "description": "Best results (5 epochs, careful tuning)",
+                "batch_size": 4,
+                "num_epochs": 5,
+                "learning_rate": 1e-5,
+                "gradient_accumulation_steps": 8,
+                "warmup_steps": 1000,
+                "save_steps": 500,
+            },
+            "memory_efficient": {
+                "name": "Memory Efficient",
+                "description": "Low VRAM (batch 2, grad accumulation 16)",
+                "batch_size": 2,
+                "num_epochs": 3,
+                "learning_rate": 2e-5,
+                "gradient_accumulation_steps": 16,
+                "warmup_steps": 500,
+                "save_steps": 1000,
+            },
+        }
+
+        return jsonify({"presets": training_presets})
+
+    @app.route("/api/datasets/generated", methods=["GET"])
+    def list_generated_datasets():
+        """List all generated deepsynth datasets (alias for /api/datasets/deepsynth)."""
+
+        # Reuse the existing deepsynth datasets endpoint
+        return list_deepsynth_datasets()
+
+    @app.route("/api/training/checkpoints", methods=["GET"])
+    def list_training_checkpoints():
+        """List available model checkpoints from completed training jobs."""
+
+        try:
+            # Get all completed training jobs
+            all_jobs = state_manager.list_jobs("model_training")
+            completed_jobs = [
+                job for job in all_jobs
+                if job.status == JobStatus.COMPLETED.value
+            ]
+
+            checkpoints = []
+            for job in completed_jobs:
+                if job.model_output_path:
+                    # Check if checkpoint directory exists
+                    checkpoint_path = Path(job.model_output_path)
+                    if checkpoint_path.exists():
+                        # List checkpoint subdirectories
+                        checkpoint_dirs = []
+                        for item in checkpoint_path.iterdir():
+                            if item.is_dir() and (item.name.startswith("checkpoint-") or item.name == "final"):
+                                checkpoint_dirs.append({
+                                    "name": item.name,
+                                    "path": str(item),
+                                    "size_mb": sum(f.stat().st_size for f in item.rglob("*") if f.is_file()) / (1024 * 1024)
+                                })
+
+                        if checkpoint_dirs:
+                            checkpoints.append({
+                                "job_id": job.job_id,
+                                "model_name": job.config.get("model_name", "unknown"),
+                                "output_path": job.model_output_path,
+                                "created_at": job.created_at,
+                                "checkpoints": checkpoint_dirs,
+                                "hf_model_repo": job.config.get("hf_model_repo"),
+                            })
+
+            return jsonify({"checkpoints": checkpoints})
+
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Failed to list checkpoints")
+            return jsonify({"error": str(exc)}), 500
 
     @app.route("/api/datasets/optimal_config", methods=["POST"])
     def optimal_config():

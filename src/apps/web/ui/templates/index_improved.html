@@ -656,6 +656,12 @@
                                    placeholder="e.g., highlights" required>
                         </div>
                     </div>
+                    <div class="form-group">
+                        <label for="instruction_prompt">Instruction Prompt (Optional) <span class="badge badge-new">NEW</span></label>
+                        <input type="text" id="instruction_prompt" name="instruction_prompt"
+                               placeholder="e.g., Summarize this text:">
+                        <small class="help-text">Text prepended to each document before image generation (useful for LoRA instruction training)</small>
+                    </div>
                 </div>
 
                 <div class="form-section">
@@ -874,6 +880,126 @@
                         <label for="evaluation_split">Evaluation Split (optional)</label>
                         <input type="text" id="evaluation_split" name="evaluation_split" placeholder="validation or test">
                         <small class="help-text">Leave empty to skip evaluation during training</small>
+                    </div>
+                </div>
+
+                <!-- LoRA Configuration -->
+                <button type="button" class="collapsible" onclick="toggleCollapsible(this)">
+                    🔧 LoRA/QLoRA Fine-Tuning <span class="badge badge-new">NEW</span>
+                </button>
+                <div class="collapsible-content">
+                    <div class="info-box">
+                        <strong>📚 LoRA (Low-Rank Adaptation):</strong><br>
+                        Parameter-efficient fine-tuning that trains only 2-16M parameters instead of 3B.<br>
+                        <strong>QLoRA:</strong> 4-bit/8-bit quantization for 75% memory savings (train on 8GB GPU!).<br>
+                        <strong>Text Encoder:</strong> Optional instruction/query encoding for better prompt following.
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="use_lora" name="use_lora" onchange="toggleLoRAOptions()">
+                            Enable LoRA Fine-Tuning
+                        </label>
+                        <small class="help-text">Use parameter-efficient training (recommended for faster training and lower memory)</small>
+                    </div>
+
+                    <div id="lora-options" style="display: none;">
+                        <!-- LoRA Presets -->
+                        <div class="form-group">
+                            <label for="lora_preset">LoRA Preset</label>
+                            <select id="lora_preset" name="lora_preset" onchange="applyLoRAPreset()">
+                                <option value="custom">Custom Configuration</option>
+                                <option value="minimal">Minimal (rank=4, alpha=8) - Fastest</option>
+                                <option value="standard" selected>Standard (rank=16, alpha=32) - Recommended</option>
+                                <option value="high_capacity">High Capacity (rank=64, alpha=128) - Best Quality</option>
+                                <option value="qlora_4bit">QLoRA 4-bit (rank=16) - 8GB GPU</option>
+                                <option value="qlora_8bit">QLoRA 8-bit (rank=16) - 12GB GPU</option>
+                            </select>
+                        </div>
+
+                        <!-- LoRA Parameters -->
+                        <div class="form-row-3">
+                            <div class="form-group">
+                                <label for="lora_rank">LoRA Rank (r)</label>
+                                <input type="number" id="lora_rank" name="lora_rank" value="16" min="4" max="128" onchange="updateLoRAEstimate()">
+                                <small class="help-text">Higher = better quality, more params</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="lora_alpha">LoRA Alpha (α)</label>
+                                <input type="number" id="lora_alpha" name="lora_alpha" value="32" min="8" max="256" onchange="updateLoRAEstimate()">
+                                <small class="help-text">Scaling factor (typically 2× rank)</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="lora_dropout">LoRA Dropout</label>
+                                <input type="number" id="lora_dropout" name="lora_dropout" value="0.05" min="0" max="0.5" step="0.05">
+                                <small class="help-text">Regularization strength</small>
+                            </div>
+                        </div>
+
+                        <!-- QLoRA Configuration -->
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="use_qlora" name="use_qlora" onchange="toggleQLoRAOptions(); updateLoRAEstimate();">
+                                Enable QLoRA (Quantization)
+                            </label>
+                            <small class="help-text">4-bit/8-bit quantization for 75% memory reduction</small>
+                        </div>
+
+                        <div id="qlora-options" style="display: none;">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="qlora_bits">Quantization Bits</label>
+                                    <select id="qlora_bits" name="qlora_bits" onchange="updateLoRAEstimate()">
+                                        <option value="4" selected>4-bit (Max Memory Savings)</option>
+                                        <option value="8">8-bit (Balanced)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="qlora_type">Quantization Type</label>
+                                    <select id="qlora_type" name="qlora_type">
+                                        <option value="nf4" selected>NormalFloat4 (Recommended)</option>
+                                        <option value="fp4">Float4</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Text Encoder Options -->
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="use_text_encoder" name="use_text_encoder" onchange="toggleTextEncoderOptions(); updateLoRAEstimate();">
+                                Enable Text Encoder (Optional)
+                            </label>
+                            <small class="help-text">Add instruction/query encoding for better prompt following</small>
+                        </div>
+
+                        <div id="text-encoder-options" style="display: none;">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="text_encoder_type">Text Encoder Type</label>
+                                    <select id="text_encoder_type" name="text_encoder_type">
+                                        <option value="qwen3" selected>Qwen3-Embedding-8B (Recommended)</option>
+                                        <option value="bert">BERT-Base (Lightweight)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>
+                                        <input type="checkbox" id="text_encoder_trainable" name="text_encoder_trainable" checked>
+                                        Trainable Text Encoder
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Resource Estimation -->
+                        <div id="lora-estimate" class="success-box" style="margin-top: 15px;">
+                            <strong>💾 Resource Estimation:</strong><br>
+                            <div id="lora-estimate-content">
+                                Estimated VRAM: <strong>8.0 GB</strong><br>
+                                Trainable Params: <strong>4.0M</strong><br>
+                                GPU Compatibility: <strong>✓ T4 (16GB)</strong>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -1359,6 +1485,110 @@
             }
         }
 
+        // LoRA Configuration Functions
+        function toggleLoRAOptions() {
+            const useLoRA = document.getElementById('use_lora').checked;
+            const loraOptions = document.getElementById('lora-options');
+            loraOptions.style.display = useLoRA ? 'block' : 'none';
+
+            if (useLoRA) {
+                updateLoRAEstimate();
+            }
+        }
+
+        function toggleQLoRAOptions() {
+            const useQLoRA = document.getElementById('use_qlora').checked;
+            const qloraOptions = document.getElementById('qlora-options');
+            qloraOptions.style.display = useQLoRA ? 'block' : 'none';
+        }
+
+        function toggleTextEncoderOptions() {
+            const useTextEncoder = document.getElementById('use_text_encoder').checked;
+            const textEncoderOptions = document.getElementById('text-encoder-options');
+            textEncoderOptions.style.display = useTextEncoder ? 'block' : 'none';
+        }
+
+        async function applyLoRAPreset() {
+            const presetName = document.getElementById('lora_preset').value;
+
+            if (presetName === 'custom') {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/lora/presets');
+                const data = await response.json();
+                const preset = data.presets[presetName];
+
+                if (preset) {
+                    // Apply preset values
+                    document.getElementById('lora_rank').value = preset.rank || 16;
+                    document.getElementById('lora_alpha').value = preset.alpha || 32;
+                    document.getElementById('lora_dropout').value = preset.dropout || 0.05;
+
+                    // Handle QLoRA presets
+                    if (preset.use_quantization) {
+                        document.getElementById('use_qlora').checked = true;
+                        toggleQLoRAOptions();
+                        document.getElementById('qlora_bits').value = preset.quantization_bits || 4;
+                        document.getElementById('qlora_type').value = preset.quantization_type || 'nf4';
+                    } else {
+                        document.getElementById('use_qlora').checked = false;
+                        toggleQLoRAOptions();
+                    }
+
+                    // Update estimate
+                    updateLoRAEstimate();
+
+                    showToast(`Applied ${presetName} preset`, 'success');
+                }
+            } catch (error) {
+                console.error('Failed to load LoRA presets:', error);
+                showToast('Failed to load preset', 'error');
+            }
+        }
+
+        async function updateLoRAEstimate() {
+            const loraRank = parseInt(document.getElementById('lora_rank').value);
+            const useQLoRA = document.getElementById('use_qlora').checked;
+            const qloraBits = parseInt(document.getElementById('qlora_bits').value);
+            const useTextEncoder = document.getElementById('use_text_encoder').checked;
+            const batchSize = parseInt(document.getElementById('batch_size').value);
+
+            try {
+                const response = await fetch('/api/lora/estimate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        lora_rank: loraRank,
+                        use_qlora: useQLoRA,
+                        qlora_bits: qloraBits,
+                        use_text_encoder: useTextEncoder,
+                        batch_size: batchSize,
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.estimated_vram_gb) {
+                    // Update estimate display
+                    let html = `Estimated VRAM: <strong>${data.estimated_vram_gb} GB</strong><br>`;
+                    html += `Trainable Params: <strong>${data.trainable_params_millions}M</strong><br>`;
+                    html += 'GPU Compatibility: ';
+
+                    const gpuChecks = [];
+                    for (const [gpu, fits] of Object.entries(data.gpu_fit)) {
+                        gpuChecks.push(fits ? `✓ ${gpu}` : `✗ ${gpu}`);
+                    }
+                    html += gpuChecks.join(', ');
+
+                    document.getElementById('lora-estimate-content').innerHTML = html;
+                }
+            } catch (error) {
+                console.error('Failed to estimate LoRA resources:', error);
+            }
+        }
+
         async function loadGeneratedDatasets(forceToast = false) {
             const select = document.getElementById('dataset_repo');
             if (!select) return;
@@ -1596,7 +1826,8 @@
                 max_samples: document.getElementById('max_samples').value || null,
                 hf_username: document.getElementById('hf_username').value,
                 dataset_name: document.getElementById('dataset_name').value,
-                private_dataset: document.getElementById('private_dataset').checked
+                private_dataset: document.getElementById('private_dataset').checked,
+                instruction_prompt: document.getElementById('instruction_prompt').value || ""
             };
 
             try {
@@ -1679,6 +1910,20 @@
                 expert_dropout_min_keep: parseInt(document.getElementById('expert_dropout_min_keep').value),
                 gate_dropout_rate: parseFloat(document.getElementById('gate_dropout_rate').value),
                 bidrop_passes: parseInt(document.getElementById('bidrop_passes').value),
+
+                // LoRA/PEFT parameters
+                use_lora: document.getElementById('use_lora').checked,
+                lora_rank: parseInt(document.getElementById('lora_rank').value),
+                lora_alpha: parseInt(document.getElementById('lora_alpha').value),
+                lora_dropout: parseFloat(document.getElementById('lora_dropout').value),
+                use_qlora: document.getElementById('use_qlora').checked,
+                qlora_bits: parseInt(document.getElementById('qlora_bits').value),
+                qlora_type: document.getElementById('qlora_type').value,
+
+                // Text Encoder parameters
+                use_text_encoder: document.getElementById('use_text_encoder').checked,
+                text_encoder_type: document.getElementById('text_encoder_type').value,
+                text_encoder_trainable: document.getElementById('text_encoder_trainable').checked,
 
                 // Image Augmentation parameters
                 rotation_degrees: parseFloat(document.getElementById('rotation_degrees').value),

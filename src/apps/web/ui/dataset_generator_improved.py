@@ -105,6 +105,15 @@ class IncrementalDatasetGenerator:
                     output_dir = Path(config['output_dir'])
                     output_dir.mkdir(parents=True, exist_ok=True)
 
+                    # Apply instruction prompting if configured
+                    instruction_prompt = config.get('instruction_prompt', '')
+                    if instruction_prompt:
+                        # Prepend instruction to text for image generation
+                        display_text = f"{instruction_prompt}\n\n{text_content}"
+                        logger.debug(f"Applied instruction prompt: {instruction_prompt[:50]}...")
+                    else:
+                        display_text = text_content
+
                     # Check if multi-resolution is enabled
                     multi_resolution = config.get('multi_resolution', False)
                     resolution_sizes = config.get('resolution_sizes', None)
@@ -124,17 +133,19 @@ class IncrementalDatasetGenerator:
                         }
 
                         multi_res_images = self.converter.convert_multi_resolution(
-                            text_content,
+                            display_text,
                             sizes=sizes_dict
                         )
 
                         # Create processed sample with multi-resolution images
                         base_image = multi_res_images.get('original')
                         if base_image is None:
-                            base_image = self.converter.convert(text_content)
+                            base_image = self.converter.convert(display_text)
 
                         processed_sample = {
-                            'text': text_content,
+                            'text': text_content,  # Store original text
+                            'display_text': display_text,  # Store text with instruction
+                            'instruction_prompt': instruction_prompt,  # Store instruction separately
                             'summary': sample.get(summary_field, ''),
                             'image': base_image,
                             'source_index': idx
@@ -147,11 +158,13 @@ class IncrementalDatasetGenerator:
 
                     else:
                         # Single resolution mode
-                        image = self.converter.convert(text_content)
+                        image = self.converter.convert(display_text)
 
                         # Create processed sample
                         processed_sample = {
-                            'text': text_content,
+                            'text': text_content,  # Store original text
+                            'display_text': display_text,  # Store text with instruction
+                            'instruction_prompt': instruction_prompt,  # Store instruction separately
                             'summary': sample.get(summary_field, ''),
                             'image': image,
                             'source_index': idx

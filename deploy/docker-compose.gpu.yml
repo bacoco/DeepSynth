@@ -3,20 +3,20 @@ version: '3.8'
 services:
   deepsynth-trainer:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: deploy/Dockerfile
     container_name: deepsynth-trainer-gpu
     ports:
       - "5001:5000"
     volumes:
       # Mount state directory for persistence
-      - ./web_ui/state:/app/web_ui/state
+      - ../src/apps/web/ui/state:/app/web_ui/state
       # Mount output directories
-      - ./trained_model:/app/trained_model
-      - ./datasets:/app/datasets
-      - ./benchmarks:/app/benchmarks
+      - ../trained_model:/app/trained_model
+      - ../datasets:/app/datasets
+      - ../benchmarks:/app/benchmarks
       # Mount logs
-      - ./logs:/app/logs
+      - ../logs:/app/logs
     environment:
       # HuggingFace Configuration
       - HF_TOKEN=${HF_TOKEN}
@@ -28,12 +28,24 @@ services:
       - HOST=0.0.0.0
       - PORT=5000
 
+      # State directory configuration
+      - DEEPSYNTH_UI_STATE_DIR=/app/web_ui/state
+
       # CUDA Configuration for GPU training
       - CUDA_VISIBLE_DEVICES=0
       - TORCH_CUDA_ARCH_LIST=7.0;7.5;8.0;8.6;8.9;9.0
 
+      # bitsandbytes Configuration (for QLoRA 4-bit/8-bit quantization)
+      - BNB_CUDA_VERSION=121
+
       # Python Configuration
       - PYTHONUNBUFFERED=1
+
+      # LoRA/PEFT Training Options (can be overridden via UI)
+      # These are defaults - users can configure via web UI
+      - DEFAULT_USE_LORA=false
+      - DEFAULT_LORA_RANK=16
+      - DEFAULT_LORA_ALPHA=32
 
     deploy:
       resources:
@@ -45,7 +57,7 @@ services:
 
     restart: unless-stopped
 
-    command: python3 -m web_ui.app --mode=training
+    command: python3 -m apps.web
 
 networks:
   default:

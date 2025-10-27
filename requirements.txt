@@ -17,6 +17,8 @@ datasets>=2.14.0
 huggingface_hub>=0.20.3
 accelerate>=0.24.0
 xformers>=0.0.22  # GPU-only, will fail on macOS
+peft>=0.11.1  # LoRA/QLoRA fine-tuning
+bitsandbytes==0.43.1  # 4-bit quantization for QLoRA (pinned for CUDA compatibility)
 rouge-score>=0.1.2
 bert-score>=0.3.13
 nltk>=3.8
