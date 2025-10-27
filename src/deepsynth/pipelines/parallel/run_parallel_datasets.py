@@ -5,6 +5,9 @@ Script de lancement pour le traitement parallèle des datasets
 
 import os
 import sys
+
+from deepsynth.data.transforms.text_to_image import DEEPSEEK_OCR_RESOLUTIONS
+
 from .parallel_datasets_builder import ParallelDatasetsPipeline
 
 def run_parallel_datasets_cli():
@@ -48,21 +51,22 @@ def run_parallel_datasets_cli():
 
     if multi_resolution:
         print("\n📏 Résolutions disponibles (DeepSeek OCR):")
-        print("  1. tiny    (512×512)")
-        print("  2. small   (640×640)")
-        print("  3. base    (1024×1024)")
-        print("  4. large   (1280×1280)")
-        print("  5. gundam  (1600×1600)")
-        print("  6. Toutes les résolutions")
+        sizes_list = list(DEEPSEEK_OCR_RESOLUTIONS.items())
+        for idx, (name, size) in enumerate(sizes_list, start=1):
+            print(f"  {idx}. {name:<6} ({size[0]}×{size[1]})")
+        print(f"  {len(sizes_list) + 1}. Toutes les résolutions")
 
-        res_choice = input("\nSélectionnez les résolutions (ex: 1,3,5 ou 6 pour toutes): ").strip()
+        all_choice = len(sizes_list) + 1
+        res_choice = input(
+            f"\nSélectionnez les résolutions (ex: 1,3 ou {all_choice} pour toutes): "
+        ).strip()
 
-        if res_choice == "6":
+        if res_choice == str(all_choice):
             resolution_sizes = None  # All sizes
             print("✅ Toutes les résolutions seront générées")
         else:
             try:
-                res_map = {1: 'tiny', 2: 'small', 3: 'base', 4: 'large', 5: 'gundam'}
+                res_map = {index + 1: name for index, (name, _) in enumerate(sizes_list)}
                 res_indices = [int(x.strip()) for x in res_choice.split(",")]
                 resolution_sizes = [res_map[i] for i in res_indices if i in res_map]
 
