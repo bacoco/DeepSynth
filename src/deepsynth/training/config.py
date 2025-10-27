@@ -41,6 +41,18 @@ class TrainerConfig:
     gate_dropout_rate: float = 0.0
     gate_dropout_keywords: Tuple[str, ...] = ("gate", "router")
 
+    # Image transform parameters
+    target_resolution: str = "base"  # tiny/small/base/large/gundam
+    use_augmentation: bool = True  # Enable data augmentation for training
+    random_resize_min: Optional[int] = None  # Min size for random resize (None = base_size * 0.8)
+    random_resize_max: Optional[int] = None  # Max size for random resize (None = base_size * 1.2)
+    rotation_degrees: float = 3.0  # Max rotation angle (±degrees)
+    perspective_distortion: float = 0.1  # Perspective transform strength (0.0-0.5)
+    perspective_prob: float = 0.3  # Probability of perspective transform
+    color_jitter_brightness: float = 0.1  # Brightness variation (0.0-1.0)
+    color_jitter_contrast: float = 0.1  # Contrast variation (0.0-1.0)
+    horizontal_flip_prob: float = 0.3  # Probability of horizontal flip
+
     def to_dict(self) -> dict:
         """Return a serialisable representation used by the web UI."""
 
@@ -67,6 +79,17 @@ class TrainerConfig:
             "bidrop_passes": self.bidrop_passes,
             "gate_dropout_rate": self.gate_dropout_rate,
             "gate_dropout_keywords": list(self.gate_dropout_keywords),
+            # Image transform parameters
+            "target_resolution": self.target_resolution,
+            "use_augmentation": self.use_augmentation,
+            "random_resize_min": self.random_resize_min,
+            "random_resize_max": self.random_resize_max,
+            "rotation_degrees": self.rotation_degrees,
+            "perspective_distortion": self.perspective_distortion,
+            "perspective_prob": self.perspective_prob,
+            "color_jitter_brightness": self.color_jitter_brightness,
+            "color_jitter_contrast": self.color_jitter_contrast,
+            "horizontal_flip_prob": self.horizontal_flip_prob,
         }
 
 

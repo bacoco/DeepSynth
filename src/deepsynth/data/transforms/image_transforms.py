@@ -106,27 +106,56 @@ def create_training_transform(
     normalize: bool = True,
     normalization_mean: Optional[Tuple[float, float, float]] = None,
     normalization_std: Optional[Tuple[float, float, float]] = None,
-    to_tensor: bool = True
+    to_tensor: bool = True,
+    # Data augmentation parameters
+    use_augmentation: bool = True,
+    random_resize_range: Optional[Tuple[int, int]] = None,
+    rotation_degrees: float = 3.0,
+    perspective_distortion: float = 0.1,
+    perspective_prob: float = 0.3,
+    color_jitter_brightness: float = 0.1,
+    color_jitter_contrast: float = 0.1,
+    horizontal_flip_prob: float = 0.3,
 ) -> transforms.Compose:
-    """Create a standard training transform pipeline for DeepSeek-OCR.
+    """Create a training transform pipeline with data augmentation for DeepSeek-OCR.
 
-    This pipeline:
-    1. Resizes images to target resolution with padding
-    2. Converts to tensor (optional)
-    3. Normalizes pixel values (optional)
+    This pipeline supports both fixed resolution and random augmentation:
+    - Fixed mode: Resize to exact resolution (for evaluation/inference)
+    - Augmentation mode: Random resize, rotation, perspective, color jitter (for training)
 
     Args:
-        resolution: Target resolution (tiny/small/base/large/gundam)
+        resolution: Base resolution name (tiny/small/base/large/gundam)
         normalize: Whether to normalize pixel values
         normalization_mean: Custom mean values for normalization (default: ImageNet)
         normalization_std: Custom std values for normalization (default: ImageNet)
         to_tensor: Whether to convert to PyTorch tensor
+        use_augmentation: Enable random augmentation (recommended for training)
+        random_resize_range: (min_size, max_size) for random resize. None = use base resolution ±20%
+        rotation_degrees: Max rotation in degrees (±range). 0 = no rotation
+        perspective_distortion: Perspective transform strength (0.0-0.5). 0 = disabled
+        perspective_prob: Probability of applying perspective transform
+        color_jitter_brightness: Brightness variation (0.0-1.0). 0 = disabled
+        color_jitter_contrast: Contrast variation (0.0-1.0). 0 = disabled
+        horizontal_flip_prob: Probability of horizontal flip (0.0-1.0)
 
     Returns:
         Composed transform pipeline
 
-    Example:
-        >>> transform = create_training_transform(resolution="base")
+    Examples:
+        >>> # Training with augmentation (default)
+        >>> transform = create_training_transform(resolution="base", use_augmentation=True)
+
+        >>> # Evaluation without augmentation
+        >>> transform = create_training_transform(resolution="base", use_augmentation=False)
+
+        >>> # Custom augmentation parameters
+        >>> transform = create_training_transform(
+        ...     resolution="base",
+        ...     random_resize_range=(800, 1200),
+        ...     rotation_degrees=5.0,
+        ...     perspective_distortion=0.15
+        ... )
+
         >>> # Apply to HuggingFace dataset
         >>> def apply_transform(examples):
         ...     examples['pixel_values'] = [transform(img) for img in examples['image']]
@@ -139,9 +168,68 @@ def create_training_transform(
             "Install with `pip install torchvision`"
         )
 
-    transform_list = [
-        ResizeTransform(resolution, padding=True),
-    ]
+    transform_list = []
+
+    if use_augmentation:
+        # Random augmentation pipeline for training
+        base_size = DEEPSEEK_OCR_RESOLUTIONS[resolution]
+
+        # Determine random resize range
+        if random_resize_range is None:
+            # Default: ±20% of base resolution
+            min_size = int(base_size[0] * 0.8)
+            max_size = int(base_size[0] * 1.2)
+        else:
+            min_size, max_size = random_resize_range
+
+        # RandomResizedCrop with scale variation
+        transform_list.append(
+            transforms.RandomResizedCrop(
+                size=base_size,
+                scale=(min_size / base_size[0], max_size / base_size[0]),
+                ratio=(0.9, 1.1),  # Slight aspect ratio variation
+                interpolation=Image.Resampling.LANCZOS
+            )
+        )
+
+        # Random rotation
+        if rotation_degrees > 0:
+            transform_list.append(
+                transforms.RandomRotation(
+                    degrees=(-rotation_degrees, rotation_degrees),
+                    interpolation=Image.Resampling.BILINEAR,
+                    fill=255  # White fill for rotated areas
+                )
+            )
+
+        # Random perspective
+        if perspective_distortion > 0 and perspective_prob > 0:
+            transform_list.append(
+                transforms.RandomPerspective(
+                    distortion_scale=perspective_distortion,
+                    p=perspective_prob,
+                    interpolation=Image.Resampling.BILINEAR,
+                    fill=255
+                )
+            )
+
+        # Color jitter
+        if color_jitter_brightness > 0 or color_jitter_contrast > 0:
+            transform_list.append(
+                transforms.ColorJitter(
+                    brightness=color_jitter_brightness,
+                    contrast=color_jitter_contrast
+                )
+            )
+
+        # Random horizontal flip
+        if horizontal_flip_prob > 0:
+            transform_list.append(
+                transforms.RandomHorizontalFlip(p=horizontal_flip_prob)
+            )
+    else:
+        # Fixed resize for evaluation/inference
+        transform_list.append(ResizeTransform(resolution, padding=True))
 
     if to_tensor:
         transform_list.append(transforms.ToTensor())
@@ -158,8 +246,8 @@ def create_training_transform(
 def create_inference_transform(resolution: str = "base") -> transforms.Compose:
     """Create a minimal inference transform pipeline.
 
-    For inference, we typically don't need normalization (depends on model).
-    This just resizes and converts to tensor.
+    For inference, we don't use augmentation - just fixed resize.
+    This ensures consistent results.
 
     Args:
         resolution: Target resolution (tiny/small/base/large/gundam)
@@ -169,7 +257,8 @@ def create_inference_transform(resolution: str = "base") -> transforms.Compose:
     """
     return create_training_transform(
         resolution=resolution,
-        normalize=False,
+        use_augmentation=False,  # No random augmentation for inference
+        normalize=True,
         to_tensor=True
     )
 

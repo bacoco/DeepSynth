@@ -25,6 +25,7 @@ except Exception:  # pragma: no cover
     AutoTokenizer = None
     get_linear_schedule_with_warmup = None
 
+from deepsynth.data.transforms import create_training_transform, create_inference_transform
 from .config import TrainerConfig
 
 LOGGER = logging.getLogger(__name__)
@@ -80,6 +81,29 @@ class DeepSynthOCRTrainer:
         # Log trainable parameters
         self._log_trainable_params()
 
+        # Create image transform pipeline
+        random_resize_range = None
+        if config.random_resize_min is not None and config.random_resize_max is not None:
+            random_resize_range = (config.random_resize_min, config.random_resize_max)
+
+        self.image_transform = create_training_transform(
+            resolution=config.target_resolution,
+            use_augmentation=config.use_augmentation,
+            random_resize_range=random_resize_range,
+            rotation_degrees=config.rotation_degrees,
+            perspective_distortion=config.perspective_distortion,
+            perspective_prob=config.perspective_prob,
+            color_jitter_brightness=config.color_jitter_brightness,
+            color_jitter_contrast=config.color_jitter_contrast,
+            horizontal_flip_prob=config.horizontal_flip_prob,
+        )
+
+        LOGGER.info(
+            "Image transform pipeline configured: resolution=%s, augmentation=%s",
+            config.target_resolution,
+            "enabled" if config.use_augmentation else "disabled"
+        )
+
     def _freeze_encoder(self) -> None:
         """Freeze the encoder/vision components (DeepEncoder 380M params)."""
         frozen_count = 0
@@ -118,23 +142,30 @@ class DeepSynthOCRTrainer:
             100 * trainable / total if total > 0 else 0
         )
 
-    def _load_image(self, image_input):
+    def _load_image(self, image_input, apply_transform=True):
         """Load an image from either a file path or PIL Image object.
 
         Args:
             image_input: Either a string path or PIL.Image object
+            apply_transform: Whether to apply the transform pipeline (default: True)
 
         Returns:
-            PIL.Image object in RGB mode
+            Transformed tensor if apply_transform=True, else PIL.Image in RGB mode
         """
         if isinstance(image_input, str):
             # Load from file path
-            return Image.open(image_input).convert("RGB")
+            image = Image.open(image_input).convert("RGB")
         elif hasattr(image_input, 'convert'):
             # Already a PIL Image
-            return image_input.convert("RGB")
+            image = image_input.convert("RGB")
         else:
             raise ValueError(f"Unsupported image input type: {type(image_input)}")
+
+        # Apply transform pipeline (resize, augmentation, normalization, to_tensor)
+        if apply_transform and hasattr(self, 'image_transform'):
+            return self.image_transform(image)
+
+        return image
 
     def _encode_images(self, image_inputs: list) -> torch.Tensor:
         """Encode images through frozen DeepEncoder to get visual tokens.
