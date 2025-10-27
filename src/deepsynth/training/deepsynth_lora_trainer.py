@@ -384,14 +384,21 @@ class DeepSynthLoRATrainer:
                     labels = input_ids.clone()
                     labels[labels == self.tokenizer.pad_token_id] = -100
 
-                    # Forward pass with images (DeepSeek-OCR API)
-                    outputs = self.model(
-                        images=images,
-                        input_ids=input_ids,
-                        attention_mask=attention_mask,
-                        labels=labels,
-                        return_dict=True,
-                    )
+                    # Forward pass with images and optional text embeddings
+                    forward_kwargs = {
+                        "images": images,
+                        "input_ids": input_ids,
+                        "attention_mask": attention_mask,
+                        "labels": labels,
+                        "return_dict": True,
+                    }
+
+                    # Add text embeddings if available (instruction prompting)
+                    if text_embeddings is not None:
+                        forward_kwargs["text_embeddings"] = text_embeddings.to(self.device)
+                        LOGGER.debug(f"Using text embeddings: shape {text_embeddings.shape}")
+
+                    outputs = self.model(**forward_kwargs)
 
                     loss = outputs.loss if hasattr(outputs, "loss") else outputs[0]
 
