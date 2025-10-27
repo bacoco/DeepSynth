@@ -12,6 +12,10 @@
 #   6. deepsynth-de        (MLSUM Allemand ~220k)
 #   7. deepsynth-en-legal  (BillSum Legal ~22k)
 #
+# Chaque dataset contiendra 6 résolutions d'images par échantillon:
+#   - image (original), image_tiny (512x512), image_small (640x640),
+#   - image_base (1024x1024), image_large (1280x1280), image_gundam (1600x1600)
+#
 # Durée estimée: 6-12 heures
 # Espace disque requis: ~15GB temporaire
 #

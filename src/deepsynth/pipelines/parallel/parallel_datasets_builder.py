@@ -30,13 +30,13 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class ParallelDatasetsPipeline:
-    def __init__(self, max_workers=7, multi_resolution=False, resolution_sizes=None):
+    def __init__(self, max_workers=7, multi_resolution=True, resolution_sizes=None):
         """
         Initialise le builder parallèle
 
         Args:
             max_workers: Nombre maximum de processus parallèles
-            multi_resolution: If True, generate multiple resolution images
+            multi_resolution: If True, generate multiple resolution images (default: True)
             resolution_sizes: List of resolution names to generate.
                              Options: ['tiny', 'small', 'base', 'large', 'gundam']
                              None means all sizes. Only used if multi_resolution=True.

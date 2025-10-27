@@ -20,12 +20,12 @@ load_dotenv(env_path)
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Process all datasets with optional multi-resolution image generation"
+        description="Process all datasets with multi-resolution image generation (always enabled)"
     )
     parser.add_argument(
-        '--multi-resolution',
+        '--single-resolution',
         action='store_true',
-        help='Generate multiple resolution images (tiny/small/base/large/gundam)'
+        help='Generate ONLY single resolution images (disables multi-resolution)'
     )
     parser.add_argument(
         '--resolution-sizes',
@@ -67,8 +67,10 @@ def main():
     print("🔄 Reprise automatique si dataset existant détecté")
     print("📤 Upload automatique tous les 5000 échantillons")
 
-    # Multi-resolution info
-    if args.multi_resolution:
+    # Multi-resolution info (always enabled unless --single-resolution flag)
+    multi_resolution = not args.single_resolution
+
+    if multi_resolution:
         if args.resolution_sizes:
             sizes_str = ', '.join(args.resolution_sizes)
             print(f"🔍 Multi-résolution activée: {sizes_str}")
@@ -80,7 +82,7 @@ def main():
 
     pipeline = ParallelDatasetsPipeline(
         max_workers=args.max_workers,
-        multi_resolution=args.multi_resolution,
+        multi_resolution=multi_resolution,
         resolution_sizes=args.resolution_sizes
     )
 

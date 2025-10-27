@@ -41,43 +41,16 @@ def run_parallel_datasets_cli():
     
     print(f"✅ Utilisation de {max_workers} processus parallèles")
 
-    # Multi-resolution options
-    print("\n🔍 OPTIONS MULTI-RÉSOLUTION (DeepSeek OCR)")
+    # Multi-resolution: Always enabled with all sizes
+    print("\n🔍 MULTI-RÉSOLUTION (DeepSeek OCR)")
     print("-" * 30)
-    multi_res_choice = input("Générer plusieurs résolutions d'images? (o/N): ").strip().lower()
+    print("✅ Multi-résolution activée: TOUTES les résolutions seront générées")
+    sizes_list = list(DEEPSEEK_OCR_RESOLUTIONS.items())
+    for idx, (name, size) in enumerate(sizes_list, start=1):
+        print(f"  {idx}. {name:<6} ({size[0]}×{size[1]})")
 
-    multi_resolution = multi_res_choice in ['o', 'oui', 'y', 'yes']
-    resolution_sizes = None
-
-    if multi_resolution:
-        print("\n📏 Résolutions disponibles (DeepSeek OCR):")
-        sizes_list = list(DEEPSEEK_OCR_RESOLUTIONS.items())
-        for idx, (name, size) in enumerate(sizes_list, start=1):
-            print(f"  {idx}. {name:<6} ({size[0]}×{size[1]})")
-        print(f"  {len(sizes_list) + 1}. Toutes les résolutions")
-
-        all_choice = len(sizes_list) + 1
-        res_choice = input(
-            f"\nSélectionnez les résolutions (ex: 1,3 ou {all_choice} pour toutes): "
-        ).strip()
-
-        if res_choice == str(all_choice):
-            resolution_sizes = None  # All sizes
-            print("✅ Toutes les résolutions seront générées")
-        else:
-            try:
-                res_map = {index + 1: name for index, (name, _) in enumerate(sizes_list)}
-                res_indices = [int(x.strip()) for x in res_choice.split(",")]
-                resolution_sizes = [res_map[i] for i in res_indices if i in res_map]
-
-                if not resolution_sizes:
-                    print("⚠️ Aucune résolution valide sélectionnée, utilisation de toutes les résolutions")
-                    resolution_sizes = None
-                else:
-                    print(f"✅ Résolutions sélectionnées: {', '.join(resolution_sizes)}")
-            except ValueError:
-                print("⚠️ Format invalide, utilisation de toutes les résolutions")
-                resolution_sizes = None
+    multi_resolution = True
+    resolution_sizes = None  # All sizes
 
     # Options de traitement
     print("\n📋 OPTIONS DE TRAITEMENT")
