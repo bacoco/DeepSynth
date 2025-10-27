@@ -13,7 +13,6 @@ from multiprocessing import Manager
 import threading
 from datetime import datetime
 
-from deepsynth.data.transforms.text_to_image import DEEPSEEK_OCR_RESOLUTIONS
 from deepsynth.pipelines._dataset_processor import OptimizedDatasetPipeline
 
 __all__ = ["ParallelDatasetsPipeline"]
@@ -30,30 +29,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class ParallelDatasetsPipeline:
-    def __init__(self, max_workers=7, multi_resolution=True, resolution_sizes=None):
+    def __init__(self, max_workers=7):
         """
         Initialise le builder parallèle
 
         Args:
-            max_workers: Nombre maximum de processus parallèles
-            multi_resolution: If True, generate multiple resolution images (default: True)
-            resolution_sizes: List of resolution names to generate.
-                             Options: ['tiny', 'small', 'base', 'large', 'gundam']
-                             None means all sizes. Only used if multi_resolution=True.
+            max_workers: Nombre maximum de processus parallèles (default: 7, one per dataset)
         """
         self.max_workers = max_workers  # 7 = one per dataset for full parallelism
-        self.multi_resolution = multi_resolution
-        if self.multi_resolution:
-            if resolution_sizes:
-                filtered = []
-                for size in resolution_sizes:
-                    if size in DEEPSEEK_OCR_RESOLUTIONS and size not in filtered:
-                        filtered.append(size)
-                self.resolution_sizes = filtered or list(DEEPSEEK_OCR_RESOLUTIONS.keys())
-            else:
-                self.resolution_sizes = list(DEEPSEEK_OCR_RESOLUTIONS.keys())
-        else:
-            self.resolution_sizes = None
         # Get arXiv limit from environment
         try:
             arxiv_limit = int(os.getenv('ARXIV_IMAGE_SAMPLES', '50000'))
@@ -167,15 +150,9 @@ class ParallelDatasetsPipeline:
             # auto_upload=True: Upload immediately when batch is ready
             work_dir = f"./work_separate_{dataset_config['output_name']}"
 
-            # Get multi-resolution settings from dataset_config (passed from run_parallel_processing)
-            multi_resolution = dataset_config.get('multi_resolution', False)
-            resolution_sizes = dataset_config.get('resolution_sizes', None)
-
             builder = OptimizedDatasetPipeline(
                 work_dir=work_dir,
-                auto_upload=True,
-                multi_resolution=multi_resolution,
-                resolution_sizes=resolution_sizes
+                auto_upload=True
             )
 
             # Traitement du dataset
@@ -273,15 +250,7 @@ class ParallelDatasetsPipeline:
                 if d['name'] in selected_datasets or d['output_name'] in selected_datasets
             ]
 
-        # Add multi-resolution settings to each dataset config
-        for dataset in datasets_to_process:
-            dataset['multi_resolution'] = self.multi_resolution
-            dataset['resolution_sizes'] = self.resolution_sizes if self.multi_resolution else None
-
         logger.info(f"📋 Datasets à traiter: {len(datasets_to_process)}")
-        if self.multi_resolution:
-            sizes_str = ', '.join(self.resolution_sizes or [])
-            logger.info(f"🔍 Multi-resolution enabled: {sizes_str}")
         for dataset in datasets_to_process:
             logger.info(f"  - {dataset['name']} (priorité {dataset['priority']})")
 

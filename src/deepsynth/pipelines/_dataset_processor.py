@@ -16,7 +16,6 @@ from huggingface_hub import HfApi, login, whoami
 from deepsynth.config import load_shared_env
 from deepsynth.data.loaders import MLSUMLoader
 from deepsynth.data.transforms import TextToImageConverter
-from deepsynth.data.transforms.text_to_image import DEEPSEEK_OCR_RESOLUTIONS
 from deepsynth.data.hub import generate_dataset_card
 from deepsynth.pipelines.uploaders.incremental import EfficientIncrementalUploader
 
@@ -90,28 +89,22 @@ class OptimizedDatasetPipeline:
     - Téléchargement métadonnées seulement (pas d'images)
     - Un seul dataset (pas de splits train/test/validation)
     - Nettoyage automatique des fichiers locaux
-    - Support multi-résolution pour DeepSeek OCR (tiny/small/base/large/gundam)
+    - Stockage d'images originales uniquement (resize via pipeline pendant l'entraînement)
     """
 
     def __init__(
         self,
         work_dir="./work_separate",
         batch_size=5000,
-        auto_upload=True,
-        multi_resolution=True,
-        resolution_sizes=None
+        auto_upload=True
     ):
         """
         Initialize the pipeline.
 
         Args:
             work_dir: Working directory for temporary files
-            batch_size: Number of samples per batch
+            batch_size: Number of samples per batch (default: 5000)
             auto_upload: Whether to upload batches automatically
-            multi_resolution: If True, generate multiple resolution images (default: True)
-            resolution_sizes: List of resolution names to generate.
-                             Options: ['tiny', 'small', 'base', 'large', 'gundam']
-                             None means all sizes. Only used if multi_resolution=True.
         """
         self.work_dir = Path(work_dir)
         self.work_dir.mkdir(exist_ok=True)
@@ -123,31 +116,13 @@ class OptimizedDatasetPipeline:
         self.converter = OptimizedConverter()
         self.progress = self.load_progress()
 
-        # Reduce batch size for multi-resolution to avoid memory issues (6x images)
-        if multi_resolution:
-            self.batch_size = min(batch_size, 1000)  # Max 1000 samples = 6000 images
-            print(f"    ℹ️  Multi-resolution enabled: reduced batch size to {self.batch_size} (memory optimization)")
-        else:
-            self.batch_size = batch_size
-
+        self.batch_size = batch_size
         self.current_batch = []
         self.batch_counter = 0
 
         # Auto-upload: Upload immediately when batch is full
         self.auto_upload = auto_upload
         self.uploader = None  # Will be created with correct dataset_name in process_and_batch_dataset
-
-        # Multi-resolution settings
-        self.multi_resolution = multi_resolution
-        default_sizes = list(DEEPSEEK_OCR_RESOLUTIONS.keys())
-        if resolution_sizes:
-            filtered_sizes: List[str] = []
-            for size in resolution_sizes:
-                if size in DEEPSEEK_OCR_RESOLUTIONS and size not in filtered_sizes:
-                    filtered_sizes.append(size)
-            self.resolution_sizes = filtered_sizes or default_sizes
-        else:
-            self.resolution_sizes = default_sizes
 
     def load_progress(self):
         if self.progress_file.exists():
@@ -233,24 +208,14 @@ class OptimizedDatasetPipeline:
                 print(f"      ⚠️  Upload warning: {e} (will retry later)")
 
         self.batch_counter += 1
-
-        # Clear batch and force garbage collection to free memory
-        self.current_batch.clear()
         self.current_batch = []
-
-        # Force garbage collection for multi-resolution (6x images per sample)
-        import gc
-        gc.collect()
 
     def _ensure_uploader(self, repo_name):
         """Initialize uploader with correct dataset_name if not already done"""
         if self.auto_upload and self.uploader is None:
-            # For multi-resolution: upload every 5 batches (5×1000=5000 samples)
-            # For single-resolution: upload every batch (1×5000=5000 samples)
-            batches_per_upload = 5 if self.batch_size <= 1000 else 1
             self.uploader = EfficientIncrementalUploader(
                 work_dir=str(self.work_dir),
-                batches_per_upload=batches_per_upload,
+                batches_per_upload=1,  # Upload immediately when batch is full (5000 samples)
                 dataset_name=repo_name
             )
 
@@ -308,11 +273,6 @@ class OptimizedDatasetPipeline:
         self._ensure_uploader(repo_name)
 
         print(f"\n📥 Processing: {name} ({subset}) → {repo_name}")
-
-        # Log multi-resolution status
-        if self.multi_resolution:
-            sizes_str = ', '.join(self.resolution_sizes)
-            print(f"  🔍 Multi-resolution enabled: {sizes_str}")
 
         # Check what's already processed (metadata only, fast!)
         processed_keys = self.check_processed_indices(repo_name)
@@ -383,39 +343,19 @@ class OptimizedDatasetPipeline:
                         continue
 
                     try:
-                        # Base sample structure
+                        # Generate original image only
+                        # Resizing to target resolution will be done via transform pipeline during training
+                        image = self.converter.convert(text)
+
+                        # Create sample with all metadata
                         sample = {
                             'text': text,
                             'summary': summary,
+                            'image': image,  # Only original high-quality image
                             'source_dataset': name,
                             'original_split': split,  # Source split (for tracking only)
                             'original_index': idx
                         }
-
-                        # Generate images based on multi_resolution setting
-                        if self.multi_resolution:
-                            sizes_dict = {
-                                name: DEEPSEEK_OCR_RESOLUTIONS[name]
-                                for name in self.resolution_sizes
-                            }
-                            multi_res_images = self.converter.convert_multi_resolution(
-                                text, sizes=sizes_dict
-                            )
-
-                            # Add original image (keep for backward compatibility)
-                            base_image = multi_res_images.get('original')
-                            if base_image is None:
-                                base_image = self.converter.convert(text)
-                            sample['image'] = base_image
-
-                            # Add selected resolution images
-                            for size_name in self.resolution_sizes:
-                                image_key = f'image_{size_name}'
-                                if size_name in multi_res_images:
-                                    sample[image_key] = multi_res_images[size_name]
-                        else:
-                            # Single resolution mode (original behavior)
-                            sample['image'] = self.converter.convert(text)
 
                         # Add to current batch
                         self.current_batch.append(sample)
