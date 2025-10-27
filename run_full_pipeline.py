@@ -11,6 +11,8 @@ import argparse
 from pathlib import Path
 from dotenv import load_dotenv
 
+from deepsynth.data.transforms.text_to_image import DEEPSEEK_OCR_RESOLUTIONS
+
 # Charger .env
 env_path = Path(__file__).parent / '.env'
 load_dotenv(env_path)
@@ -28,7 +30,7 @@ def parse_args():
     parser.add_argument(
         '--resolution-sizes',
         nargs='+',
-        choices=['tiny', 'small', 'base', 'large', 'gundam'],
+        choices=list(DEEPSEEK_OCR_RESOLUTIONS.keys()),
         help='Specific resolution sizes to generate (default: all)'
     )
     parser.add_argument(
@@ -71,7 +73,8 @@ def main():
             sizes_str = ', '.join(args.resolution_sizes)
             print(f"🔍 Multi-résolution activée: {sizes_str}")
         else:
-            print("🔍 Multi-résolution activée: toutes les tailles (tiny/small/base/large/gundam)")
+            all_sizes = "/".join(DEEPSEEK_OCR_RESOLUTIONS.keys())
+            print(f"🔍 Multi-résolution activée: toutes les tailles ({all_sizes})")
     else:
         print("📸 Mode résolution unique (image standard)")
 

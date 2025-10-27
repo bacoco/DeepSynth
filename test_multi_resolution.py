@@ -2,17 +2,13 @@
 """
 Test script for multi-resolution image generation
 """
+import sitecustomize  # noqa: F401  # Ensure src/ is on sys.path for local execution
 import sys
-from pathlib import Path
 
-# Add the specific module directory to path to avoid importing torch dependencies
-transforms_dir = Path(__file__).parent / 'src' / 'deepsynth' / 'data' / 'transforms'
-sys.path.insert(0, str(transforms_dir))
-
-# Import directly from the text_to_image module
-from text_to_image import TextToImageConverter
-from PIL import Image
-
+from deepsynth.data.transforms.text_to_image import (
+    DEEPSEEK_OCR_RESOLUTIONS,
+    TextToImageConverter,
+)
 def test_multi_resolution():
     """Test multi-resolution image generation."""
     print("🧪 Testing Multi-Resolution Image Generation")
@@ -60,13 +56,11 @@ def test_multi_resolution():
         multi_images = converter.convert_multi_resolution(sample_text)
         print("✅ Multi-resolution images generated:")
 
-        expected_sizes = {
-            'tiny': (512, 512),
-            'small': (640, 640),
-            'base': (1024, 1024),
-            'large': (1280, 1280),
-            'gundam': (1600, 1600)
-        }
+        if 'original' not in multi_images:
+            print("   ❌ Missing original image in multi-resolution output")
+            return False
+
+        expected_sizes = DEEPSEEK_OCR_RESOLUTIONS
 
         all_correct = True
         for name, expected_size in expected_sizes.items():
@@ -104,11 +98,12 @@ def test_multi_resolution():
         }
         custom_images = converter.convert_multi_resolution(sample_text, sizes=custom_sizes)
 
-        if len(custom_images) != 2:
-            print(f"❌ Expected 2 images, got {len(custom_images)}")
+        expected_custom = {'original', *custom_sizes.keys()}
+        if set(custom_images.keys()) != expected_custom:
+            print(f"❌ Unexpected keys returned: {sorted(custom_images.keys())}")
             return False
 
-        for name in ['small', 'large']:
+        for name in custom_sizes.keys():
             if name not in custom_images:
                 print(f"❌ Missing custom resolution: {name}")
                 return False
@@ -134,6 +129,8 @@ def test_multi_resolution():
 
         # Check that resized images maintain proportions (with padding)
         for name, img in wide_multi.items():
+            if name == 'original':
+                continue
             # All target sizes are square, so aspect ratio should be 1.0
             aspect = img.width / img.height
             if abs(aspect - 1.0) > 0.01:

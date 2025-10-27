@@ -8,6 +8,7 @@ import os
 import json
 import pickle
 from pathlib import Path
+from typing import List
 
 from datasets import load_dataset
 from huggingface_hub import HfApi, login, whoami
@@ -15,6 +16,7 @@ from huggingface_hub import HfApi, login, whoami
 from deepsynth.config import load_shared_env
 from deepsynth.data.loaders import MLSUMLoader
 from deepsynth.data.transforms import TextToImageConverter
+from deepsynth.data.transforms.text_to_image import DEEPSEEK_OCR_RESOLUTIONS
 from deepsynth.pipelines.uploaders.incremental import EfficientIncrementalUploader
 
 __all__ = ["OptimizedDatasetPipeline", "run_optimized_pipeline"]
@@ -130,10 +132,15 @@ class OptimizedDatasetPipeline:
 
         # Multi-resolution settings
         self.multi_resolution = multi_resolution
-        if resolution_sizes is None:
-            self.resolution_sizes = ['tiny', 'small', 'base', 'large', 'gundam']
+        default_sizes = list(DEEPSEEK_OCR_RESOLUTIONS.keys())
+        if resolution_sizes:
+            filtered_sizes: List[str] = []
+            for size in resolution_sizes:
+                if size in DEEPSEEK_OCR_RESOLUTIONS and size not in filtered_sizes:
+                    filtered_sizes.append(size)
+            self.resolution_sizes = filtered_sizes or default_sizes
         else:
-            self.resolution_sizes = resolution_sizes
+            self.resolution_sizes = default_sizes
 
     def load_progress(self):
         if self.progress_file.exists():
@@ -331,16 +338,25 @@ class OptimizedDatasetPipeline:
 
                         # Generate images based on multi_resolution setting
                         if self.multi_resolution:
-                            # Generate multiple resolution images
-                            multi_res_images = self.converter.convert_multi_resolution(text)
+                            sizes_dict = {
+                                name: DEEPSEEK_OCR_RESOLUTIONS[name]
+                                for name in self.resolution_sizes
+                            }
+                            multi_res_images = self.converter.convert_multi_resolution(
+                                text, sizes=sizes_dict
+                            )
 
                             # Add original image (keep for backward compatibility)
-                            sample['image'] = self.converter.convert(text)
+                            base_image = multi_res_images.get('original')
+                            if base_image is None:
+                                base_image = self.converter.convert(text)
+                            sample['image'] = base_image
 
                             # Add selected resolution images
                             for size_name in self.resolution_sizes:
+                                image_key = f'image_{size_name}'
                                 if size_name in multi_res_images:
-                                    sample[f'image_{size_name}'] = multi_res_images[size_name]
+                                    sample[image_key] = multi_res_images[size_name]
                         else:
                             # Single resolution mode (original behavior)
                             sample['image'] = self.converter.convert(text)
