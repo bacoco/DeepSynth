@@ -2,9 +2,12 @@
 """
 Script de production pour traiter TOUS les datasets en parallèle
 Crée les 7 datasets séparés sur HuggingFace
+
+Supports multi-resolution image generation for DeepSeek OCR training.
 """
 import os
 import sys
+import argparse
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -12,7 +15,34 @@ from dotenv import load_dotenv
 env_path = Path(__file__).parent / '.env'
 load_dotenv(env_path)
 
+def parse_args():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Process all datasets with optional multi-resolution image generation"
+    )
+    parser.add_argument(
+        '--multi-resolution',
+        action='store_true',
+        help='Generate multiple resolution images (tiny/small/base/large/gundam)'
+    )
+    parser.add_argument(
+        '--resolution-sizes',
+        nargs='+',
+        choices=['tiny', 'small', 'base', 'large', 'gundam'],
+        help='Specific resolution sizes to generate (default: all)'
+    )
+    parser.add_argument(
+        '--max-workers',
+        type=int,
+        default=7,
+        help='Maximum number of parallel workers (default: 7)'
+    )
+    return parser.parse_args()
+
 def main():
+    # Parse arguments
+    args = parse_args()
+
     # Vérifier le token
     if not os.getenv('HF_TOKEN'):
         print("❌ HF_TOKEN non trouvé dans .env")
@@ -30,12 +60,26 @@ def main():
     # Configuration pour production COMPLÈTE
     print("\n📊 CONFIGURATION PRODUCTION")
     print("-" * 70)
-    print("⚙️  Nombre de workers: 7 (1 par dataset, parallélisme maximal)")
+    print(f"⚙️  Nombre de workers: {args.max_workers} (parallélisme)")
     print("📦 Mode: Production complète (tous les échantillons disponibles)")
     print("🔄 Reprise automatique si dataset existant détecté")
     print("📤 Upload automatique tous les 5000 échantillons")
 
-    pipeline = ParallelDatasetsPipeline(max_workers=7)
+    # Multi-resolution info
+    if args.multi_resolution:
+        if args.resolution_sizes:
+            sizes_str = ', '.join(args.resolution_sizes)
+            print(f"🔍 Multi-résolution activée: {sizes_str}")
+        else:
+            print("🔍 Multi-résolution activée: toutes les tailles (tiny/small/base/large/gundam)")
+    else:
+        print("📸 Mode résolution unique (image standard)")
+
+    pipeline = ParallelDatasetsPipeline(
+        max_workers=args.max_workers,
+        multi_resolution=args.multi_resolution,
+        resolution_sizes=args.resolution_sizes
+    )
 
     # Afficher les datasets à traiter
     print(f"\n📋 DATASETS À TRAITER ({len(pipeline.datasets_config)} au total)")

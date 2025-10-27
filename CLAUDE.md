@@ -53,6 +53,35 @@ python scripts/cli/run_parallel_processing.py  # Choose specific datasets, worke
 ./scripts/run_global_pipeline.sh    # Use generate_all_datasets.sh instead
 ```
 
+**Multi-Resolution Image Generation (DeepSeek OCR):**
+```bash
+# Generate datasets with multiple resolution images for comprehensive training
+# Command-line (non-interactive)
+python run_full_pipeline.py --multi-resolution
+# Generates all 5 resolutions: tiny (512×512), small (640×640), base (1024×1024), large (1280×1280), gundam (1600×1600)
+
+# Select specific resolutions
+python run_full_pipeline.py --multi-resolution --resolution-sizes tiny base gundam
+
+# Interactive CLI (prompts for resolution selection)
+python scripts/cli/run_parallel_processing.py
+# Follow prompts to enable multi-resolution and select sizes
+
+# Web UI
+# Navigate to Dataset Generation tab, enable "Multi-Resolution Images" checkbox
+```
+
+**Multi-Resolution Dataset Schema:**
+When multi-resolution is enabled, datasets include additional image columns:
+- `image`: Original full-size image (backward compatible)
+- `image_tiny`: 512×512 version
+- `image_small`: 640×640 version
+- `image_base`: 1024×1024 version
+- `image_large`: 1280×1280 version
+- `image_gundam`: 1600×1600 version
+
+All resized images preserve aspect ratio with proper padding.
+
 ### Training
 ```bash
 # DeepSeek-OCR training (freezes encoder, fine-tunes decoder)
@@ -92,7 +121,12 @@ python scripts/cli/run_benchmark.py --model ./model --benchmark xsum --max-sampl
 
 ### Web UI
 ```bash
-make web                            # Launch dataset generation UI
+make web                            # Launch dataset generation UI (http://localhost:5000)
+# Features:
+# - Dataset generation with multi-resolution support
+# - Model training configuration
+# - Job monitoring and progress tracking
+# - Multi-resolution image selection UI
 ```
 
 ### Docker Deployment
@@ -105,13 +139,16 @@ docker-compose -f deploy/docker-compose.gpu.yml up
 
 # Full stack (both services)
 ./deploy/start-all.sh
+
+# Note: Multi-resolution image generation is fully supported in Docker
+# All necessary fonts and dependencies (DejaVu Sans) are included in the images
 ```
 
 ## Architecture
 
 ### Core Pipeline Flow
 ```
-Text Document → TextToImageConverter (PNG 1600x2200px)
+Text Document → TextToImageConverter (PNG, configurable resolutions)
 → DeepEncoder (frozen, 380M params) → Visual Tokens (20x compression)
 → MoE Decoder (fine-tuned, 570M active params) → Summary
 ```
@@ -181,10 +218,17 @@ All processed datasets follow this structure:
 {
     'text': str,              # Original document
     'summary': str,           # Human-written summary
-    'image': PIL.Image,       # PNG-rendered text (1600x2200px max)
+    'image': PIL.Image,       # PNG-rendered text (original size, backward compatible)
     'source_dataset': str,    # Origin tracking (e.g., "mlsum_fr")
     'original_split': str,    # train/validation/test
-    'original_index': int     # For duplicate prevention
+    'original_index': int,    # For duplicate prevention
+
+    # Multi-resolution columns (optional, when multi_resolution=True):
+    'image_tiny': PIL.Image,   # 512×512 version
+    'image_small': PIL.Image,  # 640×640 version
+    'image_base': PIL.Image,   # 1024×1024 version
+    'image_large': PIL.Image,  # 1280×1280 version
+    'image_gundam': PIL.Image  # 1600×1600 version
 }
 ```
 

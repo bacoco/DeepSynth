@@ -87,9 +87,29 @@ class OptimizedDatasetPipeline:
     - Téléchargement métadonnées seulement (pas d'images)
     - Un seul dataset (pas de splits train/test/validation)
     - Nettoyage automatique des fichiers locaux
+    - Support multi-résolution pour DeepSeek OCR (tiny/small/base/large/gundam)
     """
 
-    def __init__(self, work_dir="./work_separate", batch_size=5000, auto_upload=True):
+    def __init__(
+        self,
+        work_dir="./work_separate",
+        batch_size=5000,
+        auto_upload=True,
+        multi_resolution=False,
+        resolution_sizes=None
+    ):
+        """
+        Initialize the pipeline.
+
+        Args:
+            work_dir: Working directory for temporary files
+            batch_size: Number of samples per batch
+            auto_upload: Whether to upload batches automatically
+            multi_resolution: If True, generate multiple resolution images
+            resolution_sizes: List of resolution names to generate.
+                             Options: ['tiny', 'small', 'base', 'large', 'gundam']
+                             None means all sizes. Only used if multi_resolution=True.
+        """
         self.work_dir = Path(work_dir)
         self.work_dir.mkdir(exist_ok=True)
 
@@ -107,6 +127,13 @@ class OptimizedDatasetPipeline:
         # Auto-upload: Upload immediately when batch is full
         self.auto_upload = auto_upload
         self.uploader = None  # Will be created with correct dataset_name in process_and_batch_dataset
+
+        # Multi-resolution settings
+        self.multi_resolution = multi_resolution
+        if resolution_sizes is None:
+            self.resolution_sizes = ['tiny', 'small', 'base', 'large', 'gundam']
+        else:
+            self.resolution_sizes = resolution_sizes
 
     def load_progress(self):
         if self.progress_file.exists():
@@ -223,6 +250,11 @@ class OptimizedDatasetPipeline:
 
         print(f"\n📥 Processing: {name} ({subset}) → {repo_name}")
 
+        # Log multi-resolution status
+        if self.multi_resolution:
+            sizes_str = ', '.join(self.resolution_sizes)
+            print(f"  🔍 Multi-resolution enabled: {sizes_str}")
+
         # Check what's already processed (metadata only, fast!)
         processed_keys = self.check_processed_indices(repo_name)
 
@@ -288,18 +320,33 @@ class OptimizedDatasetPipeline:
                         continue
 
                     try:
-                        image = self.converter.convert(text)
-
-                        # Add to current batch
-                        self.current_batch.append({
+                        # Base sample structure
+                        sample = {
                             'text': text,
                             'summary': summary,
-                            'image': image,
                             'source_dataset': name,
                             'original_split': split,  # Source split (for tracking only)
                             'original_index': idx
-                        })
+                        }
 
+                        # Generate images based on multi_resolution setting
+                        if self.multi_resolution:
+                            # Generate multiple resolution images
+                            multi_res_images = self.converter.convert_multi_resolution(text)
+
+                            # Add original image (keep for backward compatibility)
+                            sample['image'] = self.converter.convert(text)
+
+                            # Add selected resolution images
+                            for size_name in self.resolution_sizes:
+                                if size_name in multi_res_images:
+                                    sample[f'image_{size_name}'] = multi_res_images[size_name]
+                        else:
+                            # Single resolution mode (original behavior)
+                            sample['image'] = self.converter.convert(text)
+
+                        # Add to current batch
+                        self.current_batch.append(sample)
                         total_new += 1
 
                         # Save batch when full
