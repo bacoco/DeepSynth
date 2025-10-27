@@ -36,6 +36,7 @@ from .model_utils import (
     validate_vision_model,
 )
 from .moe_dropout import ExpertGradientDropout, GateGradientDropout
+from .text_encoder import TextEncoderModule
 from deepsynth.data.transforms import create_training_transform, create_inference_transform
 
 LOGGER = logging.getLogger(__name__)
@@ -166,11 +167,38 @@ class UnifiedProductionTrainer:
         # Print detailed parameter summary
         print_parameter_summary(self.model)
 
+        # Initialize text encoder if enabled (for instruction prompting)
+        self.text_encoder = None
+        if config.use_text_encoder:
+            if not config.text_encoder_model:
+                raise ValueError("use_text_encoder=True but text_encoder_model is not specified")
+
+            LOGGER.info("=" * 80)
+            LOGGER.info("Initializing Text Encoder for Instruction Prompting")
+            LOGGER.info("=" * 80)
+
+            self.text_encoder = TextEncoderModule(
+                model_name=config.text_encoder_model,
+                trainable=config.text_encoder_trainable,
+                dtype=dtype,
+                device=self.accelerator.device,
+            )
+
+            LOGGER.info("✅ Text encoder initialized successfully")
+            LOGGER.info("  Model: %s", config.text_encoder_model)
+            LOGGER.info("  Trainable: %s", config.text_encoder_trainable)
+            LOGGER.info("  Output dim: 4096 (matches vision encoder)")
+
         # Setup dropout strategies
         self._setup_dropout_strategies()
 
-        # Setup optimizer
+        # Setup optimizer (include text encoder params if trainable)
         trainable_params = [p for p in self.model.parameters() if p.requires_grad]
+        if self.text_encoder is not None and config.text_encoder_trainable:
+            text_encoder_params = [p for p in self.text_encoder.parameters() if p.requires_grad]
+            trainable_params.extend(text_encoder_params)
+            LOGGER.info("Added %d text encoder parameters to optimizer", len(text_encoder_params))
+
         if not trainable_params:
             raise RuntimeError("No trainable parameters found!")
 
@@ -234,13 +262,14 @@ class UnifiedProductionTrainer:
         Collate batch with proper image and text processing.
 
         Args:
-            batch: List of samples with 'image' and 'summary' fields
+            batch: List of samples with 'image', 'summary', and optional 'instruction' fields
 
         Returns:
-            Dictionary with 'images', 'input_ids', 'attention_mask', 'labels'
+            Dictionary with 'images', 'input_ids', 'attention_mask', 'labels', 'instructions'
         """
         images = []
         summaries = []
+        instructions = []
 
         for sample in batch:
             if 'image' not in sample or 'summary' not in sample:
@@ -248,6 +277,13 @@ class UnifiedProductionTrainer:
 
             images.append(sample['image'])
             summaries.append(sample['summary'])
+
+            # Collect instruction if present (for instruction prompting mode)
+            if 'instruction' in sample and sample['instruction']:
+                instructions.append(sample['instruction'])
+            else:
+                # Use default instruction if not provided
+                instructions.append(self.config.instruction_prompt)
 
         if not summaries:
             raise ValueError("Batch contains no valid samples")
@@ -274,6 +310,7 @@ class UnifiedProductionTrainer:
             "input_ids": tokens["input_ids"],
             "attention_mask": tokens["attention_mask"],
             "labels": labels,
+            "instructions": instructions if instructions else None,
         }
 
     def _forward_step(
@@ -283,8 +320,12 @@ class UnifiedProductionTrainer:
         """
         Forward pass with proper vision-to-text flow.
 
+        Optional instruction prompting:
+        - If text_encoder enabled: encodes instructions and passes to model
+        - Otherwise: standard vision-only forward pass
+
         Args:
-            batch: Dictionary with 'images', 'input_ids', 'attention_mask', 'labels'
+            batch: Dictionary with 'images', 'input_ids', 'attention_mask', 'labels', 'instructions'
 
         Returns:
             Loss value (float)
@@ -293,6 +334,7 @@ class UnifiedProductionTrainer:
         input_ids = batch["input_ids"]
         attention_mask = batch["attention_mask"]
         labels = batch["labels"]
+        instructions = batch.get("instructions", None)
 
         # Move to device
         if torch.is_tensor(images):
@@ -301,15 +343,31 @@ class UnifiedProductionTrainer:
         attention_mask = attention_mask.to(self.accelerator.device)
         labels = labels.to(self.accelerator.device)
 
+        # Encode instructions if text encoder is enabled
+        text_embeddings = None
+        if self.text_encoder is not None and instructions is not None:
+            # Encode instructions to 4096-dim embeddings
+            text_embeddings = self.text_encoder.encode(
+                instructions,
+                max_length=128,  # Instructions are typically short
+            )
+            # text_embeddings shape: (batch_size, 4096)
+
         # Forward pass with images (DeepSeek-OCR API)
-        # The model should support: model(images=..., input_ids=..., labels=..., return_dict=True)
-        outputs = self.model(
-            images=images,
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            labels=labels,
-            return_dict=True,
-        )
+        # Pass text_embeddings if available (for instruction prompting)
+        forward_kwargs = {
+            "images": images,
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "labels": labels,
+            "return_dict": True,
+        }
+
+        # Add text embeddings if available
+        if text_embeddings is not None:
+            forward_kwargs["text_embeddings"] = text_embeddings
+
+        outputs = self.model(**forward_kwargs)
 
         # Extract loss
         loss = outputs.loss if hasattr(outputs, "loss") else outputs[0]
