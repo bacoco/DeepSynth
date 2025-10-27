@@ -37,7 +37,8 @@ make clean                          # Remove __pycache__, *.pyc files
 **🚀 RECOMMENDED: Simple One-Command Workflow**
 ```bash
 # Generate ALL 7 datasets in parallel (1.29M+ samples across 7 languages)
-./generate_all_datasets.sh          # Interactive prompt, automatic resumption, 3 workers
+# ✅ Multi-resolution ALWAYS enabled by default (6 image formats per sample)
+./generate_all_datasets.sh          # Automatic resumption, 7 workers
 # This is the EASIEST way to generate all datasets. Just run it and wait 6-12 hours.
 
 # Alternative: Direct Python invocation (non-interactive)
@@ -55,20 +56,19 @@ python scripts/cli/run_parallel_processing.py  # Choose specific datasets, worke
 
 **Multi-Resolution Image Generation (DeepSeek OCR):**
 ```bash
-# Generate datasets with multiple resolution images for comprehensive training
-# Command-line (non-interactive)
-python run_full_pipeline.py --multi-resolution
-# Generates all 5 resolutions: tiny (512×512), small (640×640), base (1024×1024), large (1280×1280), gundam (1600×1600)
+# ✅ Multi-resolution is NOW ENABLED BY DEFAULT
+# All datasets automatically include 6 image formats per sample:
+#   - image (original), image_tiny (512×512), image_small (640×640),
+#   - image_base (1024×1024), image_large (1280×1280), image_gundam (1600×1600)
 
-# Select specific resolutions
-python run_full_pipeline.py --multi-resolution --resolution-sizes tiny base gundam
+# Disable multi-resolution (single resolution only)
+python run_full_pipeline.py --single-resolution
 
-# Interactive CLI (prompts for resolution selection)
+# Select specific resolutions only
+python run_full_pipeline.py --resolution-sizes tiny base gundam
+
+# Interactive CLI (multi-resolution always enabled)
 python scripts/cli/run_parallel_processing.py
-# Follow prompts to enable multi-resolution and select sizes
-
-# Web UI
-# Navigate to Dataset Generation tab, enable "Multi-Resolution Images" checkbox
 ```
 
 **Multi-Resolution Dataset Schema:**

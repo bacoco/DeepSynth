@@ -17,6 +17,7 @@ from deepsynth.config import load_shared_env
 from deepsynth.data.loaders import MLSUMLoader
 from deepsynth.data.transforms import TextToImageConverter
 from deepsynth.data.transforms.text_to_image import DEEPSEEK_OCR_RESOLUTIONS
+from deepsynth.data.hub import generate_dataset_card
 from deepsynth.pipelines.uploaders.incremental import EfficientIncrementalUploader
 
 __all__ = ["OptimizedDatasetPipeline", "run_optimized_pipeline"]
@@ -97,7 +98,7 @@ class OptimizedDatasetPipeline:
         work_dir="./work_separate",
         batch_size=5000,
         auto_upload=True,
-        multi_resolution=False,
+        multi_resolution=True,
         resolution_sizes=None
     ):
         """
@@ -107,7 +108,7 @@ class OptimizedDatasetPipeline:
             work_dir: Working directory for temporary files
             batch_size: Number of samples per batch
             auto_upload: Whether to upload batches automatically
-            multi_resolution: If True, generate multiple resolution images
+            multi_resolution: If True, generate multiple resolution images (default: True)
             resolution_sizes: List of resolution names to generate.
                              Options: ['tiny', 'small', 'base', 'large', 'gundam']
                              None means all sizes. Only used if multi_resolution=True.
@@ -236,6 +237,41 @@ class OptimizedDatasetPipeline:
                 batches_per_upload=1,  # Upload IMMEDIATELY when 1 batch ready (5000 samples)
                 dataset_name=repo_name
             )
+
+    def _upload_dataset_card(self, repo_name, dataset_output_name, total_samples):
+        """
+        Generate and upload comprehensive HuggingFace dataset card
+
+        Args:
+            repo_name: Full repo ID (e.g., 'baconnier/deepsynth-en-news')
+            dataset_output_name: Dataset name without username (e.g., 'deepsynth-en-news')
+            total_samples: Number of samples in dataset
+        """
+        try:
+            print(f"  📝 Generating dataset card for {repo_name}...")
+
+            # Generate comprehensive card
+            card_content = generate_dataset_card(
+                dataset_name=dataset_output_name,
+                repo_id=repo_name,
+                num_examples=total_samples
+            )
+
+            # Upload to HuggingFace
+            api = HfApi()
+            api.upload_file(
+                path_or_fileobj=card_content.encode('utf-8'),
+                path_in_repo="README.md",
+                repo_id=repo_name,
+                repo_type="dataset",
+                commit_message="Add comprehensive dataset card with multi-resolution documentation"
+            )
+
+            print(f"  ✅ Dataset card uploaded successfully")
+
+        except Exception as e:
+            print(f"  ⚠️  Warning: Could not upload dataset card: {e}")
+            print(f"     (Dataset is still valid, card can be added later)")
 
     def process_and_batch_dataset(self, name, subset, text_field, summary_field, username, *, max_samples=None):
         """
@@ -397,6 +433,19 @@ class OptimizedDatasetPipeline:
             print(f"  📦 Batches created: {self.batch_counter}")
         else:
             print(f"\n  ℹ️  No new samples to process")
+
+        # Upload comprehensive dataset card
+        if self.auto_upload:
+            # Get actual total count from HuggingFace
+            try:
+                existing_dataset = load_dataset(repo_name, split='train', streaming=True)
+                # Count samples (this is fast with streaming)
+                actual_count = sum(1 for _ in existing_dataset)
+                self._upload_dataset_card(repo_name, output_name, actual_count)
+            except:
+                # Fallback to total_new if we can't get actual count
+                if total_new > 0:
+                    self._upload_dataset_card(repo_name, output_name, total_new)
 
         # Mark as completed
         self.progress['completed_datasets'].append(dataset_key)
