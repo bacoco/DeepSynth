@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 
 @dataclass
@@ -53,6 +53,27 @@ class TrainerConfig:
     color_jitter_contrast: float = 0.1  # Contrast variation (0.0-1.0)
     horizontal_flip_prob: float = 0.3  # Probability of horizontal flip
 
+    # LoRA/PEFT configuration
+    use_lora: bool = False  # Enable LoRA fine-tuning
+    lora_rank: int = 16  # LoRA rank (r)
+    lora_alpha: int = 32  # LoRA alpha scaling factor
+    lora_dropout: float = 0.05  # LoRA dropout rate
+    lora_target_modules: Optional[List[str]] = None  # Target modules for LoRA (None = auto-detect)
+    lora_bias: str = "none"  # LoRA bias handling: "none", "all", "lora_only"
+    use_qlora: bool = False  # Enable QLoRA (4-bit quantization)
+    qlora_bits: int = 4  # Quantization bits (4 or 8)
+    qlora_type: str = "nf4"  # Quantization type: "nf4" or "fp4"
+    qlora_double_quant: bool = True  # Enable nested quantization
+    lora_modules_to_save: Optional[List[str]] = None  # Additional modules to train fully
+
+    # Text encoder configuration (optional)
+    use_text_encoder: bool = False  # Enable text encoder for instruction/query encoding
+    text_encoder_type: Optional[str] = None  # "qwen3", "bert", or None
+    text_encoder_model: Optional[str] = None  # HuggingFace model ID
+    text_encoder_trainable: bool = True  # Whether to train text encoder
+    instruction_prompt: str = "Summarize this text:"  # Instruction prepended to text
+    use_text_projection: bool = False  # Use learnable projection from text to vision dim
+
     def to_dict(self) -> dict:
         """Return a serialisable representation used by the web UI."""
 
@@ -90,6 +111,25 @@ class TrainerConfig:
             "color_jitter_brightness": self.color_jitter_brightness,
             "color_jitter_contrast": self.color_jitter_contrast,
             "horizontal_flip_prob": self.horizontal_flip_prob,
+            # LoRA/PEFT parameters
+            "use_lora": self.use_lora,
+            "lora_rank": self.lora_rank,
+            "lora_alpha": self.lora_alpha,
+            "lora_dropout": self.lora_dropout,
+            "lora_target_modules": self.lora_target_modules,
+            "lora_bias": self.lora_bias,
+            "use_qlora": self.use_qlora,
+            "qlora_bits": self.qlora_bits,
+            "qlora_type": self.qlora_type,
+            "qlora_double_quant": self.qlora_double_quant,
+            "lora_modules_to_save": self.lora_modules_to_save,
+            # Text encoder parameters
+            "use_text_encoder": self.use_text_encoder,
+            "text_encoder_type": self.text_encoder_type,
+            "text_encoder_model": self.text_encoder_model,
+            "text_encoder_trainable": self.text_encoder_trainable,
+            "instruction_prompt": self.instruction_prompt,
+            "use_text_projection": self.use_text_projection,
         }
 
 
