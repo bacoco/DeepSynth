@@ -13,7 +13,10 @@ from datasets import Dataset, DatasetDict, Features, Value, load_dataset
 from datasets.features import Image as HFImage
 from huggingface_hub import HfApi, create_repo
 
-from deepsynth.data.text_to_image import TextToImageConverter
+from deepsynth.data.transforms.text_to_image import (
+    DEEPSEEK_OCR_RESOLUTIONS,
+    TextToImageConverter,
+)
 from deepsynth.training.config import OptimizerConfig, TrainerConfig
 
 from .state_manager import JobStatus, StateManager
@@ -108,35 +111,39 @@ class IncrementalDatasetGenerator:
 
                     # Generate images
                     if multi_resolution:
-                        # Generate base image (for backward compatibility)
-                        base_image = self.converter.convert(text_content)
+                        filtered_sizes = []
+                        for size in resolution_sizes or []:
+                            if size in DEEPSEEK_OCR_RESOLUTIONS and size not in filtered_sizes:
+                                filtered_sizes.append(size)
+                        selected_sizes = filtered_sizes or list(DEEPSEEK_OCR_RESOLUTIONS.keys())
+                        config['resolution_sizes'] = selected_sizes
 
-                        # Generate multi-resolution images
-                        sizes_dict = None
-                        if resolution_sizes:
-                            # Build sizes dict for selected resolutions
-                            all_sizes = {
-                                'tiny': (512, 512),
-                                'small': (640, 640),
-                                'base': (1024, 1024),
-                                'large': (1280, 1280),
-                                'gundam': (1600, 1600)
-                            }
-                            sizes_dict = {k: v for k, v in all_sizes.items() if k in resolution_sizes}
+                        sizes_dict = {
+                            name: DEEPSEEK_OCR_RESOLUTIONS[name]
+                            for name in selected_sizes
+                        }
 
-                        multi_res_images = self.converter.convert_multi_resolution(text_content, sizes=sizes_dict)
+                        multi_res_images = self.converter.convert_multi_resolution(
+                            text_content,
+                            sizes=sizes_dict
+                        )
 
                         # Create processed sample with multi-resolution images
+                        base_image = multi_res_images.get('original')
+                        if base_image is None:
+                            base_image = self.converter.convert(text_content)
+
                         processed_sample = {
                             'text': text_content,
                             'summary': sample.get(summary_field, ''),
-                            'image': base_image,  # Base image for backward compatibility
+                            'image': base_image,
                             'source_index': idx
                         }
 
                         # Add resolution images
-                        for res_name, res_image in multi_res_images.items():
-                            processed_sample[f'image_{res_name}'] = res_image
+                        for res_name in selected_sizes:
+                            if res_name in multi_res_images:
+                                processed_sample[f'image_{res_name}'] = multi_res_images[res_name]
 
                     else:
                         # Single resolution mode
@@ -149,6 +156,7 @@ class IncrementalDatasetGenerator:
                             'image': image,
                             'source_index': idx
                         }
+                        config['resolution_sizes'] = None
 
                     processed_data.append(processed_sample)
 
@@ -235,7 +243,12 @@ class IncrementalDatasetGenerator:
 
             # Add multi-resolution image features if enabled
             if multi_resolution:
-                for res_name in ['tiny', 'small', 'base', 'large', 'gundam']:
+                filtered_sizes = []
+                for size in config.get('resolution_sizes') or []:
+                    if size in DEEPSEEK_OCR_RESOLUTIONS and size not in filtered_sizes:
+                        filtered_sizes.append(size)
+                selected_sizes = filtered_sizes or list(DEEPSEEK_OCR_RESOLUTIONS.keys())
+                for res_name in selected_sizes:
                     features_dict[f'image_{res_name}'] = HFImage()
 
             features = Features(features_dict)

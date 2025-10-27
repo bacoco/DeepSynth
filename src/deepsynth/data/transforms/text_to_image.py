@@ -13,6 +13,16 @@ from typing import Dict, Iterable, List, Optional, Tuple
 from PIL import Image, ImageDraw, ImageFont
 
 
+# Standard DeepSeek OCR resolution targets (width, height)
+DEEPSEEK_OCR_RESOLUTIONS: Dict[str, Tuple[int, int]] = {
+    "tiny": (512, 512),
+    "small": (640, 640),
+    "base": (1024, 1024),
+    "large": (1280, 1280),
+    "gundam": (1600, 1600),
+}
+
+
 def _load_font(font_path: Optional[str], font_size: int) -> ImageFont.ImageFont:
     """Load the preferred font falling back to the default PIL font.
 
@@ -185,22 +195,17 @@ class TextToImageConverter:
                    - gundam: 1600×1600
 
         Returns:
-            Dictionary mapping resolution names to PIL Image objects
+            Dictionary mapping resolution names to PIL Image objects. The
+            unresized image is included under the ``original`` key.
         """
         if sizes is None:
-            sizes = {
-                'tiny': (512, 512),
-                'small': (640, 640),
-                'base': (1024, 1024),
-                'large': (1280, 1280),
-                'gundam': (1600, 1600)
-            }
+            sizes = DEEPSEEK_OCR_RESOLUTIONS
 
         # Generate base image from text
         base_image = self.convert(text)
 
         # Generate resized versions for each target size
-        result = {}
+        result: Dict[str, Image.Image] = {"original": base_image}
         for name, target_size in sizes.items():
             result[name] = self._resize_with_padding(base_image, target_size)
 
