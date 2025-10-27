@@ -12,6 +12,8 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from multiprocessing import Manager
 import threading
 from datetime import datetime
+
+from deepsynth.data.transforms.text_to_image import DEEPSEEK_OCR_RESOLUTIONS
 from deepsynth.pipelines._dataset_processor import OptimizedDatasetPipeline
 
 __all__ = ["ParallelDatasetsPipeline"]
@@ -41,7 +43,17 @@ class ParallelDatasetsPipeline:
         """
         self.max_workers = max_workers  # 7 = one per dataset for full parallelism
         self.multi_resolution = multi_resolution
-        self.resolution_sizes = resolution_sizes
+        if self.multi_resolution:
+            if resolution_sizes:
+                filtered = []
+                for size in resolution_sizes:
+                    if size in DEEPSEEK_OCR_RESOLUTIONS and size not in filtered:
+                        filtered.append(size)
+                self.resolution_sizes = filtered or list(DEEPSEEK_OCR_RESOLUTIONS.keys())
+            else:
+                self.resolution_sizes = list(DEEPSEEK_OCR_RESOLUTIONS.keys())
+        else:
+            self.resolution_sizes = None
         # Get arXiv limit from environment
         try:
             arxiv_limit = int(os.getenv('ARXIV_IMAGE_SAMPLES', '50000'))
@@ -264,11 +276,11 @@ class ParallelDatasetsPipeline:
         # Add multi-resolution settings to each dataset config
         for dataset in datasets_to_process:
             dataset['multi_resolution'] = self.multi_resolution
-            dataset['resolution_sizes'] = self.resolution_sizes
+            dataset['resolution_sizes'] = self.resolution_sizes if self.multi_resolution else None
 
         logger.info(f"📋 Datasets à traiter: {len(datasets_to_process)}")
         if self.multi_resolution:
-            sizes_str = ', '.join(self.resolution_sizes or ['tiny', 'small', 'base', 'large', 'gundam'])
+            sizes_str = ', '.join(self.resolution_sizes or [])
             logger.info(f"🔍 Multi-resolution enabled: {sizes_str}")
         for dataset in datasets_to_process:
             logger.info(f"  - {dataset['name']} (priorité {dataset['priority']})")

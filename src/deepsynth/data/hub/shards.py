@@ -196,17 +196,31 @@ class HubShardManager:
         return filtered, skipped
 
     def _build_dataset(self, samples: Sequence[Dict[str, object]]) -> Dataset:
-        dataset = Dataset.from_dict(
+        base_payload = {
+            "text": [sample["text"] for sample in samples],
+            "summary": [sample["summary"] for sample in samples],
+            "image": [sample["image"] for sample in samples],
+            "source_dataset": [sample["source_dataset"] for sample in samples],
+            "original_split": [sample["original_split"] for sample in samples],
+            "original_index": [sample["original_index"] for sample in samples],
+        }
+
+        # Include any generated multi-resolution columns (image_<name>)
+        image_columns = sorted(
             {
-                "text": [sample["text"] for sample in samples],
-                "summary": [sample["summary"] for sample in samples],
-                "image": [sample["image"] for sample in samples],
-                "source_dataset": [sample["source_dataset"] for sample in samples],
-                "original_split": [sample["original_split"] for sample in samples],
-                "original_index": [sample["original_index"] for sample in samples],
+                key
+                for sample in samples
+                for key in sample.keys()
+                if key.startswith("image_") and key != "image"
             }
         )
+        for column in image_columns:
+            base_payload[column] = [sample.get(column) for sample in samples]
+
+        dataset = Dataset.from_dict(base_payload)
         dataset = dataset.cast_column("image", ImageFeature())
+        for column in image_columns:
+            dataset = dataset.cast_column(column, ImageFeature())
         return dataset
 
     def _build_shard_entry(

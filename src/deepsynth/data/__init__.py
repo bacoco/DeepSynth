@@ -1,6 +1,10 @@
 """Data preparation utilities for DeepSynth summarisation."""
 from .dataset_loader import DatasetConfig, SummarizationDataset, load_local_jsonl, split_records
-from .transforms.text_to_image import TextToImageConverter, batch_convert
+from .transforms.text_to_image import (
+    DEEPSEEK_OCR_RESOLUTIONS,
+    TextToImageConverter,
+    batch_convert,
+)
 from .transforms import text_to_image  # Module alias for backward compatibility
 
 __all__ = [
@@ -8,6 +12,7 @@ __all__ = [
     "SummarizationDataset",
     "load_local_jsonl",
     "split_records",
+    "DEEPSEEK_OCR_RESOLUTIONS",
     "TextToImageConverter",
     "batch_convert",
     "text_to_image",

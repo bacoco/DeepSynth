@@ -119,6 +119,34 @@
             color: #495057;
         }
 
+        .multi-resolution-options {
+            margin-top: 15px;
+        }
+
+        .resolution-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+
+        .resolution-option {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+
+        .resolution-option input {
+            margin-right: 8px;
+        }
+
+        .multi-resolution-help {
+            display: block;
+            margin-top: 10px;
+            color: #6c757d;
+        }
+
         input[type="text"],
         input[type="number"],
         select,
@@ -684,31 +712,17 @@
                             Enable multi-resolution image generation
                         </label>
                     </div>
-                    <div id="resolution-options" style="display: none; margin-top: 15px;">
-                        <label style="display: block; margin-bottom: 10px; font-weight: 600;">Select Resolutions:</label>
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
-                            <label style="display: flex; align-items: center; padding: 10px; background: #f8f9fa; border-radius: 6px;">
-                                <input type="checkbox" class="resolution-checkbox" value="tiny" checked style="margin-right: 8px;">
-                                <span>Tiny (512×512)</span>
+                    <div id="resolution-options" class="multi-resolution-options" hidden>
+                        <label class="resolution-options-label">Select Resolutions:</label>
+                        <div class="resolution-grid">
+                            {% for name, size in resolution_options or [] %}
+                            <label class="resolution-option">
+                                <input type="checkbox" class="resolution-checkbox" value="{{ name }}" checked>
+                                <span>{{ name.title() }} ({{ size[0] }}×{{ size[1] }})</span>
                             </label>
-                            <label style="display: flex; align-items: center; padding: 10px; background: #f8f9fa; border-radius: 6px;">
-                                <input type="checkbox" class="resolution-checkbox" value="small" checked style="margin-right: 8px;">
-                                <span>Small (640×640)</span>
-                            </label>
-                            <label style="display: flex; align-items: center; padding: 10px; background: #f8f9fa; border-radius: 6px;">
-                                <input type="checkbox" class="resolution-checkbox" value="base" checked style="margin-right: 8px;">
-                                <span>Base (1024×1024)</span>
-                            </label>
-                            <label style="display: flex; align-items: center; padding: 10px; background: #f8f9fa; border-radius: 6px;">
-                                <input type="checkbox" class="resolution-checkbox" value="large" checked style="margin-right: 8px;">
-                                <span>Large (1280×1280)</span>
-                            </label>
-                            <label style="display: flex; align-items: center; padding: 10px; background: #f8f9fa; border-radius: 6px;">
-                                <input type="checkbox" class="resolution-checkbox" value="gundam" checked style="margin-right: 8px;">
-                                <span>Gundam (1600×1600)</span>
-                            </label>
+                            {% endfor %}
                         </div>
-                        <small class="help-text" style="display: block; margin-top: 10px; color: #6c757d;">
+                        <small class="multi-resolution-help help-text">
                             Select one or more resolutions. All sizes will be generated if none selected.
                         </small>
                     </div>
@@ -1513,7 +1527,7 @@
         // Handle multi-resolution checkbox toggle
         document.getElementById('multi_resolution').onchange = function() {
             const resolutionOptions = document.getElementById('resolution-options');
-            resolutionOptions.style.display = this.checked ? 'block' : 'none';
+            resolutionOptions.hidden = !this.checked;
         };
 
         // Submit custom dataset form

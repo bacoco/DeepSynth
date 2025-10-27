@@ -16,6 +16,8 @@ from deepsynth.training.optimal_configs import (
     list_benchmark_datasets,
 )
 
+from deepsynth.data.transforms.text_to_image import DEEPSEEK_OCR_RESOLUTIONS
+
 from .dataset_generator_improved import IncrementalDatasetGenerator, ModelTrainer
 from .state_manager import JobStatus, StateManager
 from .benchmark_runner import BenchmarkRunner
@@ -67,7 +69,10 @@ def _register_routes(
     def index():
         """Render the main UI."""
 
-        return render_template("index_improved.html")
+        return render_template(
+            "index_improved.html",
+            resolution_options=list(DEEPSEEK_OCR_RESOLUTIONS.items()),
+        )
 
     @app.route("/api/jobs", methods=["GET"])
     def list_jobs():
