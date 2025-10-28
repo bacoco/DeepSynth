@@ -3,7 +3,7 @@
 This module centralises the new incremental upload strategy where each
 batch of samples is serialized as an independent shard stored under the
 ``data/`` directory of the dataset repository.  An accompanying index
-(`data/shards.json`) tracks the shards already present on the Hub and the
+(`_deepsynth/shards.json`) tracks the shards already present on the Hub and the
 ``(source_dataset, original_index)`` pairs they contain so that
 subsequent uploads can avoid duplicates.
 """
@@ -20,7 +20,7 @@ from datasets import Dataset, DatasetDict
 from datasets import Image as ImageFeature
 from huggingface_hub import HfApi, hf_hub_download
 
-INDEX_PATH_IN_REPO = "data/shards.json"
+INDEX_PATH_IN_REPO = "_deepsynth/shards.json"
 DEFAULT_SHARD_PREFIX = "batch_"
 
 
@@ -147,21 +147,16 @@ class HubShardManager:
         path_in_repo = f"data/{shard_id}"
         message = commit_message or f"Add shard {shard_id} ({len(filtered_samples)} samples)"
 
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            tmp_path = Path(tmp_dir)
-
-            # Save dataset directly WITHOUT DatasetDict wrapper
-            # DatasetDict creates empty _format_kwargs struct that breaks Parquet conversion
-            dataset.save_to_disk(str(tmp_path), max_shard_size="50MB")
-
-            self.api.upload_folder(
-                folder_path=str(tmp_path),
-                path_in_repo=path_in_repo,
-                repo_id=self.repo_id,
-                repo_type="dataset",
-                commit_message=message,
-                token=self.token,
-            )
+        # Use push_to_hub directly - it handles schema/metadata correctly
+        # and creates Parquet files that work with load_dataset()
+        dataset.push_to_hub(
+            repo_id=self.repo_id,
+            split="train",
+            token=self.token,
+            commit_message=message,
+            data_dir=path_in_repo,  # Store in data/batch_XXXXXX/
+            private=False,
+        )
 
         shard_entry = self._build_shard_entry(shard_id, path_in_repo, filtered_samples)
         self.index["shards"].append(shard_entry)
