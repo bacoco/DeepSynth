@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """
-One-shot Q&A Dataset Generator (Natural Questions + MS MARCO).
+One-shot Q&A Dataset Generator (English + French Q&A datasets).
 
-Generates a single combined dataset "deepsynth-qa" with both sources:
-- Natural Questions (300k samples): Long-form Q&A with contextual extraction
-- MS MARCO (1M samples): Short passage Q&A
+Generates a single combined multilingual dataset "deepsynth-qa" with four sources:
+- MS MARCO (502k samples): English short passage Q&A
+- Natural Questions (300k samples): English long-form Q&A with contextual extraction
+- SQuAD FR (62k samples): French Q&A from Wikipedia
+- PIAF (3.8k samples): French administrative Q&A
 
 Features:
 - Pre-generated images at gundam resolution (1600px)
@@ -12,16 +14,20 @@ Features:
 - Source tracking via metadata.source field
 - Incremental upload (resumable)
 - Streaming mode (no full download required)
+- Multilingual support (English + French)
 
 Usage:
-    # Full generation
+    # Full generation (all datasets)
     python generate_qa_dataset.py
 
     # Test with limited samples
     python generate_qa_dataset.py --test --max-samples 1000
 
-    # Custom config
-    python generate_qa_dataset.py --nq-samples 50000 --marco-samples 100000
+    # Custom config with French datasets
+    python generate_qa_dataset.py --nq-samples 50000 --squad-fr-samples 10000
+
+    # Skip specific datasets
+    python generate_qa_dataset.py --skip-marco --skip-piaf
 """
 
 import argparse
@@ -34,7 +40,12 @@ from pathlib import Path
 sys.path.insert(0, "./src")
 
 from deepsynth.config import Config
-from deepsynth.data.dataset_converters import convert_natural_questions, convert_ms_marco
+from deepsynth.data.dataset_converters import (
+    convert_natural_questions,
+    convert_ms_marco,
+    convert_squad_fr,
+    convert_piaf,
+)
 from deepsynth.pipelines.uploaders import EfficientIncrementalUploader
 
 # Setup logging
@@ -113,6 +124,30 @@ def parse_args():
         help="Skip MS MARCO (only process Natural Questions)"
     )
 
+    parser.add_argument(
+        "--skip-squad-fr",
+        action="store_true",
+        help="Skip SQuAD FR (only process other datasets)"
+    )
+
+    parser.add_argument(
+        "--skip-piaf",
+        action="store_true",
+        help="Skip PIAF (only process other datasets)"
+    )
+
+    parser.add_argument(
+        "--squad-fr-samples",
+        type=int,
+        help="Max samples for SQuAD FR (default: all ~62k)"
+    )
+
+    parser.add_argument(
+        "--piaf-samples",
+        type=int,
+        help="Max samples for PIAF (default: all ~3.8k)"
+    )
+
     return parser.parse_args()
 
 
@@ -120,10 +155,14 @@ def generate_combined_qa_dataset(
     output_name: str,
     nq_max_samples: int = None,
     marco_max_samples: int = None,
+    squad_fr_max_samples: int = None,
+    piaf_max_samples: int = None,
     resolution: str = "gundam",
     batch_size: int = 100,
     skip_nq: bool = False,
     skip_marco: bool = False,
+    skip_squad_fr: bool = False,
+    skip_piaf: bool = False,
 ):
     """
     Generate combined Q&A dataset in one shot.
@@ -316,6 +355,157 @@ def generate_combined_qa_dataset(
             LOGGER.error(f"❌ Error processing Natural Questions: {e}", exc_info=True)
             raise
 
+    # Process SQuAD FR THIRD (French Q&A dataset)
+    if not skip_squad_fr:
+        LOGGER.info("==" * 40)
+        LOGGER.info("📚 PROCESSING SQUAD FR")
+        LOGGER.info("==" * 40)
+
+        try:
+            # Convert SQuAD FR with streaming
+            squad_fr_dataset = convert_squad_fr(
+                split="train",
+                max_samples=squad_fr_max_samples,
+                streaming=False,  # Streaming mode broken - use direct download
+                target_resolution=resolution,
+            )
+
+            LOGGER.info(f"Converting SQuAD FR (max: {squad_fr_max_samples or 'all'})...")
+
+            # Process and save in batches
+            current_batch = []
+            processed = 0
+
+            for sample in squad_fr_dataset:
+                current_batch.append(sample)
+                processed += 1
+
+                # Save batch when full
+                if len(current_batch) >= batch_size:
+                    # Save to disk
+                    batch_file = samples_dir / f"batch_{batch_counter:06d}.pkl"
+                    with open(batch_file, 'wb') as f:
+                        pickle.dump(current_batch, f)
+                    LOGGER.info(f"💾 Saved batch {batch_counter} ({len(current_batch)} samples)")
+
+                    # Upload immediately
+                    try:
+                        uploader.upload_if_ready()
+                        LOGGER.info(f"✅ Batch {batch_counter} uploaded")
+                    except Exception as e:
+                        LOGGER.warning(f"⚠️  Upload warning: {e} (will retry later)")
+
+                    batch_counter += 1
+                    total_processed += len(current_batch)
+                    current_batch = []
+
+                # Progress logging (every 1000 samples for better visibility)
+                if processed % 1000 == 0:
+                    LOGGER.info(f"✓ Processed {processed:,} SQuAD FR samples (batch size: {len(current_batch)})...")
+
+                # Stop if we reached max
+                if squad_fr_max_samples and processed >= squad_fr_max_samples:
+                    break
+
+            # Save remaining batch
+            if current_batch:
+                batch_file = samples_dir / f"batch_{batch_counter:06d}.pkl"
+                with open(batch_file, 'wb') as f:
+                    pickle.dump(current_batch, f)
+                LOGGER.info(f"💾 Saved final batch {batch_counter} ({len(current_batch)} samples)")
+
+                # Upload
+                try:
+                    uploader.upload_if_ready()
+                    LOGGER.info(f"✅ Final batch {batch_counter} uploaded")
+                except Exception as e:
+                    LOGGER.warning(f"⚠️  Upload warning: {e} (will retry later)")
+
+                batch_counter += 1
+                total_processed += len(current_batch)
+
+            LOGGER.info(f"✅ SQuAD FR complete: {processed:,} samples processed")
+
+        except Exception as e:
+            LOGGER.error(f"❌ Error processing SQuAD FR: {e}", exc_info=True)
+            raise
+
+    # Process PIAF FOURTH (French Q&A dataset)
+    if not skip_piaf:
+        LOGGER.info("==" * 40)
+        LOGGER.info("📚 PROCESSING PIAF")
+        LOGGER.info("==" * 40)
+
+        try:
+            # Convert PIAF with streaming
+            piaf_dataset = convert_piaf(
+                config="plain_text",
+                split="train",
+                max_samples=piaf_max_samples,
+                streaming=False,  # Streaming mode broken - use direct download
+                target_resolution=resolution,
+            )
+
+            LOGGER.info(f"Converting PIAF (max: {piaf_max_samples or 'all'})...")
+
+            # Process and save in batches
+            current_batch = []
+            processed = 0
+
+            for sample in piaf_dataset:
+                current_batch.append(sample)
+                processed += 1
+
+                # Save batch when full
+                if len(current_batch) >= batch_size:
+                    # Save to disk
+                    batch_file = samples_dir / f"batch_{batch_counter:06d}.pkl"
+                    with open(batch_file, 'wb') as f:
+                        pickle.dump(current_batch, f)
+                    LOGGER.info(f"💾 Saved batch {batch_counter} ({len(current_batch)} samples)")
+
+                    # Upload immediately
+                    try:
+                        uploader.upload_if_ready()
+                        LOGGER.info(f"✅ Batch {batch_counter} uploaded")
+                    except Exception as e:
+                        LOGGER.warning(f"⚠️  Upload warning: {e} (will retry later)")
+
+                    batch_counter += 1
+                    total_processed += len(current_batch)
+                    current_batch = []
+
+                # Progress logging (every 500 samples since PIAF is smaller)
+                if processed % 500 == 0:
+                    LOGGER.info(f"✓ Processed {processed:,} PIAF samples (batch size: {len(current_batch)})...")
+
+                # Stop if we reached max
+                if piaf_max_samples and processed >= piaf_max_samples:
+                    break
+
+            # Save remaining batch
+            if current_batch:
+                batch_file = samples_dir / f"batch_{batch_counter:06d}.pkl"
+                with open(batch_file, 'wb') as f:
+                    pickle.dump(current_batch, f)
+                LOGGER.info(f"💾 Saved final batch {batch_counter} ({len(current_batch)} samples)")
+
+                # Upload
+                try:
+                    uploader.upload_if_ready()
+                    LOGGER.info(f"✅ Final batch {batch_counter} uploaded")
+                except Exception as e:
+                    LOGGER.warning(f"⚠️  Upload warning: {e} (will retry later)")
+
+                batch_counter += 1
+                total_processed += len(current_batch)
+
+            LOGGER.info(f"✅ PIAF complete: {processed:,} samples processed")
+
+        except Exception as e:
+            LOGGER.error(f"❌ Error processing PIAF: {e}", exc_info=True)
+            raise
+
     # Upload any remaining batches
     LOGGER.info("")
     LOGGER.info("📤 Uploading remaining batches...")
@@ -335,13 +525,18 @@ def generate_combined_qa_dataset(
     LOGGER.info(f"Dataset URL: https://huggingface.co/datasets/{repo_name}")
     LOGGER.info("")
     LOGGER.info("📊 Dataset composition:")
-    if not skip_nq:
-        LOGGER.info(f"  - Natural Questions: ~{nq_max_samples or '300k'} samples")
     if not skip_marco:
-        LOGGER.info(f"  - MS MARCO: ~{marco_max_samples or '1M'} samples")
+        LOGGER.info(f"  - MS MARCO (English): ~{marco_max_samples or '502k'} samples")
+    if not skip_nq:
+        LOGGER.info(f"  - Natural Questions (English): ~{nq_max_samples or '300k'} samples")
+    if not skip_squad_fr:
+        LOGGER.info(f"  - SQuAD FR (French): ~{squad_fr_max_samples or '62k'} samples")
+    if not skip_piaf:
+        LOGGER.info(f"  - PIAF (French): ~{piaf_max_samples or '3.8k'} samples")
     LOGGER.info("")
     LOGGER.info("💡 Use metadata.source to filter by source:")
     LOGGER.info("   dataset.filter(lambda x: x['metadata']['source'] == 'natural_questions')")
+    LOGGER.info("   dataset.filter(lambda x: x['metadata']['source'] == 'squad_fr')")
     LOGGER.info("")
     LOGGER.info("💡 To resume or retry uploads:")
     LOGGER.info("   PYTHONPATH=./src python3 -m deepsynth.pipelines.uploaders.incremental")
@@ -379,10 +574,14 @@ def main():
             output_name=args.output_name,
             nq_max_samples=nq_samples,
             marco_max_samples=marco_samples,
+            squad_fr_max_samples=args.squad_fr_samples,
+            piaf_max_samples=args.piaf_samples,
             resolution=args.resolution,
             batch_size=args.batch_size,
             skip_nq=args.skip_nq,
             skip_marco=args.skip_marco,
+            skip_squad_fr=args.skip_squad_fr,
+            skip_piaf=args.skip_piaf,
         )
         return 0
 
