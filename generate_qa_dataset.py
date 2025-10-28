@@ -177,7 +177,7 @@ def generate_combined_qa_dataset(
                 config="v2.1",
                 split="train",
                 max_samples=marco_max_samples,
-                streaming=True,
+                streaming=False,  # Streaming mode broken - use direct download
                 target_resolution=resolution,
             )
 
@@ -252,7 +252,7 @@ def generate_combined_qa_dataset(
             nq_dataset = convert_natural_questions(
                 split="train",
                 max_samples=nq_max_samples,
-                streaming=True,
+                streaming=False,  # Streaming mode broken - use direct download
                 target_resolution=resolution,
             )
 
