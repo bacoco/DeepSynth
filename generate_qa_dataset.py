@@ -97,8 +97,8 @@ def parse_args():
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=5000,
-        help="Batch size for incremental uploads (default: 5000)"
+        default=100,
+        help="Batch size for incremental uploads (default: 100)"
     )
 
     parser.add_argument(
@@ -121,7 +121,7 @@ def generate_combined_qa_dataset(
     nq_max_samples: int = None,
     marco_max_samples: int = None,
     resolution: str = "gundam",
-    batch_size: int = 5000,
+    batch_size: int = 100,
     skip_nq: bool = False,
     skip_marco: bool = False,
 ):
@@ -177,7 +177,7 @@ def generate_combined_qa_dataset(
                 config="v2.1",
                 split="train",
                 max_samples=marco_max_samples,
-                streaming=True,
+                streaming=False,  # Streaming mode broken - use direct download
                 target_resolution=resolution,
             )
 
@@ -252,7 +252,7 @@ def generate_combined_qa_dataset(
             nq_dataset = convert_natural_questions(
                 split="train",
                 max_samples=nq_max_samples,
-                streaming=True,
+                streaming=False,  # Streaming mode broken - use direct download
                 target_resolution=resolution,
             )
 
