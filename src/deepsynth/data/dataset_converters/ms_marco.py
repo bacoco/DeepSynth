@@ -60,9 +60,15 @@ def convert_ms_marco(
     """
     LOGGER.info(f"Loading MS MARCO {config} ({split} split, streaming={streaming})...")
     LOGGER.info(f"Target resolution: {target_resolution}")
+    LOGGER.info("⏳ Initializing dataset connection to HuggingFace...")
+    LOGGER.info("   (This resolves shard metadata - typically takes 30-60 seconds)")
 
     # Load dataset with streaming support
+    import time
+    start_time = time.time()
     dataset = load_dataset("ms_marco", config, split=split, streaming=streaming)
+    elapsed = time.time() - start_time
+    LOGGER.info(f"✅ Dataset initialized in {elapsed:.1f}s - starting iteration...")
 
     # Apply max_samples for streaming datasets
     if max_samples and streaming:

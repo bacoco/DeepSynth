@@ -205,9 +205,15 @@ def convert_natural_questions(
     LOGGER.info(f"Loading Natural Questions ({split} split, streaming={streaming})...")
     LOGGER.info(f"Target resolution: {target_resolution}")
     LOGGER.info(f"Optimal context window: {optimal_context_window} tokens")
+    LOGGER.info("⏳ Initializing dataset connection (287 shards to resolve)...")
+    LOGGER.info("   This will take 2-5 minutes - please wait, the process is NOT frozen!")
 
     # Load dataset with streaming support
+    import time
+    start_time = time.time()
     dataset = load_dataset("natural_questions", split=split, streaming=streaming)
+    elapsed = time.time() - start_time
+    LOGGER.info(f"✅ Dataset initialized in {elapsed:.1f}s - starting iteration...")
 
     # Apply max_samples for streaming datasets
     if max_samples and streaming:
