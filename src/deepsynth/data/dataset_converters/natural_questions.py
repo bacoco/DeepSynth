@@ -316,36 +316,21 @@ def convert_natural_questions(
             # Calculate quality based on EXTRACTED token count (what's in the image)
             quality, quality_desc, estimated_height = calculate_quality(extracted_token_count)
 
-            # Create sample with all information
+            # Create sample with all information (columns ordered by importance)
             converted_samples.append({
-                # Store FULL document (not extracted) for flexibility
-                "text": full_document_text.strip(),
+                # IMPORTANT COLUMNS FIRST
                 "instruction": question.strip(),
-
-                # Answers (long priority)
-                "answer": primary_answer.strip(),
                 "short_answer": short_answer_text.strip(),
                 "long_answer": long_answer_text.strip(),
-
-                # Answer positions (for future extraction if needed)
-                "answer_start_token": answer_start,
-                "answer_end_token": answer_end,
-
-                # Pre-generated image at target resolution
+                "text": full_document_text.strip(),
                 "image": image,
-
-                # Quality indicators (based on extracted content)
-                "quality": quality,
-                "estimated_height": estimated_height,
-                "token_count": full_document_token_count,  # Full document
-                "extracted_token_count": extracted_token_count,  # What's in the image
-
-                # Tracking fields (required for HubShardManager deduplication)
                 "source_dataset": "natural_questions",
-                "original_split": split,
-                "original_index": idx,
+                "quality": quality,
 
-                # Metadata
+                # LESS IMPORTANT
+                "answer": primary_answer.strip(),  # Legacy field (long priority)
+
+                # METADATA
                 "metadata": {
                     "source": "natural_questions",
                     "original_index": idx,
@@ -357,6 +342,15 @@ def convert_natural_questions(
                     "generation_resolution": target_resolution,
                     "quality_description": quality_desc,
                 },
+
+                # TECHNICAL FIELDS (for tracking/processing)
+                "original_split": split,
+                "original_index": idx,
+                "token_count": full_document_token_count,
+                "extracted_token_count": extracted_token_count,
+                "estimated_height": estimated_height,
+                "answer_start_token": answer_start,
+                "answer_end_token": answer_end,
             })
 
             # Stop early if we have enough samples
