@@ -208,9 +208,9 @@ def generate_combined_qa_dataset(
                     total_processed += len(current_batch)
                     current_batch = []
 
-                # Progress logging
-                if processed % 1000 == 0:
-                    LOGGER.info(f"Processed {processed:,} Natural Questions samples...")
+                # Progress logging (every 100 samples for better visibility)
+                if processed % 100 == 0:
+                    LOGGER.info(f"✓ Processed {processed:,} Natural Questions samples (batch size: {len(current_batch)})...")
 
                 # Stop if we reached max
                 if nq_max_samples and processed >= nq_max_samples:
@@ -285,9 +285,9 @@ def generate_combined_qa_dataset(
                     total_processed += len(current_batch)
                     current_batch = []
 
-                # Progress logging
-                if processed % 5000 == 0:
-                    LOGGER.info(f"Processed {processed:,} MS MARCO samples...")
+                # Progress logging (every 100 samples for better visibility)
+                if processed % 100 == 0:
+                    LOGGER.info(f"✓ Processed {processed:,} MS MARCO samples (batch size: {len(current_batch)})...")
 
                 # Stop if we reached max
                 if marco_max_samples and processed >= marco_max_samples:
