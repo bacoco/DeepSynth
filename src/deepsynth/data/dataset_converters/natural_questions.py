@@ -206,22 +206,19 @@ def convert_natural_questions(
     LOGGER.info(f"Target resolution: {target_resolution}")
     LOGGER.info(f"Optimal context window: {optimal_context_window} tokens")
     LOGGER.info("⏳ Initializing dataset connection (287 shards to resolve)...")
-    LOGGER.info("   This will take 2-5 minutes - please wait, the process is NOT frozen!")
-
-    # Load dataset with streaming support
+    # FORCE NON-STREAMING: streaming mode is broken (blocks on iteration)
+    # Load with slice for limited samples
     import time
     start_time = time.time()
-    dataset = load_dataset("natural_questions", split=split, streaming=streaming)
-    elapsed = time.time() - start_time
-    LOGGER.info(f"✅ Dataset initialized in {elapsed:.1f}s - starting iteration...")
 
-    # Apply max_samples for streaming datasets
-    if max_samples and streaming:
-        dataset = dataset.take(max_samples)
-        LOGGER.info(f"Taking first {max_samples} samples (streaming mode)")
-    elif max_samples and not streaming:
+    if max_samples:
+        LOGGER.info(f"⏳ Downloading first {max_samples} samples (this may take 2-5 minutes)...")
         dataset = load_dataset("natural_questions", split=f"{split}[:{max_samples}]")
-        LOGGER.info(f"Loaded {len(dataset)} samples")
+        LOGGER.info(f"✅ Downloaded {len(dataset)} samples in {time.time() - start_time:.1f}s")
+    else:
+        LOGGER.info(f"⏳ Downloading full Natural Questions dataset (this may take 10-20 minutes)...")
+        dataset = load_dataset("natural_questions", split=split)
+        LOGGER.info(f"✅ Downloaded {len(dataset)} samples in {time.time() - start_time:.1f}s")
 
     # Initialize image converter (gundam width = 1600px)
     converter = TextToImageConverter(max_width=1600, max_height=10000)
