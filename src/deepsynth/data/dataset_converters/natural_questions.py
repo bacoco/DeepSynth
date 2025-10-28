@@ -1,138 +1,380 @@
 """
 Natural Questions Dataset Converter.
 
-Converts Google's Natural Questions dataset to DeepSynth format.
+Converts Google's Natural Questions dataset to DeepSynth format with:
+- Contextual extraction (extracts ~1000 tokens around answer instead of full 10k+ document)
+- Long answer priority (more context for training)
+- Quality indicators (excellent/good/medium/poor/unreadable)
+- Preserves both short and long answers in separate columns
+
 Dataset: https://ai.google.com/research/NaturalQuestions
 HuggingFace: natural_questions
 """
 
 import logging
-from typing import Iterator, Optional
+from typing import List, Optional, Tuple
 
 from datasets import load_dataset
 
 from ..instruction_dataset import InstructionDataset
+from ..quality_calculator import (
+    calculate_quality,
+    calculate_optimal_context_window,
+    should_extract_context,
+)
+from ..transforms.text_to_image import TextToImageConverter
 
 LOGGER = logging.getLogger(__name__)
+
+
+def extract_contextual_window(
+    tokens: List[str],
+    answer_start: int,
+    answer_end: int,
+    context_before: int = 500,
+    context_after: int = 500,
+) -> str:
+    """
+    Extract contextual window around answer position.
+
+    Instead of using full document (which can be 40k+ tokens), extract only
+    the relevant context around the answer.
+
+    Args:
+        tokens: Full document tokens
+        answer_start: Answer start position (token index)
+        answer_end: Answer end position (token index)
+        context_before: Number of tokens to include before answer
+        context_after: Number of tokens to include after answer
+
+    Returns:
+        Contextual text window as string
+
+    Example:
+        >>> tokens = ["The", "Walking", "Dead", ..., "March", "18", "2018", ...]
+        >>> extract_contextual_window(tokens, 3521, 3525, 500, 500)
+        "...context before...March 18 2018...context after..."
+    """
+    # Calculate window boundaries
+    start_idx = max(0, answer_start - context_before)
+    end_idx = min(len(tokens), answer_end + context_after)
+
+    # Extract and join tokens
+    context_tokens = tokens[start_idx:end_idx]
+    return " ".join(str(t) for t in context_tokens)
+
+
+def extract_short_answer(
+    sample: dict,
+    text_tokens: List[str],
+) -> Tuple[str, Optional[int], Optional[int]]:
+    """
+    Extract short answer from Natural Questions sample.
+
+    Args:
+        sample: Natural Questions sample
+        text_tokens: Document tokens
+
+    Returns:
+        Tuple of (answer_text, start_token, end_token)
+        Returns ("", None, None) if no short answer available
+    """
+    annotations = sample.get("annotations", {})
+    short_answers = annotations.get("short_answers", [])
+
+    if not short_answers or len(short_answers) == 0:
+        return ("", None, None)
+
+    short_answer = short_answers[0]
+
+    # Try pre-extracted text first
+    if "text" in short_answer and short_answer["text"]:
+        texts = short_answer["text"]
+        answer_text = texts[0] if isinstance(texts, list) and texts else str(texts)
+
+        # Get positions
+        start_tokens = short_answer.get("start_token", [])
+        end_tokens = short_answer.get("end_token", [])
+
+        if start_tokens and end_tokens:
+            start_token = start_tokens[0] if isinstance(start_tokens, list) else start_tokens
+            end_token = end_tokens[0] if isinstance(end_tokens, list) else end_tokens
+            return (answer_text, start_token, end_token)
+
+        return (answer_text, None, None)
+
+    # Extract from tokens using indices
+    start_tokens = short_answer.get("start_token", [])
+    end_tokens = short_answer.get("end_token", [])
+
+    if not start_tokens or not end_tokens:
+        return ("", None, None)
+
+    start_token = start_tokens[0] if isinstance(start_tokens, list) else start_tokens
+    end_token = end_tokens[0] if isinstance(end_tokens, list) else end_tokens
+
+    if start_token >= len(text_tokens) or end_token > len(text_tokens):
+        return ("", None, None)
+
+    answer_text = " ".join(str(t) for t in text_tokens[start_token:end_token])
+    return (answer_text, start_token, end_token)
+
+
+def extract_long_answer(
+    sample: dict,
+    text_tokens: List[str],
+) -> Tuple[str, Optional[int], Optional[int]]:
+    """
+    Extract long answer from Natural Questions sample.
+
+    Args:
+        sample: Natural Questions sample
+        text_tokens: Document tokens
+
+    Returns:
+        Tuple of (answer_text, start_token, end_token)
+        Returns ("", None, None) if no long answer available
+    """
+    annotations = sample.get("annotations", {})
+    long_answers = annotations.get("long_answer", [])
+
+    if not long_answers or len(long_answers) == 0:
+        return ("", None, None)
+
+    long_answer = long_answers[0]
+    start_token = long_answer.get("start_token", -1)
+    end_token = long_answer.get("end_token", -1)
+
+    # Check if valid answer (start_token >= 0 indicates answer exists)
+    if start_token < 0 or end_token < 0:
+        return ("", None, None)
+
+    if start_token >= len(text_tokens) or end_token > len(text_tokens):
+        return ("", None, None)
+
+    answer_text = " ".join(str(t) for t in text_tokens[start_token:end_token])
+    return (answer_text, start_token, end_token)
 
 
 def convert_natural_questions(
     split: str = "train",
     max_samples: Optional[int] = None,
-    use_short_answers: bool = True,
+    streaming: bool = True,
+    target_resolution: str = "gundam",
 ) -> InstructionDataset:
     """
-    Convert Natural Questions to instruction format.
+    Convert Natural Questions to instruction format with pre-generated images.
+
+    **NEW in v2.0**: Pre-generates images at target resolution (gundam by default)
+    for optimal quality. Uses intelligent contextual extraction based on document
+    size and target resolution.
+
+    Features:
+    - Pre-generates images at target resolution (gundam = 1600px)
+    - Intelligent contextual extraction (only when needed)
+    - Stores FULL document in "text" field for flexibility
+    - Prioritizes LONG answers (more context for training)
+    - Preserves both short and long answers in separate columns
+    - Stores answer positions (answer_start_token, answer_end_token)
+    - Adds quality indicators (excellent/good/medium/poor/unreadable)
 
     Args:
         split: Dataset split ("train", "validation")
         max_samples: Maximum number of samples (None = all)
-        use_short_answers: Use short answers (True) or long answers (False)
+        streaming: Use streaming mode (faster, no download required)
+        target_resolution: Target resolution for pre-generation ("gundam" recommended)
+                          Options: "tiny" (512px), "base" (1024px), "gundam" (1600px)
 
     Returns:
-        InstructionDataset
+        InstructionDataset with pre-generated images at target resolution
 
     Example:
         >>> dataset = convert_natural_questions(split="train", max_samples=1000)
-        >>> len(dataset)
-        1000
+        >>> sample = dataset[0]
+        >>> sample.keys()
+        dict_keys(['text', 'instruction', 'answer', 'short_answer', 'long_answer',
+                   'answer_start_token', 'answer_end_token', 'image',
+                   'quality', 'estimated_height', 'token_count', 'extracted_token_count',
+                   'metadata'])
+        >>> sample['image']  # Pre-generated PIL.Image
+        <PIL.Image.Image image mode=RGB size=1600x2224>
     """
-    LOGGER.info(f"Loading Natural Questions ({split} split)...")
+    # Calculate optimal context window for target resolution
+    optimal_context_window = calculate_optimal_context_window(target_resolution)
 
-    # Load dataset
-    if max_samples:
+    LOGGER.info(f"Loading Natural Questions ({split} split, streaming={streaming})...")
+    LOGGER.info(f"Target resolution: {target_resolution}")
+    LOGGER.info(f"Optimal context window: {optimal_context_window} tokens")
+
+    # Load dataset with streaming support
+    dataset = load_dataset("natural_questions", split=split, streaming=streaming)
+
+    # Apply max_samples for streaming datasets
+    if max_samples and streaming:
+        dataset = dataset.take(max_samples)
+        LOGGER.info(f"Taking first {max_samples} samples (streaming mode)")
+    elif max_samples and not streaming:
         dataset = load_dataset("natural_questions", split=f"{split}[:{max_samples}]")
-    else:
-        dataset = load_dataset("natural_questions", split=split)
+        LOGGER.info(f"Loaded {len(dataset)} samples")
 
-    LOGGER.info(f"Loaded {len(dataset)} samples")
+    # Initialize image converter (gundam width = 1600px)
+    converter = TextToImageConverter(max_width=1600, max_height=10000)
 
     # Convert to instruction format
     converted_samples = []
     skipped = 0
+    skip_reasons = {"no_document": 0, "no_question": 0, "no_answer": 0, "error": 0}
 
     for idx, sample in enumerate(dataset):
         try:
-            # Extract document text (from long answer)
+            # Extract document tokens
             if not sample.get("document") or not sample["document"].get("tokens"):
+                skip_reasons["no_document"] += 1
                 skipped += 1
                 continue
 
-            # Get document text from tokens
             tokens = sample["document"]["tokens"]
             if not isinstance(tokens, dict) or "token" not in tokens:
+                skip_reasons["no_document"] += 1
                 skipped += 1
                 continue
 
             text_tokens = tokens["token"]
-            document_text = " ".join(str(t) for t in text_tokens[:1000])  # Limit to 1000 tokens
 
             # Extract question
             question = sample.get("question", {}).get("text", "")
             if not question:
+                skip_reasons["no_question"] += 1
                 skipped += 1
                 continue
 
-            # Extract answer
-            annotations = sample.get("annotations", [])
-            if not annotations:
+            # Extract BOTH short and long answers
+            short_answer_text, short_start, short_end = extract_short_answer(sample, text_tokens)
+            long_answer_text, long_start, long_end = extract_long_answer(sample, text_tokens)
+
+            # Skip if NO answer at all
+            if not short_answer_text and not long_answer_text:
+                skip_reasons["no_answer"] += 1
                 skipped += 1
                 continue
 
-            annotation = annotations[0]  # Use first annotation
-
-            if use_short_answers:
-                # Use short answer
-                short_answers = annotation.get("short_answers", [])
-                if not short_answers:
-                    skipped += 1
-                    continue
-
-                short_answer = short_answers[0]
-                start_token = short_answer.get("start_token", 0)
-                end_token = short_answer.get("end_token", 0)
-
-                if start_token >= len(text_tokens) or end_token > len(text_tokens):
-                    skipped += 1
-                    continue
-
-                answer = " ".join(str(t) for t in text_tokens[start_token:end_token])
+            # Determine primary answer and extraction strategy
+            # Priority: LONG answer (more context) > short answer
+            if long_answer_text:
+                primary_answer = long_answer_text
+                answer_type = "long"
+                answer_start = long_start
+                answer_end = long_end
             else:
-                # Use long answer
-                long_answer = annotation.get("long_answer", {})
-                start_token = long_answer.get("start_token", 0)
-                end_token = long_answer.get("end_token", 0)
+                primary_answer = short_answer_text
+                answer_type = "short"
+                answer_start = short_start
+                answer_end = short_end
 
-                if start_token >= len(text_tokens) or end_token > len(text_tokens):
-                    skipped += 1
-                    continue
+            # Calculate FULL document token count
+            full_document_text = " ".join(str(t) for t in text_tokens)
+            full_document_token_count = len(text_tokens)
 
-                answer = " ".join(str(t) for t in text_tokens[start_token:end_token])
+            # Decide extraction strategy based on document size
+            should_extract, extraction_window = should_extract_context(
+                full_document_token_count,
+                target_resolution
+            )
 
-            if not answer or answer.strip() == "":
-                skipped += 1
-                continue
+            if should_extract:
+                # Document too long → extract contextual window
+                if answer_start is not None and answer_end is not None:
+                    document_for_image = extract_contextual_window(
+                        text_tokens,
+                        answer_start,
+                        answer_end,
+                        context_before=extraction_window,
+                        context_after=extraction_window,
+                    )
+                    extraction_method = "contextual"
+                    extracted_token_count = len(document_for_image.split())
+                else:
+                    # Rare case: no positions, use answer text
+                    document_for_image = primary_answer
+                    extraction_method = "answer_only"
+                    extracted_token_count = len(document_for_image.split())
+            else:
+                # Document short enough → use ENTIRE document
+                document_for_image = full_document_text
+                extraction_method = "full_document"
+                extracted_token_count = full_document_token_count
 
-            # Add to converted samples
+            # Generate image at target resolution (PRE-GENERATION)
+            image = converter.convert(document_for_image)
+
+            # Calculate quality based on EXTRACTED token count (what's in the image)
+            quality, quality_desc, estimated_height = calculate_quality(extracted_token_count)
+
+            # Create sample with all information
             converted_samples.append({
-                "text": document_text.strip(),
+                # Store FULL document (not extracted) for flexibility
+                "text": full_document_text.strip(),
                 "instruction": question.strip(),
-                "answer": answer.strip(),
+
+                # Answers (long priority)
+                "answer": primary_answer.strip(),
+                "short_answer": short_answer_text.strip(),
+                "long_answer": long_answer_text.strip(),
+
+                # Answer positions (for future extraction if needed)
+                "answer_start_token": answer_start,
+                "answer_end_token": answer_end,
+
+                # Pre-generated image at target resolution
+                "image": image,
+
+                # Quality indicators (based on extracted content)
+                "quality": quality,
+                "estimated_height": estimated_height,
+                "token_count": full_document_token_count,  # Full document
+                "extracted_token_count": extracted_token_count,  # What's in the image
+
+                # Metadata
                 "metadata": {
                     "source": "natural_questions",
                     "original_index": idx,
-                    "answer_type": "short" if use_short_answers else "long",
+                    "answer_type": answer_type,
+                    "has_short": bool(short_answer_text),
+                    "has_long": bool(long_answer_text),
+                    "extraction_method": extraction_method,
+                    "context_window": extraction_window if should_extract else 0,
+                    "generation_resolution": target_resolution,
+                    "quality_description": quality_desc,
                 },
             })
 
+            # Stop early if we have enough samples
+            if max_samples and len(converted_samples) >= max_samples:
+                break
+
         except Exception as e:
             LOGGER.warning(f"Failed to process sample {idx}: {e}")
+            skip_reasons["error"] += 1
             skipped += 1
             continue
 
+    # Log statistics
     LOGGER.info(f"Converted {len(converted_samples)} samples (skipped {skipped})")
+    LOGGER.info(f"Skip reasons: {skip_reasons}")
+
+    if converted_samples:
+        # Log quality distribution
+        quality_counts = {}
+        for sample in converted_samples:
+            q = sample["quality"]
+            quality_counts[q] = quality_counts.get(q, 0) + 1
+
+        LOGGER.info(f"Quality distribution:")
+        for quality, count in sorted(quality_counts.items()):
+            pct = (count / len(converted_samples)) * 100
+            LOGGER.info(f"  {quality}: {count} ({pct:.1f}%)")
 
     return InstructionDataset(converted_samples, split=split, use_augmentation=False)
 
 
-__all__ = ["convert_natural_questions"]
+__all__ = ["convert_natural_questions", "extract_contextual_window"]

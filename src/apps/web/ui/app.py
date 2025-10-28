@@ -71,6 +71,12 @@ def _register_routes(
 
         return render_template("index_improved.html")
 
+    @app.route("/qa")
+    def qa_generator():
+        """Render the Q&A dataset generator UI."""
+
+        return render_template("qa_generator.html")
+
     @app.route("/api/jobs", methods=["GET"])
     def list_jobs():
         """List all registered jobs."""
@@ -265,6 +271,46 @@ def _register_routes(
 
         except Exception as exc:  # noqa: BLE001 - bubble useful message to UI
             logger.exception("Error starting dataset generation")
+            return jsonify({"error": str(exc)}), 500
+
+    @app.route("/api/dataset/generate-qa", methods=["POST"])
+    def generate_qa_dataset():
+        """Start a Q&A dataset generation job."""
+
+        try:
+            data = request.json or {}
+
+            config = {
+                "qa_sources": data.get("qa_sources", ["natural_questions", "ms_marco"]),
+                "target_resolution": data.get("target_resolution", "gundam"),
+                "max_nq_samples": data.get("max_nq_samples"),
+                "max_marco_samples": data.get("max_marco_samples"),
+                "dataset_name": data.get("dataset_name", "deepsynth-qa"),
+                "batch_size": data.get("batch_size", 5000),
+                "hf_username": data.get("hf_username", os.environ.get("HF_USERNAME")),
+                "hf_token": data.get("hf_token", os.environ.get("HF_TOKEN")),
+                "private_dataset": data.get("private_dataset", False),
+            }
+
+            job_id = state_manager.create_job("qa_dataset_generation", config)
+
+            thread = Thread(
+                target=_run_qa_generation,
+                args=(dataset_generator, state_manager, job_id),
+                daemon=True,
+            )
+            thread.start()
+
+            return jsonify(
+                {
+                    "job_id": job_id,
+                    "message": "Q&A dataset generation started",
+                    "status": "in_progress",
+                }
+            )
+
+        except Exception as exc:  # noqa: BLE001 - bubble useful message to UI
+            logger.exception("Error starting Q&A dataset generation")
             return jsonify({"error": str(exc)}), 500
 
     @app.route("/api/model/train", methods=["POST"])
@@ -843,6 +889,28 @@ def _run_dataset_generation(
             state_manager.update_job(job)
     except Exception as exc:  # noqa: BLE001
         logger.exception("Dataset generation failed")
+        job = state_manager.get_job(job_id)
+        if job:
+            job.status = JobStatus.FAILED.value
+            job.last_error = str(exc)
+            state_manager.update_job(job)
+
+
+def _run_qa_generation(
+    generator: IncrementalDatasetGenerator,
+    state_manager: StateManager,
+    job_id: str,
+) -> None:
+    """Background worker for Q&A dataset generation."""
+
+    try:
+        generator.generate_qa_dataset(job_id)
+        job = state_manager.get_job(job_id)
+        if job:
+            job.status = JobStatus.COMPLETED.value
+            state_manager.update_job(job)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Q&A dataset generation failed")
         job = state_manager.get_job(job_id)
         if job:
             job.status = JobStatus.FAILED.value
