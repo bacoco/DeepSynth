@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 
 from datasets import load_dataset, load_from_disk
-from huggingface_hub import HfApi, login, whoami
+from huggingface_hub import HfApi, hf_hub_download, login, whoami
 
 from deepsynth.config import load_shared_env
 from deepsynth.data.hub import HubShardManager
@@ -28,6 +28,13 @@ class GlobalIncrementalPipeline:
         self.username = whoami()['name']
         self.api = HfApi()
         self.dataset_name = f"{self.username}/deepsynth-vision-complete"
+
+        self.shard_manager = HubShardManager(
+            repo_id=self.dataset_name,
+            token=self.hf_token,
+            api=self.api,
+        )
+        self.index_registry = None
 
         # Text-to-image converter
         unicode_font_path = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
@@ -248,21 +255,7 @@ for shard in index["shards"]:
             if len(batch_samples) >= batch_size:
                 print(f"🚀 Uploading batch: {len(batch_samples)} samples (Memory efficient)")
                 uploaded_count = self.upload_batch_append(batch_samples)
-                if uploaded_count is not None:
-                    # Update progress
-                    progress['current_dataset'] = dataset_key
-                    progress['current_index'] = idx + 1
-                    progress['total_samples'] += uploaded_count_count
-                    self.save_global_progress(progress)
-
-                    # Clear batch to free memory
-                    batch_samples.clear()
-                    print(f"📈 Progress: {idx + 1:,}/{target_limit:,} ({(idx + 1)/target_limit*100:.1f}%) - {progress['total_samples']:,} total samples")
-
-                    # Force garbage collection for memory efficiency
-                    import gc
-                    gc.collect()
-                else:
+                if uploaded_count is None:
                     print(f"❌ Upload failed, stopping at index {idx}")
                     return False
 
@@ -289,7 +282,7 @@ for shard in index["shards"]:
             uploaded_count = self.upload_batch_append(batch_samples)
             if uploaded_count is None:
                 return False
-            progress['total_samples'] += uploaded_count_count
+            progress['total_samples'] += uploaded_count
 
         # Mark dataset as completed
         if dataset_key not in progress['completed_datasets']:
