@@ -255,7 +255,21 @@ for shard in index["shards"]:
             if len(batch_samples) >= batch_size:
                 print(f"🚀 Uploading batch: {len(batch_samples)} samples (Memory efficient)")
                 uploaded_count = self.upload_batch_append(batch_samples)
-                if uploaded_count is None:
+                if uploaded_count is not None:
+                    # Update progress
+                    progress['current_dataset'] = dataset_key
+                    progress['current_index'] = idx + 1
+                    progress['total_samples'] += uploaded_count
+                    self.save_global_progress(progress)
+
+                    # Clear batch to free memory
+                    batch_samples.clear()
+                    print(f"📈 Progress: {idx + 1:,}/{target_limit:,} ({(idx + 1)/target_limit*100:.1f}%) - {progress['total_samples']:,} total samples")
+
+                    # Force garbage collection for memory efficiency
+                    import gc
+                    gc.collect()
+                else:
                     print(f"❌ Upload failed, stopping at index {idx}")
                     return False
 
