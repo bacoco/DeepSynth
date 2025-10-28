@@ -44,7 +44,7 @@ class RefactoredGlobalStatePipeline:
         # Initialize components
         self.converter = image_converter or TextToImageConverter()
         self.shard_manager = HubShardManager(
-            dataset_name=target_dataset_name,
+            repo_id=target_dataset_name,
             token=hf_token,
         )
         self.api = HfApi(token=hf_token)
@@ -242,6 +242,9 @@ class RefactoredGlobalStatePipeline:
                 "original_index": index,
             })
 
+            if len(self.current_batch) >= self.batch_size:
+                self._upload_current_batch()
+
             return True
 
         except Exception as e:
@@ -255,6 +258,7 @@ class RefactoredGlobalStatePipeline:
             return self.converter.convert(text)
         except Exception as e:
             logger.error(f"Failed to convert text to image: {e}")
+            self.stats["errors"] += 1
             return None
 
     def _is_duplicate(self, dataset_key: str, index: int) -> bool:
