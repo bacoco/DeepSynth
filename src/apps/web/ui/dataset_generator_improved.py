@@ -18,6 +18,7 @@ from deepsynth.data.transforms.text_to_image import (
     TextToImageConverter,
 )
 from deepsynth.data.dataset_converters import convert_natural_questions, convert_ms_marco
+from deepsynth.data.hub.shards import HubShardManager
 from deepsynth.training.config import OptimizerConfig, TrainerConfig
 
 from .state_manager import JobStatus, StateManager
@@ -312,56 +313,101 @@ class IncrementalDatasetGenerator:
         job_id: str,
         progress_callback: Optional[Callable] = None
     ):
-        """
-        Generate Q&A dataset (Natural Questions + MS MARCO) incrementally.
-
-        Args:
-            job_id: Job identifier
-            progress_callback: Optional callback for progress updates
-        """
+        """Generate Q&A dataset (Natural Questions + MS MARCO) incrementally."""
         job = self.state_manager.get_job(job_id)
         if not job:
             raise ValueError(f"Job {job_id} not found")
 
-        # Update status
         job.status = JobStatus.IN_PROGRESS.value
         self.state_manager.update_job(job)
 
-        try:
-            config = job.config
+        manager: Optional[HubShardManager] = None
 
-            # Get configuration
+        try:
+            config = job.config or {}
+
             qa_sources = config.get('qa_sources', ['natural_questions', 'ms_marco'])
             target_resolution = config.get('target_resolution', 'gundam')
-            max_nq_samples = config.get('max_nq_samples', None)
-            max_marco_samples = config.get('max_marco_samples', None)
+            max_nq_samples = config.get('max_nq_samples')
+            max_marco_samples = config.get('max_marco_samples')
+            batch_size = int(config.get('batch_size', 5000))
 
             logger.info(f"Generating Q&A dataset with sources: {qa_sources}")
             logger.info(f"Target resolution: {target_resolution}")
+            logger.info(f"Batch size: {batch_size}")
 
-            # Initialize uploader config
-            hf_token = config.get('hf_token', os.environ.get('HF_TOKEN'))
-            hf_username = config.get('hf_username', os.environ.get('HF_USERNAME'))
+            default_estimates = {
+                'natural_questions': 300_000,
+                'ms_marco': 1_000_000,
+            }
+            estimated_total = 0
+            if 'natural_questions' in qa_sources:
+                estimated_total += max_nq_samples if max_nq_samples else default_estimates['natural_questions']
+            if 'ms_marco' in qa_sources:
+                estimated_total += max_marco_samples if max_marco_samples else default_estimates['ms_marco']
+            if estimated_total == 0:
+                estimated_total = sum(default_estimates.get(source, 0) for source in qa_sources) or sum(default_estimates.values())
+            job.total_samples = estimated_total
+            self.state_manager.update_job(job)
+
+            hf_token = config.get('hf_token') or os.environ.get('HF_TOKEN')
+            if not hf_token:
+                raise ValueError("HF_TOKEN is required to upload the Q&A dataset")
+
+            repo_id = config.get('repo_id')
             dataset_name = config.get('dataset_name', 'deepsynth-qa')
-            repo_id = f"{hf_username}/{dataset_name}"
+            if not repo_id:
+                if '/' in dataset_name:
+                    repo_id = dataset_name
+                else:
+                    username = config.get('hf_username') or os.environ.get('HF_USERNAME')
+                    if not username:
+                        raise ValueError(
+                            "Either provide 'repo_id', a dataset name with owner (e.g. 'org/dataset'),"
+                            " or set HF_USERNAME to build the repository id."
+                        )
+                    repo_id = f"{username}/{dataset_name}"
 
-            # Import uploader
-            from deepsynth.pipelines.uploaders import EfficientIncrementalUploader
-
-            uploader = EfficientIncrementalUploader(
-                hf_token=hf_token,
-                hf_username=hf_username,
-                dataset_name=dataset_name,
-                batch_size=config.get('batch_size', 5000),
-                private=config.get('private_dataset', False),
-            )
+            manager = HubShardManager(repo_id=repo_id, token=hf_token)
 
             total_uploaded = 0
 
-            # Process Natural Questions
+            def flush_batch(batch: list, source_name: str) -> None:
+                nonlocal total_uploaded
+                if not batch:
+                    return
+
+                shard_id = manager.next_shard_id()
+                commit_message = f"Add {source_name} shard {shard_id} ({len(batch)} samples)"
+                result = manager.upload_samples_as_shard(batch, shard_id, commit_message=commit_message)
+                logger.info(
+                    "Uploaded shard %s: %s new samples (%s duplicates)",
+                    shard_id,
+                    result.uploaded_samples,
+                    result.skipped_duplicates,
+                )
+
+                if result.uploaded_samples:
+                    total_uploaded += result.uploaded_samples
+                    job.processed_samples = total_uploaded
+                    if not job.hf_dataset_repo:
+                        job.hf_dataset_repo = repo_id
+                    self.state_manager.update_job(job)
+                    if progress_callback:
+                        total_target = job.total_samples or total_uploaded
+                        progress_callback(job.processed_samples, total_target)
+
+                if result.index_updated:
+                    try:
+                        manager.save_index(f"Update shard index after {shard_id}")
+                    except Exception as index_err:  # pragma: no cover - defensive logging
+                        logger.warning("Failed to persist shard index for %s: %s", shard_id, index_err)
+
+                batch.clear()
+
+            # Process Natural Questions first if selected
             if 'natural_questions' in qa_sources:
                 logger.info("Processing Natural Questions...")
-
                 nq_dataset = convert_natural_questions(
                     split="train",
                     max_samples=max_nq_samples,
@@ -369,40 +415,18 @@ class IncrementalDatasetGenerator:
                     target_resolution=target_resolution,
                 )
 
-                batch = []
-                processed = 0
-
+                nq_batch: list = []
                 for sample in nq_dataset:
-                    batch.append(sample)
-                    processed += 1
+                    nq_batch.append(sample)
+                    if len(nq_batch) >= batch_size:
+                        flush_batch(nq_batch, 'natural_questions')
 
-                    # Upload batch when full
-                    if len(batch) >= config.get('batch_size', 5000):
-                        uploaded, duplicates = uploader.upload_batch(batch)
-                        total_uploaded += uploaded
-                        logger.info(f"Uploaded {uploaded} Natural Questions samples")
-                        batch = []
+                # Upload remaining
+                flush_batch(nq_batch, 'natural_questions')
 
-                        # Update progress
-                        job.processed_samples = total_uploaded
-                        self.state_manager.update_job(job)
-                        if progress_callback:
-                            progress_callback(total_uploaded, max_nq_samples or 300000)
-
-                    # Stop if reached max
-                    if max_nq_samples and processed >= max_nq_samples:
-                        break
-
-                # Upload remaining batch
-                if batch:
-                    uploaded, duplicates = uploader.upload_batch(batch)
-                    total_uploaded += uploaded
-                    logger.info(f"Uploaded final {uploaded} Natural Questions samples")
-
-            # Process MS MARCO
+            # Process MS MARCO second for faster startup
             if 'ms_marco' in qa_sources:
                 logger.info("Processing MS MARCO...")
-
                 marco_dataset = convert_ms_marco(
                     config="v2.1",
                     split="train",
@@ -411,40 +435,16 @@ class IncrementalDatasetGenerator:
                     target_resolution=target_resolution,
                 )
 
-                batch = []
-                processed = 0
-
+                marco_batch: list = []
                 for sample in marco_dataset:
-                    batch.append(sample)
-                    processed += 1
+                    marco_batch.append(sample)
+                    if len(marco_batch) >= batch_size:
+                        flush_batch(marco_batch, 'ms_marco')
 
-                    # Upload batch when full
-                    if len(batch) >= config.get('batch_size', 5000):
-                        uploaded, duplicates = uploader.upload_batch(batch)
-                        total_uploaded += uploaded
-                        logger.info(f"Uploaded {uploaded} MS MARCO samples")
-                        batch = []
+                flush_batch(marco_batch, 'ms_marco')
 
-                        # Update progress
-                        job.processed_samples = total_uploaded
-                        self.state_manager.update_job(job)
-                        if progress_callback:
-                            progress_callback(total_uploaded, (max_nq_samples or 300000) + (max_marco_samples or 1000000))
-
-                    # Stop if reached max
-                    if max_marco_samples and processed >= max_marco_samples:
-                        break
-
-                # Upload remaining batch
-                if batch:
-                    uploaded, duplicates = uploader.upload_batch(batch)
-                    total_uploaded += uploaded
-                    logger.info(f"Uploaded final {uploaded} MS MARCO samples")
-
-            # Mark job as completed
             job.status = JobStatus.COMPLETED.value
             job.processed_samples = total_uploaded
-            job.hf_dataset_repo = repo_id
             self.state_manager.update_job(job)
 
             logger.info(f"Q&A dataset generation completed. Total uploaded: {total_uploaded}")
@@ -455,6 +455,12 @@ class IncrementalDatasetGenerator:
             job.last_error = str(e)
             self.state_manager.update_job(job)
             raise
+        finally:
+            if manager is not None:
+                try:
+                    manager.save_index("Persist shard index after QA generation")
+                except Exception as index_err:  # pragma: no cover - defensive logging
+                    logger.warning("Failed to persist shard index: %s", index_err)
 
 
 class ModelTrainer:
