@@ -26,6 +26,7 @@ Usage:
 
 import argparse
 import logging
+import pickle
 import sys
 from pathlib import Path
 
@@ -147,17 +148,21 @@ def generate_combined_qa_dataset(
     # Load config
     config = Config.from_env()
 
-    # Initialize uploader
+    # Setup work directories
+    work_dir = Path("./work")
+    samples_dir = work_dir / "samples"
+    samples_dir.mkdir(parents=True, exist_ok=True)
+
+    # Initialize uploader with correct parameters
+    repo_name = output_name if '/' in output_name else f"{config.hf_username}/{output_name}"
     uploader = EfficientIncrementalUploader(
-        hf_token=config.hf_token,
-        hf_username=config.hf_username,
-        dataset_name=output_name,
-        batch_size=batch_size,
-        private=False,  # Public dataset
+        work_dir=str(work_dir),
+        batches_per_upload=1,  # Upload immediately when batch is full
+        dataset_name=repo_name,
     )
 
-    total_uploaded = 0
-    total_skipped = 0
+    batch_counter = 0
+    total_processed = 0
 
     # Process Natural Questions
     if not skip_nq:
@@ -176,23 +181,32 @@ def generate_combined_qa_dataset(
 
             LOGGER.info(f"Converting Natural Questions (max: {nq_max_samples or 'all'})...")
 
-            # Process and upload in batches
-            batch = []
+            # Process and save in batches
+            current_batch = []
             processed = 0
-            skipped = 0
 
             for sample in nq_dataset:
-                batch.append(sample)
+                current_batch.append(sample)
                 processed += 1
 
-                # Upload batch when full
-                if len(batch) >= batch_size:
-                    LOGGER.info(f"Uploading batch of {len(batch)} samples...")
-                    uploaded, duplicates = uploader.upload_batch(batch)
-                    total_uploaded += uploaded
-                    skipped += duplicates
-                    LOGGER.info(f"✓ Uploaded {uploaded} samples ({duplicates} duplicates skipped)")
-                    batch = []
+                # Save batch when full
+                if len(current_batch) >= batch_size:
+                    # Save to disk
+                    batch_file = samples_dir / f"batch_{batch_counter:06d}.pkl"
+                    with open(batch_file, 'wb') as f:
+                        pickle.dump(current_batch, f)
+                    LOGGER.info(f"💾 Saved batch {batch_counter} ({len(current_batch)} samples)")
+
+                    # Upload immediately
+                    try:
+                        uploader.upload_if_ready()
+                        LOGGER.info(f"✅ Batch {batch_counter} uploaded")
+                    except Exception as e:
+                        LOGGER.warning(f"⚠️  Upload warning: {e} (will retry later)")
+
+                    batch_counter += 1
+                    total_processed += len(current_batch)
+                    current_batch = []
 
                 # Progress logging
                 if processed % 1000 == 0:
@@ -202,14 +216,24 @@ def generate_combined_qa_dataset(
                 if nq_max_samples and processed >= nq_max_samples:
                     break
 
-            # Upload remaining batch
-            if batch:
-                LOGGER.info(f"Uploading final batch of {len(batch)} samples...")
-                uploaded, duplicates = uploader.upload_batch(batch)
-                total_uploaded += uploaded
-                skipped += duplicates
+            # Save remaining batch
+            if current_batch:
+                batch_file = samples_dir / f"batch_{batch_counter:06d}.pkl"
+                with open(batch_file, 'wb') as f:
+                    pickle.dump(current_batch, f)
+                LOGGER.info(f"💾 Saved final batch {batch_counter} ({len(current_batch)} samples)")
 
-            LOGGER.info(f"✅ Natural Questions complete: {processed:,} processed, {total_uploaded:,} uploaded")
+                # Upload
+                try:
+                    uploader.upload_if_ready()
+                    LOGGER.info(f"✅ Final batch {batch_counter} uploaded")
+                except Exception as e:
+                    LOGGER.warning(f"⚠️  Upload warning: {e} (will retry later)")
+
+                batch_counter += 1
+                total_processed += len(current_batch)
+
+            LOGGER.info(f"✅ Natural Questions complete: {processed:,} samples processed")
 
         except Exception as e:
             LOGGER.error(f"❌ Error processing Natural Questions: {e}", exc_info=True)
@@ -234,22 +258,32 @@ def generate_combined_qa_dataset(
 
             LOGGER.info(f"Converting MS MARCO (max: {marco_max_samples or 'all'})...")
 
-            # Process and upload in batches
-            batch = []
+            # Process and save in batches
+            current_batch = []
             processed = 0
 
             for sample in marco_dataset:
-                batch.append(sample)
+                current_batch.append(sample)
                 processed += 1
 
-                # Upload batch when full
-                if len(batch) >= batch_size:
-                    LOGGER.info(f"Uploading batch of {len(batch)} samples...")
-                    uploaded, duplicates = uploader.upload_batch(batch)
-                    total_uploaded += uploaded
-                    total_skipped += duplicates
-                    LOGGER.info(f"✓ Uploaded {uploaded} samples ({duplicates} duplicates skipped)")
-                    batch = []
+                # Save batch when full
+                if len(current_batch) >= batch_size:
+                    # Save to disk
+                    batch_file = samples_dir / f"batch_{batch_counter:06d}.pkl"
+                    with open(batch_file, 'wb') as f:
+                        pickle.dump(current_batch, f)
+                    LOGGER.info(f"💾 Saved batch {batch_counter} ({len(current_batch)} samples)")
+
+                    # Upload immediately
+                    try:
+                        uploader.upload_if_ready()
+                        LOGGER.info(f"✅ Batch {batch_counter} uploaded")
+                    except Exception as e:
+                        LOGGER.warning(f"⚠️  Upload warning: {e} (will retry later)")
+
+                    batch_counter += 1
+                    total_processed += len(current_batch)
+                    current_batch = []
 
                 # Progress logging
                 if processed % 5000 == 0:
@@ -259,27 +293,46 @@ def generate_combined_qa_dataset(
                 if marco_max_samples and processed >= marco_max_samples:
                     break
 
-            # Upload remaining batch
-            if batch:
-                LOGGER.info(f"Uploading final batch of {len(batch)} samples...")
-                uploaded, duplicates = uploader.upload_batch(batch)
-                total_uploaded += uploaded
-                total_skipped += duplicates
+            # Save remaining batch
+            if current_batch:
+                batch_file = samples_dir / f"batch_{batch_counter:06d}.pkl"
+                with open(batch_file, 'wb') as f:
+                    pickle.dump(current_batch, f)
+                LOGGER.info(f"💾 Saved final batch {batch_counter} ({len(current_batch)} samples)")
 
-            LOGGER.info(f"✅ MS MARCO complete: {processed:,} processed, {total_uploaded:,} uploaded")
+                # Upload
+                try:
+                    uploader.upload_if_ready()
+                    LOGGER.info(f"✅ Final batch {batch_counter} uploaded")
+                except Exception as e:
+                    LOGGER.warning(f"⚠️  Upload warning: {e} (will retry later)")
+
+                batch_counter += 1
+                total_processed += len(current_batch)
+
+            LOGGER.info(f"✅ MS MARCO complete: {processed:,} samples processed")
 
         except Exception as e:
             LOGGER.error(f"❌ Error processing MS MARCO: {e}", exc_info=True)
             raise
+
+    # Upload any remaining batches
+    LOGGER.info("")
+    LOGGER.info("📤 Uploading remaining batches...")
+    try:
+        uploader.upload_all_pending()
+    except Exception as e:
+        LOGGER.warning(f"⚠️  Some batches may not have been uploaded: {e}")
+        LOGGER.info("   You can retry by running: python -m deepsynth.pipelines.uploaders.incremental")
 
     # Final summary
     LOGGER.info("")
     LOGGER.info("=" * 80)
     LOGGER.info("🎉 GENERATION COMPLETE!")
     LOGGER.info("=" * 80)
-    LOGGER.info(f"Total samples uploaded: {total_uploaded:,}")
-    LOGGER.info(f"Total duplicates skipped: {total_skipped:,}")
-    LOGGER.info(f"Dataset URL: https://huggingface.co/datasets/{config.hf_username}/{output_name}")
+    LOGGER.info(f"Total samples processed: {total_processed:,}")
+    LOGGER.info(f"Total batches created: {batch_counter}")
+    LOGGER.info(f"Dataset URL: https://huggingface.co/datasets/{repo_name}")
     LOGGER.info("")
     LOGGER.info("📊 Dataset composition:")
     if not skip_nq:
@@ -289,6 +342,9 @@ def generate_combined_qa_dataset(
     LOGGER.info("")
     LOGGER.info("💡 Use metadata.source to filter by source:")
     LOGGER.info("   dataset.filter(lambda x: x['metadata']['source'] == 'natural_questions')")
+    LOGGER.info("")
+    LOGGER.info("💡 To resume or retry uploads:")
+    LOGGER.info("   PYTHONPATH=./src python3 -m deepsynth.pipelines.uploaders.incremental")
     LOGGER.info("=" * 80)
 
 
