@@ -409,6 +409,60 @@ cp .env.example .env  # Add same HF_TOKEN
 # Automatically detects existing 50k samples, continues from 50,001
 ```
 
+## Critical Pitfalls to Avoid
+
+### ❌ NEVER: Use save_to_disk() + upload_folder() for HuggingFace datasets
+
+**Error symptoms:**
+```
+datasets.exceptions.DatasetGenerationCastError: An error occurred while generating the dataset
+
+All the data files must have the same columns, but at some point there are 2 new columns
+({'shards', 'metadata'}) and 7 missing columns ({'_data_files', '_fingerprint', ...})
+
+Couldn't cast array of type int64 to null
+```
+
+**Root cause:**
+- HuggingFace dataset loader treats ALL `.json` files in `data/` as data files
+- `dataset.save_to_disk()` creates `state.json` and `dataset_info.json` which conflict with actual data
+- Inconsistent schemas between batches cause Parquet conversion failures
+- Metadata files (`shards.json`) in `data/` directory are loaded as dataset samples
+
+**✅ CORRECT approach:**
+```python
+# Use push_to_hub() directly - handles Parquet conversion correctly
+dataset.push_to_hub(
+    repo_id=self.repo_id,
+    split="train",
+    token=self.token,
+    commit_message=message,
+    data_dir=f"data/{shard_id}",  # Store in subdirectories
+    private=False,
+)
+```
+
+**Additional requirements:**
+- Store metadata files OUTSIDE `data/` directory (use `_deepsynth/` prefix - ignored by HF scanner)
+- Never use `ignore_patterns=["*.json"]` with `upload_folder()` - breaks dataset structure
+- Always test with `load_dataset(repo_id)` before production deployment
+
+**Reference:** See commit `125b862` for the complete fix implementation in `src/deepsynth/data/hub/shards.py`
+
+### ❌ NEVER: Store metadata JSON files in data/ directory
+
+**Wrong:**
+```python
+INDEX_PATH_IN_REPO = "data/shards.json"  # ❌ Will be loaded as dataset!
+```
+
+**Correct:**
+```python
+INDEX_PATH_IN_REPO = "_deepsynth/shards.json"  # ✅ Ignored by dataset loader
+```
+
+**Why:** HuggingFace's dataset builder scans the entire `data/` directory for data files. Any JSON in `data/` will be treated as dataset samples, causing schema conflicts.
+
 ## Documentation
 
 Comprehensive documentation is available in `docs/`:
