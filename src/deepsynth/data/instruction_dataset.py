@@ -163,6 +163,14 @@ class InstructionDataset:
         if "metadata" in sample:
             result["metadata"] = sample["metadata"]
 
+        # Pass through tracking fields (required for HubShardManager deduplication)
+        if "source_dataset" in sample:
+            result["source_dataset"] = sample["source_dataset"]
+        if "original_split" in sample:
+            result["original_split"] = sample["original_split"]
+        if "original_index" in sample:
+            result["original_index"] = sample["original_index"]
+
         return result
 
     def __iter__(self) -> Iterator[Dict[str, Any]]:

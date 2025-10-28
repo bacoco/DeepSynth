@@ -334,6 +334,11 @@ def convert_natural_questions(
                 "token_count": full_document_token_count,  # Full document
                 "extracted_token_count": extracted_token_count,  # What's in the image
 
+                # Tracking fields (required for HubShardManager deduplication)
+                "source_dataset": "natural_questions",
+                "original_split": split,
+                "original_index": idx,
+
                 # Metadata
                 "metadata": {
                     "source": "natural_questions",
@@ -374,7 +379,9 @@ def convert_natural_questions(
             pct = (count / len(converted_samples)) * 100
             LOGGER.info(f"  {quality}: {count} ({pct:.1f}%)")
 
-    return InstructionDataset(converted_samples, split=split, use_augmentation=False)
+    # For HF upload/storage, return raw dicts (PIL Images, no transforms)
+    # InstructionDataset will be created during training for transforms
+    return converted_samples
 
 
 __all__ = ["convert_natural_questions", "extract_contextual_window"]

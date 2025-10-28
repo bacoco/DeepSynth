@@ -196,31 +196,37 @@ class HubShardManager:
         return filtered, skipped
 
     def _build_dataset(self, samples: Sequence[Dict[str, object]]) -> Dataset:
-        base_payload = {
-            "text": [sample["text"] for sample in samples],
-            "summary": [sample["summary"] for sample in samples],
-            "image": [sample["image"] for sample in samples],
-            "source_dataset": [sample["source_dataset"] for sample in samples],
-            "original_split": [sample["original_split"] for sample in samples],
-            "original_index": [sample["original_index"] for sample in samples],
-        }
+        """
+        Build HuggingFace Dataset from samples.
 
-        # Include any generated multi-resolution columns (image_<name>)
-        image_columns = sorted(
-            {
-                key
-                for sample in samples
-                for key in sample.keys()
-                if key.startswith("image_") and key != "image"
-            }
-        )
-        for column in image_columns:
-            base_payload[column] = [sample.get(column) for sample in samples]
+        Supports both summarization ({text, summary, image}) and Q&A ({text, instruction, answer, metadata}) schemas.
+        Automatically detects and includes all fields from samples.
+        """
+        if not samples:
+            return Dataset.from_dict({})
 
+        # Collect all unique keys from samples
+        all_keys = set()
+        for sample in samples:
+            all_keys.update(sample.keys())
+
+        # Build payload dynamically with all fields
+        base_payload = {}
+        for key in sorted(all_keys):
+            base_payload[key] = [sample.get(key) for sample in samples]
+
+        # Identify image columns (main "image" and multi-resolution "image_<name>")
+        image_columns = sorted([key for key in all_keys if key.startswith("image")])
+
+        # Create dataset
         dataset = Dataset.from_dict(base_payload)
-        dataset = dataset.cast_column("image", ImageFeature())
+
+        # Cast image columns to HuggingFace ImageFeature
         for column in image_columns:
-            dataset = dataset.cast_column(column, ImageFeature())
+            # Only cast if column contains images (not None)
+            if any(dataset[column]):
+                dataset = dataset.cast_column(column, ImageFeature())
+
         return dataset
 
     def _build_shard_entry(
