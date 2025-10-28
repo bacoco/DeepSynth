@@ -144,19 +144,24 @@ class HubShardManager:
             self._next_batch_id = numeric_suffix + 1
 
         dataset = self._build_dataset(filtered_samples)
-        path_in_repo = f"data/{shard_id}"
+        path_in_repo = f"data/{shard_id}.parquet"  # Single parquet file
         message = commit_message or f"Add shard {shard_id} ({len(filtered_samples)} samples)"
 
-        # Use push_to_hub directly - it handles schema/metadata correctly
-        # and creates Parquet files that work with load_dataset()
-        dataset.push_to_hub(
-            repo_id=self.repo_id,
-            split="train",
-            token=self.token,
-            commit_message=message,
-            data_dir=path_in_repo,  # Store in data/batch_XXXXXX/
-            private=False,
-        )
+        # Export to parquet and upload ONLY the file (don't touch metadata)
+        # This allows incremental uploads without overwriting dataset metadata
+        with tempfile.TemporaryDirectory() as tmpdir:
+            local_parquet = Path(tmpdir) / f"{shard_id}.parquet"
+            dataset.to_parquet(local_parquet)
+
+            # Upload JUST the parquet file
+            self.api.upload_file(
+                path_or_fileobj=str(local_parquet),
+                path_in_repo=path_in_repo,
+                repo_id=self.repo_id,
+                repo_type="dataset",
+                token=self.token,
+                commit_message=message,
+            )
 
         shard_entry = self._build_shard_entry(shard_id, path_in_repo, filtered_samples)
         self.index["shards"].append(shard_entry)
