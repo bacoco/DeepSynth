@@ -293,25 +293,24 @@ def convert_natural_questions(
                         "quality": quality,
                         "source_dataset": "natural_questions",
                         "original_index": idx,
-                        # All technical info in metadata
+                        # All technical info in metadata (MUST match ms_marco.py schema)
                         "metadata": {
                             "source": "natural_questions",
-                            "split": split,
+                            "config": None,  # No config for Natural Questions (matches MS MARCO structure)
                             "original_index": idx,
                             "original_split": split,
-                            "question": question.strip(),
+                            "has_short": bool(short_answer_text),  # Renamed from has_short_answer
+                            "has_long": bool(long_answer_text),  # Renamed from has_long_answer
                             "answer_type": answer_type,
                             "answer_start_token": answer_start,
                             "answer_end_token": answer_end,
-                            "has_short_answer": bool(short_answer_text),
-                            "has_long_answer": bool(long_answer_text),
                             "extraction_method": extraction_method,
                             "extraction_window_tokens": extraction_window,
                             "extracted_token_count": extracted_token_count,
-                            "token_count": full_document_token_count,
                             "generation_resolution": target_resolution,
                             "quality_description": quality_desc,
                             "estimated_height": estimated_height,
+                            "token_count": full_document_token_count,
                         },
                     }
 
