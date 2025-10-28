@@ -16,7 +16,7 @@ from typing import List, Optional, Tuple
 
 from datasets import load_dataset
 
-from ..instruction_dataset import InstructionDataset
+# InstructionDataset import removed - converter now returns raw dicts
 from ..quality_calculator import (
     calculate_quality,
     calculate_optimal_context_window,
@@ -161,7 +161,7 @@ def convert_natural_questions(
     max_samples: Optional[int] = None,
     streaming: bool = True,
     target_resolution: str = "gundam",
-) -> InstructionDataset:
+) -> List[dict]:
     """
     Convert Natural Questions to instruction format with pre-generated images.
 
