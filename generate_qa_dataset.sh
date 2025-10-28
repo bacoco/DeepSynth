@@ -130,14 +130,9 @@ else
     echo "  • Upload incrémental tous les 5000 samples"
     echo "  • Interruption/reprise supportée (Ctrl+C)"
     echo ""
-    echo "⚠️  AVERTISSEMENT: Ceci va prendre plusieurs heures"
-
-    read -p "   Continuer? (o/N): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[OoYy]$ ]]; then
-        echo "❌ Annulé par l'utilisateur"
-        exit 0
-    fi
+    echo "⚠️  Ce processus prendra plusieurs heures"
+    echo "   Démarrage automatique dans 2 secondes..."
+    sleep 2
 
     TEST_FLAG=""
 fi
