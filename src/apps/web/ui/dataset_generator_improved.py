@@ -346,9 +346,9 @@ class IncrementalDatasetGenerator:
             repo_id = f"{hf_username}/{dataset_name}"
 
             # Import uploader
-            from deepsynth.pipelines.uploaders import IncrementalDatasetUploader
+            from deepsynth.pipelines.uploaders import EfficientIncrementalUploader
 
-            uploader = IncrementalDatasetUploader(
+            uploader = EfficientIncrementalUploader(
                 hf_token=hf_token,
                 hf_username=hf_username,
                 dataset_name=dataset_name,
