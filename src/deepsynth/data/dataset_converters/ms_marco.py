@@ -142,6 +142,11 @@ def convert_ms_marco(
                 "token_count": token_count,
                 "extracted_token_count": token_count,  # Same as token_count (no extraction)
 
+                # Tracking fields (required for HubShardManager deduplication)
+                "source_dataset": "ms_marco",
+                "original_split": split,
+                "original_index": idx,
+
                 # Metadata
                 "metadata": {
                     "source": "ms_marco",
@@ -179,7 +184,9 @@ def convert_ms_marco(
             pct = (count / len(converted_samples)) * 100
             LOGGER.info(f"  {quality}: {count} ({pct:.1f}%)")
 
-    return InstructionDataset(converted_samples, split=split, use_augmentation=False)
+    # For HF upload/storage, return raw dicts (PIL Images, no transforms)
+    # InstructionDataset will be created during training for transforms
+    return converted_samples
 
 
 __all__ = ["convert_ms_marco"]
