@@ -90,6 +90,11 @@ def convert_ms_marco(
 
                     answer = answers[0]  # Use first answer
 
+                    # Skip samples with placeholder "No Answer Present." string
+                    if not answer or answer.strip() in ["No Answer Present.", "No Answer Present", ""]:
+                        skipped += 1
+                        continue
+
                     # Generate image at target resolution (PRE-GENERATION)
                     # MS MARCO documents are typically short, so no extraction needed
                     image = converter.convert(document)
@@ -99,31 +104,33 @@ def convert_ms_marco(
                     quality, quality_desc, estimated_height = calculate_quality(token_count)
 
                     payload = {
-                        "text": document.strip(),
+                        # Main columns for fine-tuning
                         "instruction": query.strip(),
                         "answer": answer.strip(),
                         "short_answer": answer.strip(),
                         "long_answer": "",
-                        "answer_start_token": None,
-                        "answer_end_token": None,
+                        "text": document.strip(),
                         "image": image,
                         "quality": quality,
-                        "estimated_height": estimated_height,
-                        "token_count": token_count,
-                        "extracted_token_count": token_count,
                         "source_dataset": "ms_marco",
-                        "original_split": split,
                         "original_index": idx,
+                        # All technical info in metadata
                         "metadata": {
                             "source": "ms_marco",
                             "config": config,
                             "original_index": idx,
+                            "original_split": split,
                             "has_short": True,
                             "has_long": False,
                             "answer_type": "short",
+                            "answer_start_token": None,
+                            "answer_end_token": None,
                             "extraction_method": "full_document",
                             "generation_resolution": target_resolution,
                             "quality_description": quality_desc,
+                            "estimated_height": estimated_height,
+                            "token_count": token_count,
+                            "extracted_token_count": token_count,
                         },
                     }
 

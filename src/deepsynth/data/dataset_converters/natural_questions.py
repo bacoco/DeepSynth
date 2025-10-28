@@ -283,38 +283,35 @@ def convert_natural_questions(
                     quality, quality_desc, estimated_height = calculate_quality(extracted_token_count)
 
                     payload = {
-                        # Store FULL document (not extracted) for flexibility
-                        "text": full_document_text.strip(),
+                        # Main columns for fine-tuning
                         "instruction": question.strip(),
                         "answer": primary_answer.strip(),
                         "short_answer": short_answer_text.strip(),
                         "long_answer": long_answer_text.strip(),
-                        "answer_type": answer_type,
-                        "answer_start_token": answer_start,
-                        "answer_end_token": answer_end,
-                        "extraction_method": extraction_method,
-                        "extraction_window_tokens": extraction_window,
-                        "extracted_token_count": extracted_token_count,
-                        "token_count": full_document_token_count,
+                        "text": full_document_text.strip(),
                         "image": image,
                         "quality": quality,
-                        "quality_description": quality_desc,
-                        "estimated_height": estimated_height,
                         "source_dataset": "natural_questions",
-                        "original_split": split,
                         "original_index": idx,
+                        # All technical info in metadata
                         "metadata": {
                             "source": "natural_questions",
                             "split": split,
                             "original_index": idx,
+                            "original_split": split,
                             "question": question.strip(),
                             "answer_type": answer_type,
+                            "answer_start_token": answer_start,
+                            "answer_end_token": answer_end,
                             "has_short_answer": bool(short_answer_text),
                             "has_long_answer": bool(long_answer_text),
                             "extraction_method": extraction_method,
                             "extraction_window_tokens": extraction_window,
+                            "extracted_token_count": extracted_token_count,
+                            "token_count": full_document_token_count,
                             "generation_resolution": target_resolution,
                             "quality_description": quality_desc,
+                            "estimated_height": estimated_height,
                         },
                     }
 

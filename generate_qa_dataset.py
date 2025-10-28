@@ -97,8 +97,8 @@ def parse_args():
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=100,
-        help="Batch size for incremental uploads (default: 100)"
+        default=5000,
+        help="Batch size for incremental uploads (default: 5000)"
     )
 
     parser.add_argument(
@@ -210,8 +210,8 @@ def generate_combined_qa_dataset(
                     total_processed += len(current_batch)
                     current_batch = []
 
-                # Progress logging (every 100 samples for better visibility)
-                if processed % 100 == 0:
+                # Progress logging (every 1000 samples for better visibility)
+                if processed % 1000 == 0:
                     LOGGER.info(f"✓ Processed {processed:,} MS MARCO samples (batch size: {len(current_batch)})...")
 
                 # Stop if we reached max
@@ -285,8 +285,8 @@ def generate_combined_qa_dataset(
                     total_processed += len(current_batch)
                     current_batch = []
 
-                # Progress logging (every 100 samples for better visibility)
-                if processed % 100 == 0:
+                # Progress logging (every 1000 samples for better visibility)
+                if processed % 1000 == 0:
                     LOGGER.info(f"✓ Processed {processed:,} Natural Questions samples (batch size: {len(current_batch)})...")
 
                 # Stop if we reached max
