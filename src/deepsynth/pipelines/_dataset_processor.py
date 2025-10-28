@@ -171,8 +171,19 @@ class OptimizedDatasetPipeline:
             existing_metadata = load_dataset(
                 repo_name,
                 split='train',
-                columns=['original_index', 'original_split']
             )
+
+            # Restrict to the metadata columns we actually need when they exist.
+            wanted_columns = {'original_index', 'original_split'}
+            available_columns = set(existing_metadata.column_names)
+            missing_columns = wanted_columns - available_columns
+            if missing_columns:
+                print(
+                    "    ⚠️  Missing expected metadata columns: "
+                    f"{', '.join(sorted(missing_columns))}"
+                )
+            else:
+                existing_metadata = existing_metadata.select_columns(sorted(wanted_columns))
 
             processed = set()
             for row in existing_metadata:
@@ -211,13 +222,19 @@ class OptimizedDatasetPipeline:
         self.current_batch = []
 
     def _ensure_uploader(self, repo_name):
-        """Initialize uploader with correct dataset_name if not already done"""
-        if self.auto_upload and self.uploader is None:
-            self.uploader = EfficientIncrementalUploader(
-                work_dir=str(self.work_dir),
-                batches_per_upload=1,  # Upload immediately when batch is full (5000 samples)
-                dataset_name=repo_name
-            )
+        """(Re)initialize uploader with the correct target repository."""
+        if not self.auto_upload:
+            return
+
+        normalized_repo = repo_name
+        if self.uploader is not None and getattr(self.uploader, "dataset_name", None) == normalized_repo:
+            return
+
+        self.uploader = EfficientIncrementalUploader(
+            work_dir=str(self.work_dir),
+            batches_per_upload=1,  # Upload immediately when batch is full (5000 samples)
+            dataset_name=normalized_repo,
+        )
 
     def _upload_dataset_card(self, repo_name, dataset_output_name, total_samples):
         """
