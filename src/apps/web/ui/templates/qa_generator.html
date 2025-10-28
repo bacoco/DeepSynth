@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepSynth Q&A Dataset Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .back-link {
+            display: inline-block;
+            color: white;
+            text-decoration: none;
+            opacity: 0.9;
+            margin-top: 15px;
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+
+        .back-link:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 4px;
+        }
+
+        .warning-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 4px;
+        }
+
+        .form-section {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .form-section h3 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #495057;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .checkbox-group {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .progress-container {
+            display: none;
+            margin-top: 30px;
+            padding: 25px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e9ecef;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+        }
+
+        .progress-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .progress-stat {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #667eea;
+        }
+
+        .progress-stat strong {
+            display: block;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            color: #155724;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+            color: #721c24;
+        }
+
+        .dataset-size-estimate {
+            background: #fff3cd;
+            padding: 20px;
+            border-radius: 6px;
+            margin-top: 15px;
+        }
+
+        .dataset-size-estimate h4 {
+            margin-bottom: 10px;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 Q&A Dataset Generator</h1>
+            <p class="subtitle">Generate combined Natural Questions + MS MARCO dataset with pre-generated images</p>
+            <a href="/" class="back-link">← Back to Main Interface</a>
+        </header>
+
+        <div class="content">
+            <div class="info-box">
+                <strong>ℹ️ What This Generates:</strong><br>
+                A single combined dataset (<code>deepsynth-qa</code>) containing both Natural Questions and MS MARCO samples with pre-generated images at gundam resolution (1600px). All samples include metadata to track their source.
+            </div>
+
+            <div class="warning-box">
+                <strong>⚠️ Time & Storage Estimate:</strong><br>
+                • Test mode (1k samples/source): ~5-10 minutes<br>
+                • Production (~1.3M samples): 6-12 hours, 312-624 GB compressed on HuggingFace
+            </div>
+
+            <form id="qa-form">
+                <div class="form-section">
+                    <h3>1️⃣ Dataset Configuration</h3>
+
+                    <div class="form-group">
+                        <label for="dataset_name">Output Dataset Name</label>
+                        <input type="text" id="dataset_name" name="dataset_name" value="deepsynth-qa" required>
+                        <small style="color: #6c757d;">Will be uploaded to HuggingFace as {username}/{dataset_name}</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Sources to Include</label>
+                        <div class="checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="sources" value="natural_questions" checked>
+                                Natural Questions (~300k samples)
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="sources" value="ms_marco" checked>
+                                MS MARCO (~1M samples)
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>2️⃣ Sample Limits (Optional)</h3>
+
+                    <div class="form-group">
+                        <label for="max_nq_samples">Natural Questions Max Samples</label>
+                        <input type="number" id="max_nq_samples" name="max_nq_samples" placeholder="Leave empty for all (~300k)">
+                        <small style="color: #6c757d;">For testing, use 1000-5000</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="max_marco_samples">MS MARCO Max Samples</label>
+                        <input type="number" id="max_marco_samples" name="max_marco_samples" placeholder="Leave empty for all (~1M)">
+                        <small style="color: #6c757d;">For testing, use 1000-5000</small>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>3️⃣ Advanced Options</h3>
+
+                    <div class="form-group">
+                        <label for="target_resolution">Image Resolution</label>
+                        <select id="target_resolution" name="target_resolution">
+                            <option value="tiny">Tiny (512×512px)</option>
+                            <option value="small">Small (640×640px)</option>
+                            <option value="base">Base (1024×1024px)</option>
+                            <option value="large">Large (1280×1280px)</option>
+                            <option value="gundam" selected>Gundam (1600×1600px) - Recommended</option>
+                        </select>
+                        <small style="color: #6c757d;">Gundam provides best quality and can be downscaled during training</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="batch_size">Upload Batch Size</label>
+                        <input type="number" id="batch_size" name="batch_size" value="5000" min="1000" max="10000">
+                        <small style="color: #6c757d;">Samples per batch upload to HuggingFace (5000 recommended)</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="private_dataset" name="private_dataset">
+                            Make dataset private on HuggingFace
+                        </label>
+                    </div>
+                </div>
+
+                <div class="dataset-size-estimate">
+                    <h4>📊 Estimated Dataset Size</h4>
+                    <div id="size-estimate">
+                        <strong>Natural Questions</strong> (~300k samples): 216-432 GB compressed<br>
+                        <strong>MS MARCO</strong> (~1M samples): 96-192 GB compressed<br>
+                        <strong>Total</strong>: 312-624 GB compressed on HuggingFace
+                    </div>
+                </div>
+
+                <button type="submit" id="generate-btn">🚀 Generate Q&A Dataset</button>
+            </form>
+
+            <div id="progress-container" class="progress-container">
+                <h3>Generation Progress</h3>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill">0%</div>
+                </div>
+                <div class="progress-info">
+                    <div class="progress-stat">
+                        <strong>Job ID</strong>
+                        <span id="job-id">-</span>
+                    </div>
+                    <div class="progress-stat">
+                        <strong>Status</strong>
+                        <span id="job-status">-</span>
+                    </div>
+                    <div class="progress-stat">
+                        <strong>Processed Samples</strong>
+                        <span id="processed-samples">0</span>
+                    </div>
+                    <div class="progress-stat">
+                        <strong>Dataset URL</strong>
+                        <span id="dataset-url">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="alert-container"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentJobId = null;
+        let progressInterval = null;
+
+        document.getElementById('qa-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = new FormData(e.target);
+            const sources = [];
+            document.querySelectorAll('input[name="sources"]:checked').forEach(cb => {
+                sources.push(cb.value);
+            });
+
+            if (sources.length === 0) {
+                showAlert('error', 'Please select at least one dataset source');
+                return;
+            }
+
+            const config = {
+                dataset_name: formData.get('dataset_name'),
+                qa_sources: sources,
+                target_resolution: formData.get('target_resolution'),
+                max_nq_samples: formData.get('max_nq_samples') ? parseInt(formData.get('max_nq_samples')) : null,
+                max_marco_samples: formData.get('max_marco_samples') ? parseInt(formData.get('max_marco_samples')) : null,
+                batch_size: parseInt(formData.get('batch_size')),
+                private_dataset: formData.get('private_dataset') === 'on',
+            };
+
+            try {
+                document.getElementById('generate-btn').disabled = true;
+                document.getElementById('generate-btn').textContent = 'Starting...';
+
+                const response = await fetch('/api/dataset/generate-qa', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(config)
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || 'Failed to start generation');
+                }
+
+                currentJobId = result.job_id;
+                document.getElementById('job-id').textContent = currentJobId;
+                document.getElementById('progress-container').style.display = 'block';
+
+                showAlert('success', `Generation started! Job ID: ${currentJobId}`);
+
+                // Start polling for progress
+                progressInterval = setInterval(updateProgress, 2000);
+
+            } catch (error) {
+                showAlert('error', error.message);
+                document.getElementById('generate-btn').disabled = false;
+                document.getElementById('generate-btn').textContent = '🚀 Generate Q&A Dataset';
+            }
+        });
+
+        async function updateProgress() {
+            if (!currentJobId) return;
+
+            try {
+                const response = await fetch(`/api/jobs/${currentJobId}/progress`);
+                const progress = await response.json();
+
+                document.getElementById('job-status').textContent = progress.status;
+                document.getElementById('processed-samples').textContent = progress.processed_samples || 0;
+
+                const percent = progress.progress_percentage || 0;
+                document.getElementById('progress-fill').style.width = `${percent}%`;
+                document.getElementById('progress-fill').textContent = `${percent}%`;
+
+                if (progress.hf_dataset_repo) {
+                    document.getElementById('dataset-url').innerHTML =
+                        `<a href="https://huggingface.co/datasets/${progress.hf_dataset_repo}" target="_blank">${progress.hf_dataset_repo}</a>`;
+                }
+
+                if (progress.status === 'completed') {
+                    clearInterval(progressInterval);
+                    showAlert('success', 'Generation completed successfully!');
+                    document.getElementById('generate-btn').disabled = false;
+                    document.getElementById('generate-btn').textContent = '🚀 Generate Q&A Dataset';
+                } else if (progress.status === 'failed') {
+                    clearInterval(progressInterval);
+                    showAlert('error', `Generation failed: ${progress.last_error || 'Unknown error'}`);
+                    document.getElementById('generate-btn').disabled = false;
+                    document.getElementById('generate-btn').textContent = '🚀 Generate Q&A Dataset';
+                }
+
+            } catch (error) {
+                console.error('Error updating progress:', error);
+            }
+        }
+
+        function showAlert(type, message) {
+            const container = document.getElementById('alert-container');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            container.appendChild(alert);
+
+            setTimeout(() => alert.remove(), 10000);
+        }
+    </script>
+</body>
+</html>

@@ -130,12 +130,40 @@ class InstructionDataset:
         else:
             raise KeyError(f"Sample {idx} must have either 'image' or 'text' field")
 
-        return {
+        result = {
             "text": sample.get("text", ""),
             "instruction": sample["instruction"],
             "summary": output,  # Use 'summary' key for compatibility with trainers
             "image": image,
         }
+
+        # Pass through quality indicators if present
+        if "quality" in sample:
+            result["quality"] = sample["quality"]
+        if "estimated_height" in sample:
+            result["estimated_height"] = sample["estimated_height"]
+        if "token_count" in sample:
+            result["token_count"] = sample["token_count"]
+        if "extracted_token_count" in sample:
+            result["extracted_token_count"] = sample["extracted_token_count"]
+
+        # Pass through answer columns if present
+        if "answer" in sample:
+            result["answer"] = sample["answer"]
+        if "short_answer" in sample:
+            result["short_answer"] = sample["short_answer"]
+        if "long_answer" in sample:
+            result["long_answer"] = sample["long_answer"]
+        if "answer_start_token" in sample:
+            result["answer_start_token"] = sample["answer_start_token"]
+        if "answer_end_token" in sample:
+            result["answer_end_token"] = sample["answer_end_token"]
+
+        # Pass through metadata if present
+        if "metadata" in sample:
+            result["metadata"] = sample["metadata"]
+
+        return result
 
     def __iter__(self) -> Iterator[Dict[str, Any]]:
         """Iterate over dataset."""
