@@ -125,35 +125,21 @@ def convert_ms_marco(
             token_count = len(document.split())
             quality, quality_desc, estimated_height = calculate_quality(token_count)
 
-            # Add to converted samples
+            # Add to converted samples (columns ordered by importance)
             converted_samples.append({
-                "text": document.strip(),
+                # IMPORTANT COLUMNS FIRST
                 "instruction": query.strip(),
-
-                # Answers
-                "answer": answer.strip(),
                 "short_answer": answer.strip(),  # MS MARCO answers are typically short
-                "long_answer": "",  # No long answer in MS MARCO
-
-                # Answer positions (MS MARCO doesn't provide these)
-                "answer_start_token": None,
-                "answer_end_token": None,
-
-                # Pre-generated image at target resolution
+                "text": document.strip(),
                 "image": image,
-
-                # Quality indicators
-                "quality": quality,
-                "estimated_height": estimated_height,
-                "token_count": token_count,
-                "extracted_token_count": token_count,  # Same as token_count (no extraction)
-
-                # Tracking fields (required for HubShardManager deduplication)
                 "source_dataset": "ms_marco",
-                "original_split": split,
-                "original_index": idx,
+                "quality": quality,
 
-                # Metadata
+                # LESS IMPORTANT
+                "long_answer": "",  # No long answer in MS MARCO
+                "answer": answer.strip(),  # Legacy field
+
+                # METADATA
                 "metadata": {
                     "source": "ms_marco",
                     "config": config,
@@ -161,10 +147,19 @@ def convert_ms_marco(
                     "has_short": True,
                     "has_long": False,
                     "answer_type": "short",
-                    "extraction_method": "full_document",  # MS MARCO docs are short
+                    "extraction_method": "full_document",
                     "generation_resolution": target_resolution,
                     "quality_description": quality_desc,
                 },
+
+                # TECHNICAL FIELDS (for tracking/processing)
+                "original_split": split,
+                "original_index": idx,
+                "token_count": token_count,
+                "extracted_token_count": token_count,
+                "estimated_height": estimated_height,
+                "answer_start_token": None,
+                "answer_end_token": None,
             })
 
             # Stop early if we have enough samples
