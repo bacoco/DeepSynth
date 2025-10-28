@@ -11,11 +11,11 @@ HuggingFace: ms_marco
 """
 
 import logging
-from typing import Optional
+from typing import List, Optional
 
 from datasets import load_dataset
 
-from ..instruction_dataset import InstructionDataset
+# InstructionDataset import removed - converter now returns raw dicts
 from ..quality_calculator import calculate_quality
 from ..transforms.text_to_image import TextToImageConverter
 
@@ -28,7 +28,7 @@ def convert_ms_marco(
     max_samples: Optional[int] = None,
     streaming: bool = True,
     target_resolution: str = "gundam",
-) -> InstructionDataset:
+) -> List[dict]:
     """
     Convert MS MARCO to instruction format with pre-generated images.
 
