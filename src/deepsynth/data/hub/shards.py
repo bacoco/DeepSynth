@@ -149,11 +149,10 @@ class HubShardManager:
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir)
-            dataset_dict = DatasetDict({"train": dataset})
 
-            # Force a minimum shard size to avoid single-shard issues
-            # Single shards with DatasetDict cause _format_kwargs problems
-            dataset_dict.save_to_disk(str(tmp_path), max_shard_size="50MB")
+            # Save dataset directly WITHOUT DatasetDict wrapper
+            # DatasetDict creates empty _format_kwargs struct that breaks Parquet conversion
+            dataset.save_to_disk(str(tmp_path), max_shard_size="50MB")
 
             self.api.upload_folder(
                 folder_path=str(tmp_path),
