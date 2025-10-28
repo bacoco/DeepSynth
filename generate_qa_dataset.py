@@ -34,7 +34,7 @@ sys.path.insert(0, "./src")
 
 from deepsynth.config import Config
 from deepsynth.data.dataset_converters import convert_natural_questions, convert_ms_marco
-from deepsynth.pipelines.uploaders import IncrementalDatasetUploader
+from deepsynth.pipelines.uploaders import EfficientIncrementalUploader
 
 # Setup logging
 logging.basicConfig(
@@ -148,7 +148,7 @@ def generate_combined_qa_dataset(
     config = Config.from_env()
 
     # Initialize uploader
-    uploader = IncrementalDatasetUploader(
+    uploader = EfficientIncrementalUploader(
         hf_token=config.hf_token,
         hf_username=config.hf_username,
         dataset_name=output_name,
