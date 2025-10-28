@@ -204,7 +204,9 @@ class StateManager:
             "updated_at": job.updated_at,
             "unique_samples": len(self.get_processed_hashes(job_id)),
             "error_count": job.error_count,
-            "last_error": job.last_error
+            "last_error": job.last_error,
+            "hf_dataset_repo": job.hf_dataset_repo,
+            "dataset_url": f"https://huggingface.co/datasets/{job.hf_dataset_repo}" if job.hf_dataset_repo else None,
         }
 
     def create_split(

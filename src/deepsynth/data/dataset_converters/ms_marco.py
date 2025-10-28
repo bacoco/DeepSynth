@@ -11,7 +11,8 @@ HuggingFace: ms_marco
 """
 
 import logging
-from typing import List, Optional
+from collections import Counter
+from typing import Generator, Iterable, Optional
 
 from datasets import load_dataset
 
@@ -28,37 +29,9 @@ def convert_ms_marco(
     max_samples: Optional[int] = None,
     streaming: bool = True,
     target_resolution: str = "gundam",
-) -> List[dict]:
-    """
-    Convert MS MARCO to instruction format with pre-generated images.
-
-    **NEW in v2.0**: Pre-generates images at target resolution (gundam by default)
-    for optimal quality. MS MARCO documents are typically short, so no contextual
-    extraction is usually needed.
-
-    MS MARCO provides relatively short passages (~200-500 tokens) with concise answers.
-    Most samples will have "excellent" quality.
-
-    Args:
-        config: Dataset config ("v1.1", "v2.1")
-        split: Dataset split ("train", "validation", "test")
-        max_samples: Maximum number of samples (None = all)
-        streaming: Use streaming mode (faster, no download required)
-        target_resolution: Target resolution for pre-generation ("gundam" recommended)
-                          Options: "tiny" (512px), "base" (1024px), "gundam" (1600px)
-
-    Returns:
-        InstructionDataset with pre-generated images at target resolution
-
-    Example:
-        >>> dataset = convert_ms_marco(split="train", max_samples=10000)
-        >>> sample = dataset[0]
-        >>> sample['quality']
-        'excellent'
-        >>> sample['image']  # Pre-generated PIL.Image
-        <PIL.Image.Image image mode=RGB size=1600x800>
-    """
-    LOGGER.info(f"Loading MS MARCO {config} ({split} split)...")
+) -> Iterable[dict]:
+    """Convert MS MARCO to instruction format with pre-generated images."""
+    LOGGER.info(f"Loading MS MARCO {config} ({split} split, streaming={streaming})...")
     LOGGER.info(f"Target resolution: {target_resolution}")
 
     # FORCE NON-STREAMING: streaming mode is broken (blocks on iteration)
@@ -78,113 +51,103 @@ def convert_ms_marco(
     # Initialize image converter (gundam width = 1600px)
     converter = TextToImageConverter(max_width=1600, max_height=10000)
 
-    # Convert to instruction format
-    converted_samples = []
     skipped = 0
+    processed = 0
+    quality_counts: Counter = Counter()
 
-    for idx, sample in enumerate(dataset):
+    def iterator() -> Generator[dict, None, None]:
+        nonlocal skipped, processed
         try:
-            # Extract query/question
-            query = sample.get("query", "")
-            if not query:
-                skipped += 1
-                continue
+            for idx, sample in enumerate(dataset):
+                try:
+                    # Extract query/question
+                    query = sample.get("query", "")
+                    if not query:
+                        skipped += 1
+                        continue
 
-            # Extract passages (use first relevant passage as document)
-            passages = sample.get("passages", {})
-            if not passages:
-                skipped += 1
-                continue
+                    # Extract passages (use first relevant passage as document)
+                    passages = sample.get("passages", {})
+                    if not passages:
+                        skipped += 1
+                        continue
 
-            # Get passage texts
-            passage_texts = passages.get("passage_text", [])
-            if not passage_texts or len(passage_texts) == 0:
-                skipped += 1
-                continue
+                    # Get passage texts
+                    passage_texts = passages.get("passage_text", [])
+                    if not passage_texts or len(passage_texts) == 0:
+                        skipped += 1
+                        continue
 
-            # Use first passage as document
-            document = passage_texts[0]
+                    # Use first passage as document
+                    document = passage_texts[0]
 
-            # Extract answer
-            answers = sample.get("answers", [])
-            if not answers or len(answers) == 0:
-                # No answer provided, skip
-                skipped += 1
-                continue
+                    # Extract answer
+                    answers = sample.get("answers", [])
+                    if not answers or len(answers) == 0:
+                        # No answer provided, skip
+                        skipped += 1
+                        continue
 
-            answer = answers[0]  # Use first answer
+                    answer = answers[0]  # Use first answer
 
-            # Generate image at target resolution (PRE-GENERATION)
-            # MS MARCO documents are typically short, so no extraction needed
-            image = converter.convert(document)
+                    # Generate image at target resolution (PRE-GENERATION)
+                    # MS MARCO documents are typically short, so no extraction needed
+                    image = converter.convert(document)
 
-            # Calculate quality indicators
-            token_count = len(document.split())
-            quality, quality_desc, estimated_height = calculate_quality(token_count)
+                    # Calculate quality indicators
+                    token_count = len(document.split())
+                    quality, quality_desc, estimated_height = calculate_quality(token_count)
 
-            # Add to converted samples (columns ordered by importance)
-            converted_samples.append({
-                # IMPORTANT COLUMNS FIRST
-                "instruction": query.strip(),
-                "short_answer": answer.strip(),  # MS MARCO answers are typically short
-                "text": document.strip(),
-                "image": image,
-                "source_dataset": "ms_marco",
-                "quality": quality,
+                    payload = {
+                        "text": document.strip(),
+                        "instruction": query.strip(),
+                        "answer": answer.strip(),
+                        "short_answer": answer.strip(),
+                        "long_answer": "",
+                        "answer_start_token": None,
+                        "answer_end_token": None,
+                        "image": image,
+                        "quality": quality,
+                        "estimated_height": estimated_height,
+                        "token_count": token_count,
+                        "extracted_token_count": token_count,
+                        "source_dataset": "ms_marco",
+                        "original_split": split,
+                        "original_index": idx,
+                        "metadata": {
+                            "source": "ms_marco",
+                            "config": config,
+                            "original_index": idx,
+                            "has_short": True,
+                            "has_long": False,
+                            "answer_type": "short",
+                            "extraction_method": "full_document",
+                            "generation_resolution": target_resolution,
+                            "quality_description": quality_desc,
+                        },
+                    }
 
-                # LESS IMPORTANT
-                "long_answer": "",  # No long answer in MS MARCO
-                "answer": answer.strip(),  # Legacy field
+                    processed += 1
+                    quality_counts[quality] += 1
+                    yield payload
 
-                # METADATA
-                "metadata": {
-                    "source": "ms_marco",
-                    "config": config,
-                    "original_index": idx,
-                    "has_short": True,
-                    "has_long": False,
-                    "answer_type": "short",
-                    "extraction_method": "full_document",
-                    "generation_resolution": target_resolution,
-                    "quality_description": quality_desc,
-                },
+                    if max_samples and not streaming and processed >= max_samples:
+                        break
 
-                # TECHNICAL FIELDS (for tracking/processing)
-                "original_split": split,
-                "original_index": idx,
-                "token_count": token_count,
-                "extracted_token_count": token_count,
-                "estimated_height": estimated_height,
-                "answer_start_token": None,
-                "answer_end_token": None,
-            })
+                except Exception as exc:  # pragma: no cover - defensive logging
+                    LOGGER.warning(f"Failed to process sample {idx}: {exc}")
+                    skipped += 1
+                    continue
+        finally:
+            LOGGER.info(f"Converted {processed} samples (skipped {skipped})")
+            if processed:
+                LOGGER.info("Quality distribution:")
+                for quality, count in sorted(quality_counts.items()):
+                    pct = (count / processed) * 100
+                    LOGGER.info(f"  {quality}: {count} ({pct:.1f}%)")
 
-            # Stop early if we have enough samples
-            if max_samples and len(converted_samples) >= max_samples:
-                break
+    return iterator()
 
-        except Exception as e:
-            LOGGER.warning(f"Failed to process sample {idx}: {e}")
-            skipped += 1
-            continue
-
-    LOGGER.info(f"Converted {len(converted_samples)} samples (skipped {skipped})")
-
-    if converted_samples:
-        # Log quality distribution
-        quality_counts = {}
-        for sample in converted_samples:
-            q = sample["quality"]
-            quality_counts[q] = quality_counts.get(q, 0) + 1
-
-        LOGGER.info(f"Quality distribution:")
-        for quality, count in sorted(quality_counts.items()):
-            pct = (count / len(converted_samples)) * 100
-            LOGGER.info(f"  {quality}: {count} ({pct:.1f}%)")
-
-    # For HF upload/storage, return raw dicts (PIL Images, no transforms)
-    # InstructionDataset will be created during training for transforms
-    return converted_samples
 
 
 __all__ = ["convert_ms_marco"]
