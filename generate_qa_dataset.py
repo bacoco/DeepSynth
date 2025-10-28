@@ -164,7 +164,84 @@ def generate_combined_qa_dataset(
     batch_counter = 0
     total_processed = 0
 
-    # Process Natural Questions
+    # Process MS MARCO FIRST (faster startup, fewer shards to download)
+    if not skip_marco:
+        LOGGER.info("")
+        LOGGER.info("=" * 80)
+        LOGGER.info("📚 PROCESSING MS MARCO (FASTER STARTUP)")
+        LOGGER.info("=" * 80)
+
+        try:
+            # Convert MS MARCO with streaming
+            marco_dataset = convert_ms_marco(
+                config="v2.1",
+                split="train",
+                max_samples=marco_max_samples,
+                streaming=True,
+                target_resolution=resolution,
+            )
+
+            LOGGER.info(f"Converting MS MARCO (max: {marco_max_samples or 'all'})...")
+
+            # Process and save in batches
+            current_batch = []
+            processed = 0
+
+            for sample in marco_dataset:
+                current_batch.append(sample)
+                processed += 1
+
+                # Save batch when full
+                if len(current_batch) >= batch_size:
+                    # Save to disk
+                    batch_file = samples_dir / f"batch_{batch_counter:06d}.pkl"
+                    with open(batch_file, 'wb') as f:
+                        pickle.dump(current_batch, f)
+                    LOGGER.info(f"💾 Saved batch {batch_counter} ({len(current_batch)} samples)")
+
+                    # Upload immediately
+                    try:
+                        uploader.upload_if_ready()
+                        LOGGER.info(f"✅ Batch {batch_counter} uploaded")
+                    except Exception as e:
+                        LOGGER.warning(f"⚠️  Upload warning: {e} (will retry later)")
+
+                    batch_counter += 1
+                    total_processed += len(current_batch)
+                    current_batch = []
+
+                # Progress logging (every 100 samples for better visibility)
+                if processed % 100 == 0:
+                    LOGGER.info(f"✓ Processed {processed:,} MS MARCO samples (batch size: {len(current_batch)})...")
+
+                # Stop if we reached max
+                if marco_max_samples and processed >= marco_max_samples:
+                    break
+
+            # Save remaining batch
+            if current_batch:
+                batch_file = samples_dir / f"batch_{batch_counter:06d}.pkl"
+                with open(batch_file, 'wb') as f:
+                    pickle.dump(current_batch, f)
+                LOGGER.info(f"💾 Saved final batch {batch_counter} ({len(current_batch)} samples)")
+
+                # Upload
+                try:
+                    uploader.upload_if_ready()
+                    LOGGER.info(f"✅ Final batch {batch_counter} uploaded")
+                except Exception as e:
+                    LOGGER.warning(f"⚠️  Upload warning: {e} (will retry later)")
+
+                batch_counter += 1
+                total_processed += len(current_batch)
+
+            LOGGER.info(f"✅ MS MARCO complete: {processed:,} samples processed")
+
+        except Exception as e:
+            LOGGER.error(f"❌ Error processing MS MARCO: {e}", exc_info=True)
+            raise
+
+    # Process Natural Questions SECOND (slower startup, 287 shards)
     if not skip_nq:
         LOGGER.info("=" * 80)
         LOGGER.info("📖 PROCESSING NATURAL QUESTIONS")
@@ -237,83 +314,6 @@ def generate_combined_qa_dataset(
 
         except Exception as e:
             LOGGER.error(f"❌ Error processing Natural Questions: {e}", exc_info=True)
-            raise
-
-    # Process MS MARCO
-    if not skip_marco:
-        LOGGER.info("")
-        LOGGER.info("=" * 80)
-        LOGGER.info("📚 PROCESSING MS MARCO")
-        LOGGER.info("=" * 80)
-
-        try:
-            # Convert MS MARCO with streaming
-            marco_dataset = convert_ms_marco(
-                config="v2.1",
-                split="train",
-                max_samples=marco_max_samples,
-                streaming=True,
-                target_resolution=resolution,
-            )
-
-            LOGGER.info(f"Converting MS MARCO (max: {marco_max_samples or 'all'})...")
-
-            # Process and save in batches
-            current_batch = []
-            processed = 0
-
-            for sample in marco_dataset:
-                current_batch.append(sample)
-                processed += 1
-
-                # Save batch when full
-                if len(current_batch) >= batch_size:
-                    # Save to disk
-                    batch_file = samples_dir / f"batch_{batch_counter:06d}.pkl"
-                    with open(batch_file, 'wb') as f:
-                        pickle.dump(current_batch, f)
-                    LOGGER.info(f"💾 Saved batch {batch_counter} ({len(current_batch)} samples)")
-
-                    # Upload immediately
-                    try:
-                        uploader.upload_if_ready()
-                        LOGGER.info(f"✅ Batch {batch_counter} uploaded")
-                    except Exception as e:
-                        LOGGER.warning(f"⚠️  Upload warning: {e} (will retry later)")
-
-                    batch_counter += 1
-                    total_processed += len(current_batch)
-                    current_batch = []
-
-                # Progress logging (every 100 samples for better visibility)
-                if processed % 100 == 0:
-                    LOGGER.info(f"✓ Processed {processed:,} MS MARCO samples (batch size: {len(current_batch)})...")
-
-                # Stop if we reached max
-                if marco_max_samples and processed >= marco_max_samples:
-                    break
-
-            # Save remaining batch
-            if current_batch:
-                batch_file = samples_dir / f"batch_{batch_counter:06d}.pkl"
-                with open(batch_file, 'wb') as f:
-                    pickle.dump(current_batch, f)
-                LOGGER.info(f"💾 Saved final batch {batch_counter} ({len(current_batch)} samples)")
-
-                # Upload
-                try:
-                    uploader.upload_if_ready()
-                    LOGGER.info(f"✅ Final batch {batch_counter} uploaded")
-                except Exception as e:
-                    LOGGER.warning(f"⚠️  Upload warning: {e} (will retry later)")
-
-                batch_counter += 1
-                total_processed += len(current_batch)
-
-            LOGGER.info(f"✅ MS MARCO complete: {processed:,} samples processed")
-
-        except Exception as e:
-            LOGGER.error(f"❌ Error processing MS MARCO: {e}", exc_info=True)
             raise
 
     # Upload any remaining batches
