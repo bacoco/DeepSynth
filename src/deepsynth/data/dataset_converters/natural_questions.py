@@ -12,7 +12,8 @@ HuggingFace: natural_questions
 """
 
 import logging
-from typing import List, Optional, Tuple
+from collections import Counter
+from typing import Generator, Iterable, List, Optional, Tuple
 
 from datasets import load_dataset
 
@@ -161,44 +162,8 @@ def convert_natural_questions(
     max_samples: Optional[int] = None,
     streaming: bool = True,
     target_resolution: str = "gundam",
-) -> List[dict]:
-    """
-    Convert Natural Questions to instruction format with pre-generated images.
-
-    **NEW in v2.0**: Pre-generates images at target resolution (gundam by default)
-    for optimal quality. Uses intelligent contextual extraction based on document
-    size and target resolution.
-
-    Features:
-    - Pre-generates images at target resolution (gundam = 1600px)
-    - Intelligent contextual extraction (only when needed)
-    - Stores FULL document in "text" field for flexibility
-    - Prioritizes LONG answers (more context for training)
-    - Preserves both short and long answers in separate columns
-    - Stores answer positions (answer_start_token, answer_end_token)
-    - Adds quality indicators (excellent/good/medium/poor/unreadable)
-
-    Args:
-        split: Dataset split ("train", "validation")
-        max_samples: Maximum number of samples (None = all)
-        streaming: Use streaming mode (faster, no download required)
-        target_resolution: Target resolution for pre-generation ("gundam" recommended)
-                          Options: "tiny" (512px), "base" (1024px), "gundam" (1600px)
-
-    Returns:
-        InstructionDataset with pre-generated images at target resolution
-
-    Example:
-        >>> dataset = convert_natural_questions(split="train", max_samples=1000)
-        >>> sample = dataset[0]
-        >>> sample.keys()
-        dict_keys(['text', 'instruction', 'answer', 'short_answer', 'long_answer',
-                   'answer_start_token', 'answer_end_token', 'image',
-                   'quality', 'estimated_height', 'token_count', 'extracted_token_count',
-                   'metadata'])
-        >>> sample['image']  # Pre-generated PIL.Image
-        <PIL.Image.Image image mode=RGB size=1600x2224>
-    """
+) -> Iterable[dict]:
+    """Convert Natural Questions to instruction format with pre-generated images."""
     # Calculate optimal context window for target resolution
     optimal_context_window = calculate_optimal_context_window(target_resolution)
 
@@ -226,168 +191,162 @@ def convert_natural_questions(
     # Initialize image converter (gundam width = 1600px)
     converter = TextToImageConverter(max_width=1600, max_height=10000)
 
-    # Convert to instruction format
-    converted_samples = []
-    skipped = 0
+    # Convert to instruction format lazily to avoid large memory usage
     skip_reasons = {"no_document": 0, "no_question": 0, "no_answer": 0, "error": 0}
+    skipped = 0
+    processed = 0
+    quality_counts: Counter = Counter()
 
-    for idx, sample in enumerate(dataset):
+    def iterator() -> Generator[dict, None, None]:
+        nonlocal skipped, processed
         try:
-            # Extract document tokens
-            if not sample.get("document") or not sample["document"].get("tokens"):
-                skip_reasons["no_document"] += 1
-                skipped += 1
-                continue
+            for idx, sample in enumerate(dataset):
+                try:
+                    # Extract document tokens
+                    if not sample.get("document") or not sample["document"].get("tokens"):
+                        skip_reasons["no_document"] += 1
+                        skipped += 1
+                        continue
 
-            tokens = sample["document"]["tokens"]
-            if not isinstance(tokens, dict) or "token" not in tokens:
-                skip_reasons["no_document"] += 1
-                skipped += 1
-                continue
+                    tokens = sample["document"]["tokens"]
+                    if not isinstance(tokens, dict) or "token" not in tokens:
+                        skip_reasons["no_document"] += 1
+                        skipped += 1
+                        continue
 
-            text_tokens = tokens["token"]
+                    text_tokens = tokens["token"]
 
-            # Extract question
-            question = sample.get("question", {}).get("text", "")
-            if not question:
-                skip_reasons["no_question"] += 1
-                skipped += 1
-                continue
+                    # Extract question
+                    question = sample.get("question", {}).get("text", "")
+                    if not question:
+                        skip_reasons["no_question"] += 1
+                        skipped += 1
+                        continue
 
-            # Extract BOTH short and long answers
-            short_answer_text, short_start, short_end = extract_short_answer(sample, text_tokens)
-            long_answer_text, long_start, long_end = extract_long_answer(sample, text_tokens)
+                    # Extract BOTH short and long answers
+                    short_answer_text, short_start, short_end = extract_short_answer(sample, text_tokens)
+                    long_answer_text, long_start, long_end = extract_long_answer(sample, text_tokens)
 
-            # Skip if NO answer at all
-            if not short_answer_text and not long_answer_text:
-                skip_reasons["no_answer"] += 1
-                skipped += 1
-                continue
+                    # Skip if NO answer at all
+                    if not short_answer_text and not long_answer_text:
+                        skip_reasons["no_answer"] += 1
+                        skipped += 1
+                        continue
 
-            # Determine primary answer and extraction strategy
-            # Priority: LONG answer (more context) > short answer
-            if long_answer_text:
-                primary_answer = long_answer_text
-                answer_type = "long"
-                answer_start = long_start
-                answer_end = long_end
-            else:
-                primary_answer = short_answer_text
-                answer_type = "short"
-                answer_start = short_start
-                answer_end = short_end
+                    # Determine primary answer and extraction strategy
+                    # Priority: LONG answer (more context) > short answer
+                    if long_answer_text:
+                        primary_answer = long_answer_text
+                        answer_type = "long"
+                        answer_start = long_start
+                        answer_end = long_end
+                    else:
+                        primary_answer = short_answer_text
+                        answer_type = "short"
+                        answer_start = short_start
+                        answer_end = short_end
 
-            # Calculate FULL document token count
-            full_document_text = " ".join(str(t) for t in text_tokens)
-            full_document_token_count = len(text_tokens)
+                    # Calculate FULL document token count
+                    full_document_text = " ".join(str(t) for t in text_tokens)
+                    full_document_token_count = len(text_tokens)
 
-            # Decide extraction strategy based on document size
-            should_extract, extraction_window = should_extract_context(
-                full_document_token_count,
-                target_resolution
-            )
-
-            if should_extract:
-                # Document too long → extract contextual window
-                if answer_start is not None and answer_end is not None:
-                    document_for_image = extract_contextual_window(
-                        text_tokens,
-                        answer_start,
-                        answer_end,
-                        context_before=extraction_window,
-                        context_after=extraction_window,
+                    # Decide extraction strategy based on document size
+                    should_extract, extraction_window = should_extract_context(
+                        full_document_token_count,
+                        target_resolution
                     )
-                    extraction_method = "contextual"
-                    extracted_token_count = len(document_for_image.split())
-                else:
-                    # Rare case: no positions, use answer text
-                    document_for_image = primary_answer
-                    extraction_method = "answer_only"
-                    extracted_token_count = len(document_for_image.split())
-            else:
-                # Document short enough → use ENTIRE document
-                document_for_image = full_document_text
-                extraction_method = "full_document"
-                extracted_token_count = full_document_token_count
 
-            # Generate image at target resolution (PRE-GENERATION)
-            image = converter.convert(document_for_image)
+                    if should_extract:
+                        # Document too long → extract contextual window
+                        if answer_start is not None and answer_end is not None:
+                            document_for_image = extract_contextual_window(
+                                text_tokens,
+                                answer_start,
+                                answer_end,
+                                context_before=extraction_window,
+                                context_after=extraction_window,
+                            )
+                            extraction_method = "contextual"
+                            extracted_token_count = len(document_for_image.split())
+                        else:
+                            # Rare case: no positions, use answer text
+                            document_for_image = primary_answer
+                            extraction_method = "answer_only"
+                            extracted_token_count = len(document_for_image.split())
+                    else:
+                        # Document short enough → use ENTIRE document
+                        document_for_image = full_document_text
+                        extraction_method = "full_document"
+                        extracted_token_count = full_document_token_count
 
-            # Calculate quality based on EXTRACTED token count (what's in the image)
-            quality, quality_desc, estimated_height = calculate_quality(extracted_token_count)
+                    # Generate image at target resolution (PRE-GENERATION)
+                    image = converter.convert(document_for_image)
 
-            # Create sample with all information
-            converted_samples.append({
-                # Store FULL document (not extracted) for flexibility
-                "text": full_document_text.strip(),
-                "instruction": question.strip(),
+                    # Calculate quality based on EXTRACTED token count (what's in the image)
+                    quality, quality_desc, estimated_height = calculate_quality(extracted_token_count)
 
-                # Answers (long priority)
-                "answer": primary_answer.strip(),
-                "short_answer": short_answer_text.strip(),
-                "long_answer": long_answer_text.strip(),
+                    payload = {
+                        # Store FULL document (not extracted) for flexibility
+                        "text": full_document_text.strip(),
+                        "instruction": question.strip(),
+                        "answer": primary_answer.strip(),
+                        "short_answer": short_answer_text.strip(),
+                        "long_answer": long_answer_text.strip(),
+                        "answer_type": answer_type,
+                        "answer_start_token": answer_start,
+                        "answer_end_token": answer_end,
+                        "extraction_method": extraction_method,
+                        "extraction_window_tokens": extraction_window,
+                        "extracted_token_count": extracted_token_count,
+                        "token_count": full_document_token_count,
+                        "image": image,
+                        "quality": quality,
+                        "quality_description": quality_desc,
+                        "estimated_height": estimated_height,
+                        "source_dataset": "natural_questions",
+                        "original_split": split,
+                        "original_index": idx,
+                        "metadata": {
+                            "source": "natural_questions",
+                            "split": split,
+                            "original_index": idx,
+                            "question": question.strip(),
+                            "answer_type": answer_type,
+                            "has_short_answer": bool(short_answer_text),
+                            "has_long_answer": bool(long_answer_text),
+                            "extraction_method": extraction_method,
+                            "extraction_window_tokens": extraction_window,
+                            "generation_resolution": target_resolution,
+                            "quality_description": quality_desc,
+                        },
+                    }
 
-                # Answer positions (for future extraction if needed)
-                "answer_start_token": answer_start,
-                "answer_end_token": answer_end,
+                    processed += 1
+                    quality_counts[quality] += 1
+                    yield payload
 
-                # Pre-generated image at target resolution
-                "image": image,
+                    if max_samples and not streaming and processed >= max_samples:
+                        break
 
-                # Quality indicators (based on extracted content)
-                "quality": quality,
-                "estimated_height": estimated_height,
-                "token_count": full_document_token_count,  # Full document
-                "extracted_token_count": extracted_token_count,  # What's in the image
+                except Exception as exc:  # pragma: no cover - defensive logging
+                    LOGGER.exception(f"Error converting sample {idx}: {exc}")
+                    skip_reasons["error"] += 1
+                    skipped += 1
+                    continue
+        finally:
+            LOGGER.info(f"Converted {processed} samples (skipped {skipped})")
+            if skipped:
+                LOGGER.info("Skip reasons:")
+                for reason, count in skip_reasons.items():
+                    LOGGER.info(f"  {reason}: {count}")
+            if processed:
+                LOGGER.info("Quality distribution:")
+                for quality, count in sorted(quality_counts.items()):
+                    pct = (count / processed) * 100
+                    LOGGER.info(f"  {quality}: {count} ({pct:.1f}%)")
 
-                # Tracking fields (required for HubShardManager deduplication)
-                "source_dataset": "natural_questions",
-                "original_split": split,
-                "original_index": idx,
+    return iterator()
 
-                # Metadata
-                "metadata": {
-                    "source": "natural_questions",
-                    "original_index": idx,
-                    "answer_type": answer_type,
-                    "has_short": bool(short_answer_text),
-                    "has_long": bool(long_answer_text),
-                    "extraction_method": extraction_method,
-                    "context_window": extraction_window if should_extract else 0,
-                    "generation_resolution": target_resolution,
-                    "quality_description": quality_desc,
-                },
-            })
-
-            # Stop early if we have enough samples
-            if max_samples and len(converted_samples) >= max_samples:
-                break
-
-        except Exception as e:
-            LOGGER.warning(f"Failed to process sample {idx}: {e}")
-            skip_reasons["error"] += 1
-            skipped += 1
-            continue
-
-    # Log statistics
-    LOGGER.info(f"Converted {len(converted_samples)} samples (skipped {skipped})")
-    LOGGER.info(f"Skip reasons: {skip_reasons}")
-
-    if converted_samples:
-        # Log quality distribution
-        quality_counts = {}
-        for sample in converted_samples:
-            q = sample["quality"]
-            quality_counts[q] = quality_counts.get(q, 0) + 1
-
-        LOGGER.info(f"Quality distribution:")
-        for quality, count in sorted(quality_counts.items()):
-            pct = (count / len(converted_samples)) * 100
-            LOGGER.info(f"  {quality}: {count} ({pct:.1f}%)")
-
-    # For HF upload/storage, return raw dicts (PIL Images, no transforms)
-    # InstructionDataset will be created during training for transforms
-    return converted_samples
 
 
 __all__ = ["convert_natural_questions", "extract_contextual_window"]
