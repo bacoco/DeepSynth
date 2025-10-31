@@ -16,6 +16,8 @@ ENV LD_LIBRARY_PATH="${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}"
 # Environment variables for bitsandbytes (QLoRA support)
 ENV BNB_CUDA_VERSION=121
 ENV CUDA_VISIBLE_DEVICES=0
+# Persist UI state outside the source tree by default
+ENV DEEPSYNTH_UI_STATE_DIR=/app/web_ui/state
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -71,14 +73,12 @@ COPY . .
 # Create necessary directories
 RUN mkdir -p \
     /app/web_ui/state \
-    /app/web_ui/templates \
-    /app/web_ui/static \
     /app/generated_images \
     /app/trained_model \
     /app/logs
 
-# Set permissions
-RUN chmod +x /app/web_ui/app.py
+# Ensure the UI package is importable when running via ``python -m``
+ENV PYTHONPATH="/app/src:${PYTHONPATH}"
 
 # Expose port for web UI
 EXPOSE 5000
