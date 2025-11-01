@@ -239,24 +239,24 @@ print("🚀 Container launched! Setting up tunnel...")
 
 **5. Create Public URL Access**
 ```python
-# Install ngrok for public URL
-!pip install pyngrok
-from pyngrok import ngrok
+# Use Colab's built-in tunneling (no signup required)
+from google.colab.output import eval_js
 
-# Create tunnel to container
-public_url = ngrok.connect(7860)
-print(f"🌐 DeepSynth Interface: {public_url}")
-print(f"📱 Click the link above to access your training interface!")
+print("🚀 Container is running!")
+print("🌐 Access your DeepSynth interface at:")
+tunnel_url = eval_js("google.colab.kernel.proxyPort(7860)")
+print(f"📱 {tunnel_url}")
+print("\n✅ Click the link above to access your training interface!")
 
-# Keep the tunnel alive
+# Keep this cell running to maintain access
 import time
-print("🔄 Tunnel active - keep this cell running...")
+print("🔄 Interface active - keep this cell running...")
 try:
     while True:
         time.sleep(60)
         print(".", end="", flush=True)
 except KeyboardInterrupt:
-    print("\n🛑 Tunnel stopped")
+    print("\n🛑 Interface access stopped")
 ```
 
 **6. Monitor Training**
