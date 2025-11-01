@@ -12,6 +12,7 @@ import json
 import logging
 import math
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional, Tuple, Union
@@ -29,6 +30,12 @@ from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from transformers import AutoModel, AutoTokenizer, get_scheduler
 
+from .checkpoint_utils import (
+    find_latest_checkpoint,
+    load_checkpoint_state,
+    push_to_hub_async,
+    save_checkpoint_state,
+)
 from .config import TrainerConfig
 from .model_utils import (
     freeze_vision_encoder,
