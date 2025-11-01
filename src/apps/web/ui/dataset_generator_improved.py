@@ -552,14 +552,40 @@ class ModelTrainer:
                 train_datasets = []
                 for repo in dataset_repos:
                     logger.info(f"Loading training samples from {repo}...")
-                    ds = load_dataset(repo, split="train")
 
-                    # Filter to train indices only
+                    # Get indices for this repo
                     repo_indices = train_indices.get(repo, [])
-                    if repo_indices:
+                    if not repo_indices:
+                        continue
+
+                    # OPTIMIZATION: For quick tests with small sample counts, use streaming
+                    # to avoid downloading entire dataset (which can be 500+ files)
+                    max_train_samples = trainer_config.max_train_samples
+                    use_streaming = max_train_samples and max_train_samples <= 1000
+
+                    if use_streaming:
+                        # Streaming mode: Take first N samples (fast, no full download)
+                        # For quick tests, we don't care about specific indices - just grab what we need fast
+                        logger.info(f"  Using streaming mode (quick test - taking first {max_train_samples} samples)")
+                        ds_stream = load_dataset(repo, split="train", streaming=True)
+
+                        # Take only the first max_train_samples
+                        collected_samples = []
+                        for sample in ds_stream.take(min(max_train_samples, len(repo_indices))):
+                            collected_samples.append(sample)
+
+                        # Convert to regular dataset
+                        from datasets import Dataset
+                        ds_filtered = Dataset.from_list(collected_samples)
+                        logger.info(f"  ✅ Loaded {len(ds_filtered)} samples via streaming (NO full dataset download!)")
+                    else:
+                        # Regular mode: download full dataset (for production training)
+                        logger.info(f"  Loading full dataset (production mode)")
+                        ds = load_dataset(repo, split="train")
                         ds_filtered = ds.select(repo_indices)
-                        train_datasets.append(ds_filtered)
                         logger.info(f"  Loaded {len(ds_filtered)} training samples from {repo}")
+
+                    train_datasets.append(ds_filtered)
 
                 if not train_datasets:
                     raise ValueError("No training samples loaded!")
