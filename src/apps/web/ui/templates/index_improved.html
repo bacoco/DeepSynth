@@ -1936,11 +1936,11 @@
                     throw new Error('No datasets available. Please generate datasets first.');
                 }
 
-                // Step 2: Select French dataset automatically
-                statusDiv.innerHTML = '🔄 Step 2/4: Selecting French dataset...';
-                const frenchDataset = allDatasets.find(ds => ds.name === 'deepsynth-fr');
+                // Step 2: Select French MINI dataset automatically
+                statusDiv.innerHTML = '🔄 Step 2/4: Selecting French mini dataset...';
+                const frenchDataset = allDatasets.find(ds => ds.name === 'deepsynth-fr-mini');
                 if (!frenchDataset) {
-                    throw new Error('French dataset (deepsynth-fr) not found. Please generate it first.');
+                    throw new Error('French mini dataset (deepsynth-fr-mini) not found.');
                 }
 
                 selectedDatasets.clear();

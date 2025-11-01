@@ -12,8 +12,8 @@
 
 torch==2.8.0
 torchvision==0.23.0
-transformers>=4.46.0
-tokenizers>=0.20.0
+transformers==4.46.3  # Required by DeepSeek-OCR (official doc)
+tokenizers==0.20.3  # Required by DeepSeek-OCR (official doc)
 datasets>=2.14.0
 huggingface_hub>=0.20.3
 accelerate>=0.24.0
@@ -35,3 +35,7 @@ flask>=3.0.0
 werkzeug>=3.0.0
 pytesseract>=0.3.10
 python-dotenv>=1.0.0
+addict>=2.4.0  # Required by DeepSeek-OCR
+einops>=0.8.0  # Required by DeepSeek-OCR
+easydict>=1.9  # Required by DeepSeek-OCR
+flash-attn>=2.7.3  # Required by DeepSeek-OCR (official doc: 2.7.3)

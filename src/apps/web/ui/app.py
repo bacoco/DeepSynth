@@ -614,7 +614,8 @@ def _register_routes(
         training_presets = {
             "quick_test": {
                 "name": "Quick Test",
-                "description": "Fast training for testing (1 epoch, small batch)",
+                "description": "Fast training for testing (1 epoch, small batch, mini dataset)",
+                "hf_dataset": "baconnier/deepsynth-fr-mini",
                 "batch_size": 4,
                 "num_epochs": 1,
                 "learning_rate": 3e-5,
