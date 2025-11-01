@@ -164,6 +164,13 @@ class UnifiedProductionTrainer:
         if freeze_stats['frozen_params'] == 0:
             raise RuntimeError("Failed to freeze vision encoder! No parameters frozen.")
 
+        # Apply LoRA if enabled (before printing parameter summary)
+        if config.use_lora or config.use_qlora:
+            LOGGER.info("=" * 80)
+            LOGGER.info("Applying LoRA/QLoRA Configuration")
+            LOGGER.info("=" * 80)
+            self._apply_lora()
+
         # Print detailed parameter summary
         print_parameter_summary(self.model)
 
@@ -218,6 +225,87 @@ class UnifiedProductionTrainer:
         self.global_step = 0
         self.train_losses = []
 
+    def _apply_lora(self) -> None:
+        """
+        Apply LoRA (Low-Rank Adaptation) or QLoRA to the model.
+
+        This reduces trainable parameters from 2.9B to ~2-16M by using
+        low-rank matrices instead of full fine-tuning.
+        """
+        from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+        from transformers import BitsAndBytesConfig
+
+        config = self.config
+
+        # For QLoRA: need to reload model with quantization
+        if config.use_qlora:
+            LOGGER.info("Applying QLoRA with %d-bit quantization", config.qlora_bits)
+
+            # Create quantization config
+            bnb_config = BitsAndBytesConfig(
+                load_in_4bit=(config.qlora_bits == 4),
+                load_in_8bit=(config.qlora_bits == 8),
+                bnb_4bit_quant_type=config.qlora_type,
+                bnb_4bit_compute_dtype=torch.bfloat16 if config.mixed_precision == "bf16" else torch.float16,
+                bnb_4bit_use_double_quant=config.qlora_double_quant,
+            )
+
+            # Reload model with quantization
+            model_source = config.resume_from_checkpoint or config.model_name
+            from transformers import AutoModel
+            self.model = AutoModel.from_pretrained(
+                model_source,
+                trust_remote_code=True,
+                quantization_config=bnb_config,
+                device_map={"": self.accelerator.device},
+            )
+
+            # Prepare model for k-bit training
+            self.model = prepare_model_for_kbit_training(self.model)
+
+            LOGGER.info("✅ Model quantized to %d-bit", config.qlora_bits)
+
+        # Auto-detect target modules if not specified
+        target_modules = config.lora_target_modules
+        if target_modules is None:
+            # DeepSeek-OCR uses standard attention modules
+            # Target q_proj, k_proj, v_proj, o_proj in decoder
+            target_modules = [
+                "q_proj",
+                "k_proj",
+                "v_proj",
+                "o_proj",
+            ]
+            LOGGER.info("Auto-detected LoRA target modules: %s", target_modules)
+
+        # Create LoRA configuration
+        lora_config = LoraConfig(
+            r=config.lora_rank,
+            lora_alpha=config.lora_alpha,
+            target_modules=target_modules,
+            lora_dropout=config.lora_dropout,
+            bias=config.lora_bias,
+            task_type="CAUSAL_LM",  # For text generation
+            modules_to_save=config.lora_modules_to_save,
+        )
+
+        # Apply LoRA to model
+        self.model = get_peft_model(self.model, lora_config)
+
+        # Log LoRA configuration
+        trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        total_params = sum(p.numel() for p in self.model.parameters())
+
+        LOGGER.info("✅ LoRA applied successfully")
+        LOGGER.info("  Rank (r): %d", config.lora_rank)
+        LOGGER.info("  Alpha: %d", config.lora_alpha)
+        LOGGER.info("  Dropout: %.3f", config.lora_dropout)
+        LOGGER.info("  Target modules: %s", target_modules)
+        LOGGER.info("  Trainable params: {:,} ({:.2%})".format(
+            trainable_params, trainable_params / total_params
+        ))
+        LOGGER.info("  Total params: {:,}".format(total_params))
+
     def _setup_dropout_strategies(self) -> None:
         """Initialize optional dropout-based regularization strategies."""
         self.bidrop_passes = max(1, int(self.config.bidrop_passes))
@@ -257,15 +345,79 @@ class UnifiedProductionTrainer:
             collate_fn=self._collate_batch,
         )
 
+    def _preprocess_images_for_deepseek(self, pil_images: list) -> tuple:
+        """
+        Preprocess PIL images to DeepSeek-OCR format.
+        Replicates the preprocessing logic from the infer() method.
+
+        For images ≤640x640 (like our dataset):
+        - Creates global view: pad to 1024x1024
+        - No local crops needed
+        - Returns tuple format: (crops, originals, spatial_crop)
+
+        Args:
+            pil_images: List of PIL images
+
+        Returns:
+            Tuple of (images_crop, images_ori, images_spatial_crop)
+        """
+        from PIL import ImageOps
+
+        base_size = 1024  # Global view size
+        images_ori_list = []
+        images_spatial_crop_list = []
+
+        # Image transform: normalize with mean=0.5, std=0.5
+        from torchvision import transforms
+        image_transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
+        ])
+
+        for img in pil_images:
+            # Handle both PIL images and tensors
+            if torch.is_tensor(img):
+                # Image is already a tensor from dataset transform - skip padding
+                # Just ensure it's the right dtype and size
+                if img.shape[0] == 3:  # CHW format
+                    global_tensor = img.to(torch.bfloat16)
+                else:
+                    global_tensor = img.permute(2, 0, 1).to(torch.bfloat16)  # HWC -> CHW
+            else:
+                # PIL image - apply padding and normalization
+                global_view = ImageOps.pad(
+                    img,
+                    (base_size, base_size),
+                    color=(127, 127, 127)  # Mean of 0.5 * 255
+                )
+                # Transform and convert to bfloat16
+                global_tensor = image_transform(global_view).to(torch.bfloat16)
+
+            images_ori_list.append(global_tensor)
+
+            # No cropping for small images: [1, 1]
+            images_spatial_crop_list.append([1, 1])
+
+        # Stack into batched tensors
+        images_ori = torch.stack(images_ori_list, dim=0)
+        images_spatial_crop = torch.tensor(images_spatial_crop_list, dtype=torch.long)
+
+        # No local crops for small images: return zeros placeholder
+        batch_size = len(pil_images)
+        images_crop = torch.zeros((batch_size, 3, base_size, base_size), dtype=torch.bfloat16)
+
+        return images_crop, images_ori, images_spatial_crop
+
     def _collate_batch(self, batch: list[dict]) -> dict:
         """
         Collate batch with proper image and text processing.
+        Creates prompts with <image> token and images_seq_mask like infer() does.
 
         Args:
             batch: List of samples with 'image', 'summary', and optional 'instruction' fields
 
         Returns:
-            Dictionary with 'images', 'input_ids', 'attention_mask', 'labels', 'instructions'
+            Dictionary with images, input_ids, images_seq_mask, labels
         """
         images = []
         summaries = []
@@ -288,28 +440,95 @@ class UnifiedProductionTrainer:
         if not summaries:
             raise ValueError("Batch contains no valid samples")
 
-        # Tokenize summaries
-        tokens = self.tokenizer(
-            summaries,
-            max_length=self.config.max_length,
-            truncation=True,
-            padding="max_length",
-            return_tensors="pt",
-        )
+        # Preprocess images to DeepSeek-OCR format
+        images_crop, images_ori, images_spatial_crop = self._preprocess_images_for_deepseek(images)
 
-        # Prepare labels (mask padding tokens)
-        labels = tokens["input_ids"].clone()
-        labels[labels == self.tokenizer.pad_token_id] = -100
+        # Create prompts with <image> token + summary (following infer() pattern)
+        # For training: "<image>\nSummary: {summary}"
+        batch_size = len(summaries)
+        input_ids_list = []
+        images_seq_mask_list = []
+        labels_list = []
 
-        # Stack images if they're tensors, otherwise keep as list
-        if len(images) > 0 and torch.is_tensor(images[0]):
-            images = torch.stack(images)
+        # Image token constants (from infer() method)
+        image_token_id = 128815
+        patch_size = 16
+        downsample_ratio = 4
+        base_size = 1024
+        num_queries_base = 16  # ceil((1024 // 16) / 4) = 16
+
+        for i in range(batch_size):
+            # Create prompt: "<image>\n" + summary
+            # Tokenize prompt part
+            prompt_text = "<image>\n"
+            prompt_tokens = self.tokenizer.encode(prompt_text, add_special_tokens=True)
+
+            # Tokenize summary (target)
+            summary_tokens = self.tokenizer.encode(summaries[i], add_special_tokens=False)
+
+            # Create image token sequence (273 tokens for 1024x1024 with no crops)
+            # Formula from infer(): ([token_id] * num_queries_base + [token_id]) * num_queries_base + [token_id]
+            num_image_tokens = (num_queries_base + 1) * num_queries_base + 1  # 273
+            image_token_sequence = [image_token_id] * num_image_tokens
+
+            # Build full sequence: prompt_tokens (before <image>) + image_tokens + summary_tokens
+            # The <image> text token gets replaced by the 273 image token IDs
+            # Find and replace <image> token
+            image_text_token = self.tokenizer.encode("<image>", add_special_tokens=False)[0]
+            prompt_tokens_replaced = []
+            for tok in prompt_tokens:
+                if tok == image_text_token:
+                    prompt_tokens_replaced.extend(image_token_sequence)
+                else:
+                    prompt_tokens_replaced.append(tok)
+
+            # Combine: prompt (with image tokens) + summary
+            full_sequence = prompt_tokens_replaced + summary_tokens
+
+            # Create images_seq_mask: False for text, True for image tokens
+            mask = []
+            for tok in prompt_tokens:
+                if tok == image_text_token:
+                    mask.extend([True] * num_image_tokens)  # Image tokens
+                else:
+                    mask.append(False)  # Text token
+            mask.extend([False] * len(summary_tokens))  # Summary is text
+
+            # Create labels: -100 for prompt, actual tokens for summary
+            label_sequence = [-100] * len(prompt_tokens_replaced) + summary_tokens
+
+            input_ids_list.append(full_sequence)
+            images_seq_mask_list.append(mask)
+            labels_list.append(label_sequence)
+
+        # Pad sequences to max length
+        max_len = max(len(seq) for seq in input_ids_list)
+        max_len = min(max_len, self.config.max_length)
+
+        input_ids_padded = []
+        masks_padded = []
+        labels_padded = []
+        attention_masks = []
+
+        for i in range(batch_size):
+            seq = input_ids_list[i][:max_len]
+            mask = images_seq_mask_list[i][:max_len]
+            lab = labels_list[i][:max_len]
+
+            pad_len = max_len - len(seq)
+            input_ids_padded.append(seq + [self.tokenizer.pad_token_id] * pad_len)
+            masks_padded.append(mask + [False] * pad_len)
+            labels_padded.append(lab + [-100] * pad_len)
+            attention_masks.append([1] * len(seq) + [0] * pad_len)
 
         return {
-            "images": images,
-            "input_ids": tokens["input_ids"],
-            "attention_mask": tokens["attention_mask"],
-            "labels": labels,
+            "images_crop": images_crop,
+            "images_ori": images_ori,
+            "images_spatial_crop": images_spatial_crop,
+            "input_ids": torch.tensor(input_ids_padded, dtype=torch.long),
+            "attention_mask": torch.tensor(attention_masks, dtype=torch.long),
+            "images_seq_mask": torch.tensor(masks_padded, dtype=torch.bool),
+            "labels": torch.tensor(labels_padded, dtype=torch.long),
             "instructions": instructions if instructions else None,
         }
 
@@ -325,23 +544,33 @@ class UnifiedProductionTrainer:
         - Otherwise: standard vision-only forward pass
 
         Args:
-            batch: Dictionary with 'images', 'input_ids', 'attention_mask', 'labels', 'instructions'
+            batch: Dictionary with 'images_crop', 'images_ori', 'images_spatial_crop',
+                   'input_ids', 'attention_mask', 'labels', 'instructions'
 
         Returns:
             Loss value (float)
         """
-        images = batch["images"]
+        images_crop = batch["images_crop"]
+        images_ori = batch["images_ori"]
+        images_spatial_crop = batch["images_spatial_crop"]
+        images_seq_mask = batch["images_seq_mask"]
         input_ids = batch["input_ids"]
         attention_mask = batch["attention_mask"]
         labels = batch["labels"]
         instructions = batch.get("instructions", None)
 
-        # Move to device
-        if torch.is_tensor(images):
-            images = images.to(self.accelerator.device)
+        # Move tensors to device
+        images_crop = images_crop.to(self.accelerator.device)
+        images_ori = images_ori.to(self.accelerator.device)
+        images_spatial_crop = images_spatial_crop.to(self.accelerator.device)
+        images_seq_mask = images_seq_mask.to(self.accelerator.device)
         input_ids = input_ids.to(self.accelerator.device)
         attention_mask = attention_mask.to(self.accelerator.device)
         labels = labels.to(self.accelerator.device)
+
+        # Convert to DeepSeek-OCR tuple format: [(crop_batch, ori_batch)]
+        # This is a LIST with ONE TUPLE containing the full batched tensors
+        images_tuples = [(images_crop, images_ori)]
 
         # Encode instructions if text encoder is enabled
         text_embeddings = None
@@ -353,10 +582,11 @@ class UnifiedProductionTrainer:
             )
             # text_embeddings shape: (batch_size, 4096)
 
-        # Forward pass with images (DeepSeek-OCR API)
-        # Pass text_embeddings if available (for instruction prompting)
+        # Forward pass with DeepSeek-OCR format (following infer() pattern)
         forward_kwargs = {
-            "images": images,
+            "images": images_tuples,  # List of (crop, ori) tuples
+            "images_spatial_crop": images_spatial_crop,  # [[1, 1], [1, 1], ...]
+            "images_seq_mask": images_seq_mask,  # Boolean mask for image tokens
             "input_ids": input_ids,
             "attention_mask": attention_mask,
             "labels": labels,
@@ -392,6 +622,7 @@ class UnifiedProductionTrainer:
             Tuple of (metrics, checkpoints)
         """
         # Create image transform pipeline for training
+        # DeepSeek-OCR expects PIL images, not tensors - it handles its own processing
         if self.config.use_augmentation:
             LOGGER.info("Creating training transform with augmentation")
             transform = create_training_transform(
@@ -403,13 +634,21 @@ class UnifiedProductionTrainer:
                 color_jitter_brightness=self.config.color_jitter_brightness,
                 color_jitter_contrast=self.config.color_jitter_contrast,
                 horizontal_flip_prob=self.config.horizontal_flip_prob,
+                to_tensor=False,  # Keep as PIL images for DeepSeek-OCR
+                normalize=False,
             )
         else:
             LOGGER.info("Creating training transform without augmentation")
-            transform = create_inference_transform(resolution=self.config.target_resolution)
+            transform = create_training_transform(
+                resolution=self.config.target_resolution,
+                use_augmentation=False,
+                to_tensor=False,  # Keep as PIL images for DeepSeek-OCR
+                normalize=False,
+            )
 
-        # Wrap dataset
-        if not isinstance(dataset, Dataset):
+        # Wrap dataset with DeepSynthDataset to apply transform
+        # Always wrap if not already a DeepSynthDataset (including HuggingFace datasets)
+        if not isinstance(dataset, DeepSynthDataset):
             dataset = DeepSynthDataset(dataset, transform=transform)
 
         # Create DataLoader
