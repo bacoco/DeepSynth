@@ -36,7 +36,7 @@ services:
       - TORCH_CUDA_ARCH_LIST=7.0;7.5;8.0;8.6;8.9;9.0
 
       # bitsandbytes Configuration (for QLoRA 4-bit/8-bit quantization)
-      - BNB_CUDA_VERSION=121
+      - BNB_CUDA_VERSION=124
 
       # Python Configuration
       - PYTHONUNBUFFERED=1
