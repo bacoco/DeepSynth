@@ -2533,6 +2533,18 @@
                     refreshJobs();
                 }
             }, 5000);
+
+            // Inject OCR tab button linking to /ocr without altering existing tab logic
+            try {
+                const tabs = document.querySelector('.tabs');
+                if (tabs) {
+                    const btn = document.createElement('button');
+                    btn.className = 'tab-btn';
+                    btn.textContent = 'OCR';
+                    btn.onclick = () => { window.location.href = '/ocr'; };
+                    tabs.appendChild(btn);
+                }
+            } catch (e) { /* no-op */ }
         });
     </script>
 </body>

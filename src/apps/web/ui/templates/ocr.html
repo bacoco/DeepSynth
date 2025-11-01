@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DeepSynth — OCR Tester</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+    header { padding: 12px 16px; background: #0b2239; color: #fff; }
+    main { padding: 16px; display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
+    .panel { border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; background: #fff; }
+    .thumbs { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+    .thumbs img { width: 96px; height: 96px; object-fit: cover; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; }
+    .preview { width: 100%; max-height: 420px; object-fit: contain; border: 1px solid #ddd; border-radius: 6px; background: #f9f9f9; }
+    .result { white-space: pre-wrap; border: 1px solid #ddd; padding: 8px; border-radius: 4px; min-height: 260px; background: #fafafa; }
+    .row { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+    label { font-weight: 600; }
+    .small { font-size: 12px; color: #666; }
+    button { padding: 8px 12px; cursor: pointer; }
+    input[type=file] { max-width: 100%; }
+    select { padding: 6px 8px; }
+  </style>
+  <script>
+    let selectedSample = null;
+    let selectedFile = null;
+    let samples = [];
+
+    async function fetchModels() {
+      const res = await fetch('/api/ocr/models');
+      return res.json();
+    }
+
+    function pickSample(id) {
+      selectedSample = samples.find(s => s.id === id) || null;
+      selectedFile = null;
+      document.getElementById('picked-info').textContent = selectedSample ? `Sample: ${selectedSample.label}` : 'None';
+      if (selectedSample) {
+        const img = document.getElementById('preview');
+        img.src = selectedSample.data;
+      }
+    }
+
+    function onFileChange(ev) {
+      selectedFile = ev.target.files[0] || null;
+      selectedSample = null;
+      document.getElementById('picked-info').textContent = selectedFile ? `File: ${selectedFile.name}` : 'None';
+      if (selectedFile) {
+        const url = URL.createObjectURL(selectedFile);
+        const img = document.getElementById('preview');
+        img.src = url;
+        img.onload = () => URL.revokeObjectURL(url);
+      }
+    }
+
+    function onModelChange(ev) {
+      const v = ev.target.value || 'base';
+      const meta = document.getElementById('chosen_meta');
+      meta.textContent = v === 'base' ? 'DeepSeek‑OCR (base)' : v.replace('local:', 'Adapter: ');
+    }
+
+    async function runOCR() {
+      const chosen = document.getElementById('model_selector').value || 'base';
+      const isBase = (chosen === 'base');
+
+      let body;
+      let headers = {};
+      if (selectedFile) {
+        body = new FormData();
+        body.append('file', selectedFile);
+        body.append('model_base', String(isBase));
+        body.append('model_finetuned', isBase ? 'none' : chosen);
+      } else if (selectedSample) {
+        body = JSON.stringify({ sample_data: selectedSample.data, model_base: isBase, model_finetuned: isBase ? 'none' : chosen });
+        headers['Content-Type'] = 'application/json';
+      } else {
+        alert('Choose a sample image or upload a file.');
+        return;
+      }
+
+      document.getElementById('run_btn').disabled = true;
+      document.getElementById('result_text').textContent = '';
+      document.getElementById('result_meta').textContent = '';
+      try {
+        const res = await fetch('/api/ocr/run', { method: 'POST', headers, body });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'OCR failed');
+        const r = data.results || {};
+        const out = isBase ? r.base : r.finetuned;
+        if (out) {
+          document.getElementById('result_text').textContent = out.text;
+          document.getElementById('result_meta').textContent = `${out.model_id} • ${out.latency_ms.toFixed(1)} ms`;
+        }
+      } catch (e) {
+        alert(String(e));
+      } finally {
+        document.getElementById('run_btn').disabled = false;
+      }
+    }
+
+    async function init() {
+      const m = await fetchModels();
+      const local = m.local || [];
+      const sel = document.getElementById('model_selector');
+      sel.innerHTML = '';
+      const optBase = document.createElement('option'); optBase.value = 'base'; optBase.textContent = 'DeepSeek‑OCR (base)'; sel.appendChild(optBase);
+      local.forEach(name => { const o = document.createElement('option'); o.value = `local:${name}`; o.textContent = `Adapter (local): ${name}`; sel.appendChild(o); });
+
+      const resp = await fetch('/api/ocr/samples?limit=6');
+      const data = await resp.json();
+      samples = data.samples || [];
+      const thumbs = document.getElementById('thumbs');
+      thumbs.innerHTML = '';
+      samples.forEach(s => {
+        const img = document.createElement('img');
+        img.src = s.data; img.alt = s.label; img.title = s.label;
+        img.onclick = () => pickSample(s.id);
+        thumbs.appendChild(img);
+      });
+    }
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</head>
+<body>
+  <header>
+    <h2>OCR Tester — Base or Adapter on one image</h2>
+  </header>
+  <main>
+    <section class="panel">
+      <div class="row"><label>Input</label><span id="picked-info" class="small">None</span></div>
+      <div class="row"><input type="file" accept="image/*" onchange="onFileChange(event)" /></div>
+      <img id="preview" class="preview" alt="preview" />
+      <div>
+        <div class="small">Pick a sample:</div>
+        <div id="thumbs" class="thumbs"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="row">
+        <label>Model</label>
+        <select id="model_selector" onchange="onModelChange(event)"></select>
+        <span id="chosen_meta" class="small">DeepSeek‑OCR (base)</span>
+      </div>
+      <div class="row"><button id="run_btn" onclick="runOCR()">Run OCR</button></div>
+      <div class="row"><label>Result</label> <span id="result_meta" class="small"></span></div>
+      <div id="result_text" class="result"></div>
+    </section>
+  </main>
+</body>
+</html>
+

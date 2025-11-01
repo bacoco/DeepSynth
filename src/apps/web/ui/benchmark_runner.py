@@ -254,7 +254,7 @@ class BenchmarkRunner:
                 )
                 with open(readme_path, 'r') as f:
                     existing_content = f.read()
-            except:
+            except Exception:
                 existing_content = f"# {hub_model_id}\n\nModel card\n"
 
             # Create benchmark section

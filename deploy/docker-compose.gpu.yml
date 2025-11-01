@@ -8,6 +8,8 @@ services:
     container_name: deepsynth-trainer-gpu
     ports:
       - "5001:5000"
+    # Ensure GPU is available in non-swarm Compose
+    gpus: all
     volumes:
       # Mount state directory for persistence
       - ../src/apps/web/ui/state:/app/web_ui/state

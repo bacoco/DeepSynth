@@ -10,13 +10,29 @@ import sys
 from pathlib import Path
 from typing import List, Tuple, Optional
 
+# Ensure UTF-8 stdout on Windows consoles to avoid UnicodeEncodeError
+try:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 class CodebaseValidator:
     """Valide le codebase pour détecter les problèmes critiques."""
 
     def __init__(self):
-        self.base_path = Path(__file__).parent
+        # Point to repository root (parent of tools/)
+        self.base_path = Path(__file__).resolve().parents[1]
         self.issues_found = []
         self.checks_passed = []
+
+    def _read_text(self, path: Path) -> str:
+        """Read text with UTF-8 fallback and replace errors for portability."""
+        try:
+            return path.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            # Best-effort fallback
+            return path.read_text(errors="replace")
 
     def validate_all(self) -> bool:
         """Exécute toutes les validations."""
@@ -42,7 +58,7 @@ class CodebaseValidator:
         file_path = self.base_path / "src/deepsynth/pipelines/global_state.py"
 
         if file_path.exists():
-            content = file_path.read_text()
+            content = self._read_text(file_path)
             if "progress['total_samples'] += uploaded" in content and "uploaded_count" not in content:
                 self.issues_found.append((
                     "CRITICAL",
@@ -59,7 +75,7 @@ class CodebaseValidator:
         bare_except_pattern = re.compile(r'^\s*except:\s*$', re.MULTILINE)
 
         for py_file in src_path.rglob("*.py"):
-            content = py_file.read_text()
+            content = self._read_text(py_file)
             matches = bare_except_pattern.findall(content)
 
             if matches:
@@ -77,7 +93,7 @@ class CodebaseValidator:
         file_path = self.base_path / "src/deepsynth/data/transforms/text_to_image.py"
 
         if file_path.exists():
-            content = file_path.read_text()
+            content = self._read_text(file_path)
             if "MAX_HEIGHT_MULTIPLIER" in content or "max_allowed_height" in content:
                 self.checks_passed.append("Limite de hauteur d'image implémentée")
             else:
@@ -92,7 +108,7 @@ class CodebaseValidator:
         file_path = self.base_path / "src/deepsynth/training/deepsynth_trainer_v2.py"
 
         if file_path.exists():
-            content = file_path.read_text()
+            content = self._read_text(file_path)
             if "checkpoint_path.exists()" in content or "Path(config.resume_from_checkpoint).exists()" in content:
                 self.checks_passed.append("Validation des checkpoints implémentée")
             else:
@@ -108,7 +124,7 @@ class CodebaseValidator:
 
         dataloader_found = False
         for py_file in training_path.glob("*.py"):
-            content = py_file.read_text()
+            content = self._read_text(py_file)
             if "DataLoader" in content and "from torch.utils.data" in content:
                 dataloader_found = True
                 break
@@ -128,7 +144,7 @@ class CodebaseValidator:
 
         gradient_scaler_found = False
         for py_file in training_path.glob("*.py"):
-            content = py_file.read_text()
+            content = self._read_text(py_file)
             if "GradScaler" in content or "amp.GradScaler" in content:
                 gradient_scaler_found = True
                 break
@@ -149,7 +165,7 @@ class CodebaseValidator:
 
         for py_file in src_path.rglob("*.py"):
             try:
-                content = py_file.read_text()
+                content = self._read_text(py_file)
                 tree = ast.parse(content)
 
                 for node in ast.walk(tree):
@@ -161,7 +177,7 @@ class CodebaseValidator:
                                 node.name,
                                 complexity
                             ))
-            except:
+            except Exception:
                 pass  # Ignore parsing errors
 
         if complex_functions:
@@ -194,13 +210,13 @@ class CodebaseValidator:
         # Compter les lignes de code source
         src_path = self.base_path / "src"
         for py_file in src_path.rglob("*.py"):
-            src_lines += len(py_file.read_text().splitlines())
+            src_lines += len(self._read_text(py_file).splitlines())
 
         # Compter les lignes de tests
         test_path = self.base_path / "tests"
         if test_path.exists():
             for py_file in test_path.rglob("*.py"):
-                test_lines += len(py_file.read_text().splitlines())
+                test_lines += len(self._read_text(py_file).splitlines())
 
         coverage_ratio = (test_lines / src_lines * 100) if src_lines > 0 else 0
 

@@ -8,7 +8,17 @@ import os
 import requests
 import zipfile
 import time
-import fcntl
+try:
+    import fcntl  # Unix-only
+    HAS_FCNTL = True
+except Exception:
+    HAS_FCNTL = False
+    class _FakeFcntl:
+        LOCK_EX = 1
+        LOCK_NB = 2
+        def flock(self, *args, **kwargs):
+            return None
+    fcntl = _FakeFcntl()  # type: ignore
 from pathlib import Path
 from datasets import Dataset, DatasetDict
 from typing import Dict, List, Any
@@ -72,7 +82,7 @@ class MLSUMLoader:
                 # Clean up lock file
                 try:
                     lock_file.unlink()
-                except:
+                except (FileNotFoundError, PermissionError):
                     pass
 
     def _download_mlsum_data(self):

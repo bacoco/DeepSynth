@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DeepSynth – OCR Tester</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+    header { padding: 12px 16px; background: #0b2239; color: #fff; }
+    main { padding: 16px; display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
+    .panel { border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; }
+    .thumbs { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+    .thumbs img { width: 96px; height: 96px; object-fit: cover; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; }
+    .result { white-space: pre-wrap; border: 1px solid #ddd; padding: 8px; border-radius: 4px; min-height: 180px; background: #fafafa; }
+    .row { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+    label { font-weight: 600; }
+    .small { font-size: 12px; color: #666; }
+    .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    button { padding: 8px 12px; cursor: pointer; }
+    input[type=file] { max-width: 100%; }
+  </style>
+  <script>
+    let selectedSample = null;
+    let selectedFile = null;
+    let samples = [];
+
+    async function fetchModels() {
+      const res = await fetch('/api/ocr/models');
+      return res.json();
+    }
+
+    function pickSample(id) {
+      selectedSample = samples.find(s => s.id === id) || null;
+      selectedFile = null;
+      document.getElementById('picked-info').textContent = selectedSample ? `Sample: ${selectedSample.label}` : 'None';
+    }
+
+    function onFileChange(ev) {
+      selectedFile = ev.target.files[0] || null;
+      selectedSample = null;
+      document.getElementById('picked-info').textContent = selectedFile ? `File: ${selectedFile.name}` : 'None';
+    }
+
+    async function runOCR() {
+      const chosen = document.getElementById('model_selector').value || 'base'; const isBase = (chosen === 'base');
+
+      let body;
+      let headers = {};
+      if (selectedFile) {
+        body = new FormData();
+        body.append('file', selectedFile);
+        body.append('model_base', String(isBase));
+        body.append('model_finetuned', isBase ? 'none' : chosen);
+      } else if (selectedSample) {
+        body = JSON.stringify({ sample_data: selectedSample.data, model_base: isBase, model_finetuned: isBase ? 'none' : chosen });
+        headers['Content-Type'] = 'application/json';
+      } else {
+        alert('Choose a sample image or upload a file.');
+        return;
+      }
+
+      document.getElementById('run_btn').disabled = true;
+      document.getElementById('result_text').textContent = '';
+      document.getElementById('result_meta').textContent = '';
+      try {
+        const res = await fetch('/api/ocr/run', { method: 'POST', headers, body });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'OCR failed');
+        const r = data.results || {};
+        const out = isBase ? r.base : r.finetuned; if (out) { document.getElementById('result_text').textContent = out.text; document.getElementById('result_meta').textContent = `${out.model_id} � ${out.latency_ms.toFixed(1)} ms`; } • ${r.finetuned.latency_ms.toFixed(1)} ms`;
+        }
+      } catch (e) {
+        alert(String(e));
+      } finally {
+        document.getElementById('run_btn').disabled = false;
+      }
+    }
+
+    async function init() {
+      const m = await fetchModels();
+      const local = m.local || [];
+      const sel = document.getElementById('finetuned_local');
+      sel.innerHTML = '';
+      const opt0 = document.createElement('option'); opt0.value = ''; opt0.textContent = '— select —'; sel.appendChild(opt0);
+      local.forEach(name => { const o = document.createElement('option'); o.value = name; o.textContent = name; sel.appendChild(o); });
+      const resp = await fetch('/api/ocr/samples?limit=6');
+      const data = await resp.json();
+      samples = data.samples || [];
+      const thumbs = document.getElementById('thumbs');
+      samples.forEach(s => {
+        const img = document.createElement('img');
+        img.src = s.data; img.alt = s.label; img.title = s.label;
+        img.onclick = () => pickSample(s.id);
+        thumbs.appendChild(img);
+      });
+    }
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</head>
+<body>
+  <header>
+    <h2>OCR Tester — Compare Base vs Fine‑tuned</h2>
+  </header>
+  <main>
+    <section class="panel">
+      <div class="row"><label>Input</label><span id="picked-info" class="small">None</span></div>
+      <div class="row"><input type="file" accept="image/*" onchange="onFileChange(event)" /></div>
+      <div>
+        <div class="small">Pick a sample:</div>
+        <div id="thumbs" class="thumbs"></div>
+      </div>
+      
+      <div class="row"><label>Model</label><span id="chosen_meta" class="small" style="margin-left:8px;">DeepSeek-OCR (base)</span></div>
+      <div class="row"><input id="model_base" type="checkbox" checked /> <span>DeepSeek‑OCR (base)</span></div>
+      <div class="row">
+        <label>Fine‑tuned (local)</label>
+        <select id="finetuned_local"></select>
+      </div>
+      <div class="row"><button id="run_btn" onclick="runOCR()">Run OCR</button></div>
+        <img id="preview" class="preview" alt="preview" />
+      </section>
+      <section class="panel">
+        <div>
+        <div>
+          <div class="row"><label>Base</label> <span id="base_meta" class="small"></span></div>
+          <div id="base_text" class="result"></div>
+        </div>
+        <div>
+          <div class="row"><label>Fine‑tuned</label> <span id="finetuned_meta" class="small"></span></div>
+          <div id="finetuned_text" class="result"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
+

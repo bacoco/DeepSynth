@@ -9,11 +9,19 @@ import sys
 from pathlib import Path
 from typing import List, Tuple
 
+# Ensure UTF-8 stdout on Windows consoles to avoid UnicodeEncodeError
+try:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 class CriticalIssueFixer:
     """Corrige automatiquement les problèmes critiques du codebase."""
 
     def __init__(self):
-        self.base_path = Path(__file__).parent
+        # Point to repository root (parent of tools/)
+        self.base_path = Path(__file__).resolve().parents[1]
         self.fixes_applied = []
         self.fixes_failed = []
 

@@ -325,7 +325,7 @@ class OptimizedDatasetPipeline:
                             dataset = load_dataset(name, subset, split=split)
                         else:
                             dataset = load_dataset(name, split=split)
-                    except:
+                    except Exception:
                         if subset:
                             dataset = load_dataset(name, subset, split=split, trust_remote_code=True)
                         else:

@@ -25,6 +25,8 @@ RUN apt-get update && apt-get install -y \
     wget \
     curl \
     build-essential \
+    fontconfig \
+    fonts-dejavu-core \
     libgl1-mesa-glx \
     libglib2.0-0 \
     libsm6 \

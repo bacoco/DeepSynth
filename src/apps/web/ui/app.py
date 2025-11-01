@@ -22,6 +22,7 @@ from deepsynth.data.transforms.text_to_image import DEEPSEEK_OCR_RESOLUTIONS
 from .dataset_generator_improved import IncrementalDatasetGenerator, ModelTrainer
 from .state_manager import JobStatus, StateManager
 from .benchmark_runner import BenchmarkRunner
+from deepsynth.inference.ocr_service import OCRModelService, DEFAULT_BASE_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -46,13 +47,15 @@ def create_app(config: Optional[type] = None) -> Flask:
     dataset_generator = IncrementalDatasetGenerator(state_manager)
     model_trainer = ModelTrainer(state_manager)
     benchmark_runner = BenchmarkRunner(state_manager)
+    ocr_service = OCRModelService()
 
-    _register_routes(app, state_manager, dataset_generator, model_trainer, benchmark_runner)
+    _register_routes(app, state_manager, dataset_generator, model_trainer, benchmark_runner, ocr_service)
 
     app.state_manager = state_manager  # type: ignore[attr-defined]
     app.dataset_generator = dataset_generator  # type: ignore[attr-defined]
     app.model_trainer = model_trainer  # type: ignore[attr-defined]
     app.benchmark_runner = benchmark_runner  # type: ignore[attr-defined]
+    app.ocr_service = ocr_service  # type: ignore[attr-defined]
 
     return app
 
@@ -63,6 +66,7 @@ def _register_routes(
     dataset_generator: IncrementalDatasetGenerator,
     model_trainer: ModelTrainer,
     benchmark_runner: BenchmarkRunner,
+    ocr_service: OCRModelService,
 ) -> None:
     """Bind HTTP routes to the Flask application."""
 
@@ -82,6 +86,12 @@ def _register_routes(
         """Render the Q&A dataset generator UI."""
 
         return render_template("qa_generator.html")
+
+    # -------------------- OCR Tester UI --------------------
+    @app.route("/ocr")
+    def ocr_tester():
+        """Render the OCR comparison tester UI."""
+        return render_template("ocr.html")
 
     @app.route("/api/jobs", methods=["GET"])
     def list_jobs():
@@ -428,6 +438,127 @@ def _register_routes(
         """Health check endpoint for Docker and monitoring."""
 
         return jsonify({"status": "ok"})
+
+    @app.route("/api/ocr/samples", methods=["GET"])
+    def list_ocr_samples():
+        """Return a small set of image samples from local datasets.
+
+        Looks under ./generated_images and ./datasets for PNG/JPG files and
+        returns up to N as base64 data URLs for quick preview.
+        """
+        import base64
+
+        roots = [Path("./generated_images"), Path("./datasets")]
+        exts = {".png", ".jpg", ".jpeg"}
+        max_items = int(request.args.get("limit", "4"))
+        results = []
+        for root in roots:
+            if not root.exists():
+                continue
+            for p in root.rglob("*"):
+                if p.is_file() and p.suffix.lower() in exts:
+                    try:
+                        data = p.read_bytes()
+                        # Small cap: only include images < 1.5MB to avoid bloating response
+                        if len(data) > 1_500_000:
+                            continue
+                        b64 = base64.b64encode(data).decode("ascii")
+                        mime = "image/png" if p.suffix.lower() == ".png" else "image/jpeg"
+                        results.append({
+                            "id": p.name,
+                            "label": p.name,
+                            "data": f"data:{mime};base64,{b64}",
+                        })
+                        if len(results) >= max_items:
+                            return jsonify({"samples": results})
+                    except Exception:
+                        continue
+        return jsonify({"samples": results})
+
+    @app.route("/api/ocr/models", methods=["GET"])
+    def list_ocr_models():
+        """List base and detected fine-tuned models.
+
+        Fine-tuned (local) detection: look under ./trained_model for directories.
+        Optionally accept DEFAULT_FINETUNED_REPO env for HF repo id.
+        """
+        trained_dir = Path("./trained_model")
+        local = []
+        if trained_dir.exists():
+            for p in sorted(trained_dir.iterdir()):
+                if p.is_dir():
+                    local.append(p.name)
+        hf_repo = os.environ.get("DEFAULT_FINETUNED_REPO", "")
+        return jsonify({
+            "base": DEFAULT_BASE_MODEL,
+            "local": local,
+            "hf_repo": hf_repo,
+        })
+
+    @app.route("/api/ocr/run", methods=["POST"])
+    def run_ocr():
+        """Run OCR on an uploaded image or a base64 sample and return text for selected models.
+
+        Body can be multipart/form-data or JSON.
+        Fields:
+          - model_base: bool (default true)
+          - model_finetuned: one of {"local:<dir>", "hf:<repo>", "none"}
+          - file: uploaded image file (multipart)
+          - sample_data: base64 data URL (JSON)
+        """
+        try:
+            # Acquire image bytes
+            img_bytes: Optional[bytes] = None
+            if request.files and "file" in request.files:
+                f = request.files["file"]
+                img_bytes = f.read()
+            else:
+                data = request.get_json(silent=True) or {}
+                sample_data = data.get("sample_data", "")
+                if isinstance(sample_data, str) and sample_data.startswith("data:image/"):
+                    import base64
+                    encoded = sample_data.split(",", 1)[1]
+                    img_bytes = base64.b64decode(encoded)
+            if not img_bytes:
+                return jsonify({"error": "No image provided"}), 400
+
+            # Determine model ids
+            data = request.form if request.form else (request.get_json(silent=True) or {})
+            want_base = str(data.get("model_base", "true")).lower() in {"1", "true", "yes", "on"}
+            finetuned_spec = data.get("model_finetuned", "none")
+
+            results = {}
+
+            if want_base:
+                r = ocr_service.infer_from_bytes(img_bytes, DEFAULT_BASE_MODEL)
+                results["base"] = {
+                    "text": r.text,
+                    "latency_ms": r.latency_ms,
+                    "model_id": r.model_id,
+                    "image_size": r.image_size,
+                }
+
+            if isinstance(finetuned_spec, str) and finetuned_spec != "none":
+                model_id = None
+                if finetuned_spec.startswith("local:"):
+                    # map to local trained_model subdir
+                    name = finetuned_spec.split(":", 1)[1]
+                    model_id = str(Path("./trained_model") / name)
+                elif finetuned_spec.startswith("hf:"):
+                    model_id = finetuned_spec.split(":", 1)[1]
+                if model_id:
+                    r2 = ocr_service.infer_from_bytes(img_bytes, model_id)
+                    results["finetuned"] = {
+                        "text": r2.text,
+                        "latency_ms": r2.latency_ms,
+                        "model_id": r2.model_id,
+                        "image_size": r2.image_size,
+                    }
+
+            return jsonify({"results": results})
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("OCR inference error")
+            return jsonify({"error": str(exc)}), 500
 
     @app.route("/api/config/hf-token", methods=["GET"])
     def get_hf_config():
