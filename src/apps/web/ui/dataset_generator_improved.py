@@ -561,37 +561,16 @@ class ModelTrainer:
                     if not repo_indices:
                         continue
 
-                    # OPTIMIZATION: For quick tests with small sample counts, use streaming
-                    # to avoid downloading entire dataset (which can be 500+ files)
+                    # OPTIMIZATION: For quick tests, limit the number of indices to load
                     max_train_samples = trainer_config.max_train_samples
-                    use_streaming = max_train_samples and max_train_samples <= 1000
+                    if max_train_samples and max_train_samples < len(repo_indices):
+                        logger.info(f"  Quick test mode: Limiting to first {max_train_samples} of {len(repo_indices)} indices")
+                        repo_indices = repo_indices[:max_train_samples]
 
-                    if use_streaming:
-                        # Streaming mode: Take first N samples (fast, no full download)
-                        # For quick tests, we don't care about specific indices - just grab what we need fast
-                        logger.info(f"  Using streaming mode (quick test - taking first {max_train_samples} samples)")
-                        logger.info(f"  Loading dataset in streaming mode from {repo}...")
-                        ds_stream = load_dataset(repo, split="train", streaming=True)
-                        logger.info(f"  Dataset stream created, iterating to collect {max_train_samples} samples...")
-
-                        # Take only the first max_train_samples
-                        collected_samples = []
-                        for i, sample in enumerate(ds_stream.take(max_train_samples)):
-                            collected_samples.append(sample)
-                            if (i + 1) % 100 == 0:
-                                logger.info(f"    Collected {i + 1}/{max_train_samples} samples...")
-
-                        # Convert to regular dataset
-                        from datasets import Dataset
-                        logger.info(f"  Converting {len(collected_samples)} samples to dataset...")
-                        ds_filtered = Dataset.from_list(collected_samples)
-                        logger.info(f"  ✅ Loaded {len(ds_filtered)} samples via streaming (NO full dataset download!)")
-                    else:
-                        # Regular mode: download full dataset (for production training)
-                        logger.info(f"  Loading full dataset (production mode)")
-                        ds = load_dataset(repo, split="train")
-                        ds_filtered = ds.select(repo_indices)
-                        logger.info(f"  Loaded {len(ds_filtered)} training samples from {repo}")
+                    logger.info(f"  Loading {len(repo_indices)} samples from {repo}...")
+                    ds = load_dataset(repo, split="train")
+                    ds_filtered = ds.select(repo_indices)
+                    logger.info(f"  ✅ Loaded {len(ds_filtered)} training samples from {repo}")
 
                     train_datasets.append(ds_filtered)
 
