@@ -35,6 +35,8 @@ class TrainerConfig:
     resume_from_checkpoint: Optional[str] = None
     metrics_output_path: Optional[str] = None
     save_metrics_to_hub: bool = True
+    max_train_samples: Optional[int] = None  # Limit training samples for quick tests
+    max_eval_samples: Optional[int] = None  # Limit evaluation samples for quick tests
     expert_dropout_rate: float = 0.0
     expert_dropout_min_keep: int = 1
     bidrop_passes: int = 1
@@ -95,6 +97,8 @@ class TrainerConfig:
             "resume_from_checkpoint": self.resume_from_checkpoint,
             "metrics_output_path": self.metrics_output_path,
             "save_metrics_to_hub": self.save_metrics_to_hub,
+            "max_train_samples": self.max_train_samples,
+            "max_eval_samples": self.max_eval_samples,
             "expert_dropout_rate": self.expert_dropout_rate,
             "expert_dropout_min_keep": self.expert_dropout_min_keep,
             "bidrop_passes": self.bidrop_passes,

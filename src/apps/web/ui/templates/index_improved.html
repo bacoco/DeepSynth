@@ -573,14 +573,23 @@
                         <small class="help-text">Your HuggingFace username (for dataset/model uploads)</small>
                     </div>
                 </div>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    <button type="button" class="btn btn-primary" onclick="saveHFConfig()" style="width: auto; padding: 10px 20px;">
-                        💾 Save Configuration
-                    </button>
-                    <button type="button" class="btn btn-secondary" onclick="testHFConnection()" style="width: auto; padding: 10px 20px;">
-                        🔍 Test Connection
-                    </button>
-                    <span id="hf-save-status" style="color: #28a745; font-weight: 500;"></span>
+                <div style="display: flex; gap: 10px; align-items: center; justify-content: space-between;">
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <button type="button" class="btn btn-primary" onclick="saveHFConfig()" style="width: auto; padding: 10px 20px;">
+                            💾 Save Configuration
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="testHFConnection()" style="width: auto; padding: 10px 20px;">
+                            🔍 Test Connection
+                        </button>
+                        <span id="hf-save-status" style="color: #28a745; font-weight: 500;"></span>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <button type="button" class="btn" onclick="runOneClickTest()"
+                                style="background: #667eea; color: white; padding: 10px 20px; border: none; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);">
+                            🧪 Quick Test (FR, 500 samples)
+                        </button>
+                        <span id="one-click-status" style="font-size: 13px; color: #666;"></span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -749,21 +758,7 @@
             <h2>Model Training</h2>
 
             <form id="training-form">
-                <!-- ONE-CLICK PIPELINE TEST -->
-                <div class="form-section" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 12px; margin-bottom: 30px; text-align: center;">
-                    <h2 style="margin: 0 0 15px 0; font-size: 28px;">🧪 ONE-CLICK PIPELINE TEST</h2>
-                    <p style="margin: 0 0 20px 0; font-size: 16px; opacity: 0.95;">
-                        Test the entire fine-tuning pipeline automatically<br>
-                        <small style="opacity: 0.85;">(500 samples, 1 epoch, ~5-10 minutes)</small>
-                    </p>
-                    <button type="button" class="btn" onclick="runOneClickTest()"
-                            style="background: white; color: #667eea; font-size: 18px; padding: 15px 40px; font-weight: bold; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
-                        ▶ START QUICK TEST
-                    </button>
-                    <div id="one-click-status" style="margin-top: 15px; font-size: 14px; min-height: 20px;"></div>
-                </div>
-
-                <!-- Dataset Selection -->
+                    <!-- Dataset Selection -->
                 <div class="form-section">
                     <h3>1. Select Datasets for Training</h3>
                     <div class="info-box">
@@ -2306,13 +2301,34 @@
                     const detailsHtml = detailLines.length ? `<div style="font-size:0.85em;color:#495057;margin-top:10px;">${detailLines.join('<br>')}</div>` : '';
                     const metricsHtml = metricLines.length ? `<div style="font-size:0.85em;color:#212529;margin-top:6px;">${metricLines.join(' • ')}</div>` : '';
 
+                    // Show error message if job failed
+                    const errorHtml = (job.status === 'failed' && progress.last_error)
+                        ? `<div style="background:#ffebee;border-left:3px solid #f44336;padding:8px;margin-top:10px;font-size:0.85em;color:#c62828;">
+                              <strong>Error:</strong> ${progress.last_error}
+                           </div>`
+                        : '';
+
+                    // Show current status message if in progress
+                    const statusMsgHtml = (job.status === 'in_progress' && progress.status_message)
+                        ? `<div style="background:#e3f2fd;border-left:3px solid #2196f3;padding:8px;margin-top:10px;font-size:0.85em;color:#0d47a1;">
+                              ${progress.status_message}
+                           </div>`
+                        : '';
+
                     card.innerHTML = `
                         <div class="job-header">
                             <div>
                                 <strong>${job.job_type.replace('_', ' ').toUpperCase()}</strong>
                                 <div style="font-size: 0.85em; color: #6c757d;">Job ID: ${job.job_id}</div>
                             </div>
-                            <span class="job-status status-${job.status}">${job.status.toUpperCase()}</span>
+                            <div style="display:flex;gap:10px;align-items:center;">
+                                <span class="job-status status-${job.status}">${job.status.toUpperCase()}</span>
+                                <button onclick="deleteJob('${job.job_id}')"
+                                        style="background:#dc3545;color:white;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:0.85em;"
+                                        ${job.status === 'in_progress' ? 'disabled title="Cannot delete running job"' : ''}>
+                                    🗑️ Delete
+                                </button>
+                            </div>
                         </div>
                         <div class="progress-bar">
                             <div class="progress-fill" style="width: ${percentage}%">${percentage.toFixed(1)}%</div>
@@ -2322,6 +2338,8 @@
                         </div>
                         ${detailsHtml}
                         ${metricsHtml}
+                        ${errorHtml}
+                        ${statusMsgHtml}
                     `;
 
                     container.appendChild(card);
@@ -2333,6 +2351,30 @@
 
         function filterJobs(type) {
             refreshJobs(type === 'all' ? null : type);
+        }
+
+        async function deleteJob(jobId) {
+            if (!confirm('Are you sure you want to delete this job? This cannot be undone.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/jobs/${jobId}`, {
+                    method: 'DELETE'
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showToast(`Job deleted successfully: ${jobId}`, 'success');
+                    refreshJobs(); // Refresh the jobs list
+                } else {
+                    showToast(`Failed to delete job: ${data.error || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error deleting job:', error);
+                showToast(`Error deleting job: ${error.message}`, 'error');
+            }
         }
 
         // HuggingFace Configuration Functions

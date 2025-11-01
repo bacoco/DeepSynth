@@ -42,3 +42,8 @@ test_images_output/
 
 # Logs
 *.log
+
+# UI State (contains temporary job data)
+src/apps/web/ui/state/
+deploy/web_ui/state/
+.claude/settings.local.json
