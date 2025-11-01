@@ -568,9 +568,13 @@ class UnifiedProductionTrainer:
         attention_mask = attention_mask.to(self.accelerator.device)
         labels = labels.to(self.accelerator.device)
 
-        # Convert to DeepSeek-OCR tuple format: [(crop_batch, ori_batch)]
-        # This is a LIST with ONE TUPLE containing the full batched tensors
-        images_tuples = [(images_crop, images_ori)]
+        # Convert to DeepSeek-OCR tuple format: [(crop0, ori0), (crop1, ori1), ...]
+        # Model expects a list of per-image tuples, not a single batched tuple
+        batch_size = images_crop.shape[0]
+        images_tuples = [
+            (images_crop[i:i+1], images_ori[i:i+1])  # Keep batch dimension with size 1
+            for i in range(batch_size)
+        ]
 
         # Encode instructions if text encoder is enabled
         text_embeddings = None
@@ -583,9 +587,12 @@ class UnifiedProductionTrainer:
             # text_embeddings shape: (batch_size, 4096)
 
         # Forward pass with DeepSeek-OCR format (following infer() pattern)
+        # Convert images_spatial_crop tensor to list for model compatibility
+        images_spatial_crop_list = images_spatial_crop.tolist()
+
         forward_kwargs = {
             "images": images_tuples,  # List of (crop, ori) tuples
-            "images_spatial_crop": images_spatial_crop,  # [[1, 1], [1, 1], ...]
+            "images_spatial_crop": images_spatial_crop_list,  # [[1, 1], [1, 1], ...]
             "images_seq_mask": images_seq_mask,  # Boolean mask for image tokens
             "input_ids": input_ids,
             "attention_mask": attention_mask,
