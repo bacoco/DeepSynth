@@ -918,6 +918,18 @@
                     </div>
                     <div class="form-row">
                         <div class="form-group">
+                            <label for="max_train_samples">🧪 Max Training Samples (for testing)</label>
+                            <input type="number" id="max_train_samples" name="max_train_samples" value="" placeholder="Leave empty for all">
+                            <small class="help-text">Use 100-1000 for quick tests (e.g., 500 samples)</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="max_eval_samples">🧪 Max Validation Samples</label>
+                            <input type="number" id="max_eval_samples" name="max_eval_samples" value="" placeholder="Leave empty for all">
+                            <small class="help-text">Use 50-200 for quick validation</small>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
                             <label for="learning_rate">Learning Rate</label>
                             <input type="text" id="learning_rate" name="learning_rate" value="5e-5">
                             <small class="help-text">Default: 5e-5 for fine-tuning</small>
@@ -2010,6 +2022,10 @@
                 mixed_precision: document.getElementById('mixed_precision').value,
                 gradient_accumulation_steps: parseInt(document.getElementById('gradient_accumulation_steps').value),
                 evaluation_split: document.getElementById('evaluation_split').value || null,
+
+                // Testing parameters (for quick tests)
+                max_train_samples: document.getElementById('max_train_samples').value ? parseInt(document.getElementById('max_train_samples').value) : null,
+                max_eval_samples: document.getElementById('max_eval_samples').value ? parseInt(document.getElementById('max_eval_samples').value) : null,
 
                 // MoE Dropout parameters
                 expert_dropout_rate: parseFloat(document.getElementById('expert_dropout_rate').value),
