@@ -69,8 +69,13 @@ def _register_routes(
     @app.route("/")
     def index():
         """Render the main UI."""
+        # Pass current environment variables to template
+        hf_token = os.environ.get("HF_TOKEN", "")
+        hf_username = os.environ.get("HF_USERNAME", "")
 
-        return render_template("index_improved.html")
+        return render_template("index_improved.html",
+                             hf_token=hf_token,
+                             hf_username=hf_username)
 
     @app.route("/qa")
     def qa_generator():
@@ -416,6 +421,81 @@ def _register_routes(
         """Health check endpoint for Docker and monitoring."""
 
         return jsonify({"status": "ok"})
+
+    @app.route("/api/config/hf-token", methods=["GET"])
+    def get_hf_config():
+        """Get current HuggingFace configuration."""
+        hf_token = os.environ.get("HF_TOKEN", "")
+        # Mask token for security - show only first 6 and last 4 characters
+        masked_token = ""
+        if hf_token:
+            if len(hf_token) > 10:
+                masked_token = hf_token[:6] + "..." + hf_token[-4:]
+            else:
+                masked_token = hf_token[:3] + "..." + hf_token[-2:] if len(hf_token) > 5 else "***"
+
+        return jsonify({
+            "hf_token": hf_token,  # Full token for form population
+            "hf_token_masked": masked_token,  # Masked for display
+            "hf_username": os.environ.get("HF_USERNAME", ""),
+            "token_configured": bool(hf_token)
+        })
+
+    @app.route("/api/config/hf-token", methods=["POST"])
+    def save_hf_config():
+        """Save HuggingFace configuration to .env file."""
+        try:
+            data = request.json or {}
+            hf_token = data.get("hf_token", "").strip()
+            hf_username = data.get("hf_username", "").strip()
+
+            if not hf_token:
+                return jsonify({"error": "HF_TOKEN is required"}), 400
+
+            if not hf_username:
+                return jsonify({"error": "HF_USERNAME is required"}), 400
+
+            # Validate token format
+            if not hf_token.startswith("hf_"):
+                return jsonify({"error": "Invalid token format. HuggingFace tokens start with 'hf_'"}), 400
+
+            # Update environment variables
+            os.environ["HF_TOKEN"] = hf_token
+            os.environ["HF_USERNAME"] = hf_username
+
+            # Update .env file
+            env_path = Path(".env")
+            env_content = ""
+
+            if env_path.exists():
+                env_content = env_path.read_text()
+
+            # Update or add HF_TOKEN
+            if "HF_TOKEN=" in env_content:
+                import re
+                env_content = re.sub(r"HF_TOKEN=.*", f"HF_TOKEN={hf_token}", env_content)
+            else:
+                env_content += f"\nHF_TOKEN={hf_token}"
+
+            # Update or add HF_USERNAME
+            if "HF_USERNAME=" in env_content:
+                import re
+                env_content = re.sub(r"HF_USERNAME=.*", f"HF_USERNAME={hf_username}", env_content)
+            else:
+                env_content += f"\nHF_USERNAME={hf_username}"
+
+            # Write back to .env file
+            env_path.write_text(env_content)
+
+            return jsonify({
+                "message": "HuggingFace configuration saved successfully",
+                "hf_username": hf_username,
+                "token_configured": True
+            })
+
+        except Exception as exc:
+            logger.exception("Error saving HF configuration")
+            return jsonify({"error": str(exc)}), 500
 
     @app.route("/api/lora/presets", methods=["GET"])
     def get_lora_presets():

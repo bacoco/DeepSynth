@@ -547,6 +547,44 @@
             <p class="subtitle">Production-grade fine-tuning with MoE dropout regularization</p>
         </header>
 
+        <!-- HuggingFace Configuration Section -->
+        <div id="hf-config-section" class="form-section" style="margin: 20px 30px; background: #f8f9fa;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; color: #667eea;">🤗 HuggingFace Configuration</h3>
+                <div id="hf-status" style="padding: 6px 12px; border-radius: 20px; font-size: 0.85em; font-weight: 600;">
+                    <!-- Status will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <div id="hf-config-form" style="margin-top: 15px;">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="hf_token_input">HuggingFace Token*</label>
+                        <input type="password" id="hf_token_input" placeholder="hf_xxxxxxxxxxxxxxxxxxxxxxxxx"
+                               value="{{ hf_token }}" style="font-family: monospace;">
+                        <small class="help-text">
+                            Get your token at <a href="https://huggingface.co/settings/tokens" target="_blank">huggingface.co/settings/tokens</a>
+                        </small>
+                    </div>
+                    <div class="form-group">
+                        <label for="hf_username_input">HuggingFace Username*</label>
+                        <input type="text" id="hf_username_input" placeholder="your-username"
+                               value="{{ hf_username }}">
+                        <small class="help-text">Your HuggingFace username (for dataset/model uploads)</small>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button type="button" class="btn btn-primary" onclick="saveHFConfig()" style="width: auto; padding: 10px 20px;">
+                        💾 Save Configuration
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="testHFConnection()" style="width: auto; padding: 10px 20px;">
+                        🔍 Test Connection
+                    </button>
+                    <span id="hf-save-status" style="color: #28a745; font-weight: 500;"></span>
+                </div>
+            </div>
+        </div>
+
         <!-- Tabs -->
         <div class="tabs">
             <button class="tab-btn active" onclick="switchTab('training')">🚀 Fine-Tune Model</button>
@@ -2140,8 +2178,134 @@
             refreshJobs(type === 'all' ? null : type);
         }
 
+        // HuggingFace Configuration Functions
+        async function loadHFConfig() {
+            try {
+                const response = await fetch('/api/config/hf-token');
+                const data = await response.json();
+
+                document.getElementById('hf_token_input').value = data.hf_token || '';
+                document.getElementById('hf_username_input').value = data.hf_username || '';
+
+                // Update status
+                const statusEl = document.getElementById('hf-status');
+                if (data.token_configured) {
+                    statusEl.textContent = '✅ Configured';
+                    statusEl.className = 'status-completed';
+                } else {
+                    statusEl.textContent = '⚠️ Not configured';
+                    statusEl.className = 'status-failed';
+                }
+            } catch (error) {
+                console.error('Failed to load HF config:', error);
+            }
+        }
+
+        async function saveHFConfig() {
+            const token = document.getElementById('hf_token_input').value.trim();
+            const username = document.getElementById('hf_username_input').value.trim();
+            const statusEl = document.getElementById('hf-save-status');
+
+            if (!token) {
+                statusEl.textContent = '❌ Token is required';
+                statusEl.style.color = '#dc3545';
+                return;
+            }
+
+            if (!username) {
+                statusEl.textContent = '❌ Username is required';
+                statusEl.style.color = '#dc3545';
+                return;
+            }
+
+            if (!token.startsWith('hf_')) {
+                statusEl.textContent = '❌ Invalid token format (must start with hf_)';
+                statusEl.style.color = '#dc3545';
+                return;
+            }
+
+            try {
+                statusEl.textContent = '💾 Saving...';
+                statusEl.style.color = '#6c757d';
+
+                const response = await fetch('/api/config/hf-token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        hf_token: token,
+                        hf_username: username
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    statusEl.textContent = '✅ Configuration saved!';
+                    statusEl.style.color = '#28a745';
+
+                    // Update status indicator
+                    const statusIndicator = document.getElementById('hf-status');
+                    statusIndicator.textContent = '✅ Configured';
+                    statusIndicator.className = 'status-completed';
+
+                    // Clear status after 3 seconds
+                    setTimeout(() => {
+                        statusEl.textContent = '';
+                    }, 3000);
+                } else {
+                    statusEl.textContent = `❌ ${data.error}`;
+                    statusEl.style.color = '#dc3545';
+                }
+            } catch (error) {
+                statusEl.textContent = '❌ Failed to save configuration';
+                statusEl.style.color = '#dc3545';
+                console.error('Save error:', error);
+            }
+        }
+
+        async function testHFConnection() {
+            const token = document.getElementById('hf_token_input').value.trim();
+            const username = document.getElementById('hf_username_input').value.trim();
+            const statusEl = document.getElementById('hf-save-status');
+
+            if (!token || !username) {
+                statusEl.textContent = '❌ Please enter both token and username first';
+                statusEl.style.color = '#dc3545';
+                return;
+            }
+
+            try {
+                statusEl.textContent = '🔍 Testing connection...';
+                statusEl.style.color = '#6c757d';
+
+                // Test by trying to list datasets
+                const response = await fetch('/api/datasets/deepsynth');
+
+                if (response.ok) {
+                    statusEl.textContent = '✅ Connection successful!';
+                    statusEl.style.color = '#28a745';
+                } else {
+                    statusEl.textContent = '❌ Connection failed - check your token';
+                    statusEl.style.color = '#dc3545';
+                }
+
+                // Clear status after 3 seconds
+                setTimeout(() => {
+                    statusEl.textContent = '';
+                }, 3000);
+
+            } catch (error) {
+                statusEl.textContent = '❌ Connection test failed';
+                statusEl.style.color = '#dc3545';
+                console.error('Test error:', error);
+            }
+        }
+
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
+            loadHFConfig();
             loadBenchmarkDatasets();
             loadTrainingPresets();
             loadGeneratedDatasets();
