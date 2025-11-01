@@ -1,5 +1,6 @@
 # Environment
 .env
+.envrc
 
 # macOS
 .DS_Store

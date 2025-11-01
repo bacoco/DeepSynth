@@ -1,7 +1,8 @@
 # Base requirements for dataset generation (no GPU/training dependencies)
 # This file is used for dataset generation on macOS or CPU-only machines
 
-torch>=2.0.0
+torch==2.8.0
+torchvision==0.23.0
 transformers>=4.46.0
 tokenizers>=0.20.0
 datasets>=2.14.0

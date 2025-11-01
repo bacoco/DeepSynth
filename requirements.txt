@@ -10,7 +10,8 @@
 # Or use this file directly (may fail on macOS due to xformers):
 #   pip install -r requirements.txt
 
-torch>=2.0.0
+torch==2.8.0
+torchvision==0.23.0
 transformers>=4.46.0
 tokenizers>=0.20.0
 datasets>=2.14.0

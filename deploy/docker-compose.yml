@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   deepsynth-ui:
-    build: .
+    build: 
+      context: ..
+      dockerfile: deploy/Dockerfile
     container_name: deepsynth-dataset-generator
     ports:
       - "5000:5000"

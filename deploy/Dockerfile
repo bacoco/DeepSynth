@@ -45,11 +45,11 @@ WORKDIR /app
 COPY requirements.txt .
 
 # Install CUDA-enabled PyTorch first (critical for GPU support)
-# Pinned versions for reproducibility
+# Updated versions for availability
 RUN pip3 install --no-cache-dir --index-url https://download.pytorch.org/whl/cu121 \
-    torch==2.0.1+cu121 \
-    torchvision==0.15.2+cu121 \
-    torchaudio==2.0.2+cu121
+    torch==2.5.1+cu121 \
+    torchvision==0.20.1+cu121 \
+    torchaudio==2.5.1+cu121
 
 # Install Python dependencies
 # This includes:

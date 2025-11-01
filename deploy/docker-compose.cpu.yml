@@ -3,8 +3,8 @@ version: '3.8'
 services:
   deepsynth-dataset-generator:
     build:
-      context: .
-      dockerfile: Dockerfile.cpu
+      context: ..
+      dockerfile: deploy/Dockerfile.cpu
     container_name: deepsynth-dataset-generator-cpu
     ports:
       - "5000:5000"
