@@ -107,34 +107,286 @@ python run_benchmark.py --model ./your-model --benchmark cnn_dailymail
 
 ---
 
-## ⚡ Quick Start (30 seconds)
+## ⚡ Quick Start
 
-### 🔮 Claude Skills System
+### 🎯 Choose Your Setup
 
-**Professional Claude Code skills have been moved to a dedicated repository:**
+**🚀 Google Colab (Recommended for Training)**
+- ✅ Free GPU access (T4, V100, A100)
+- ✅ No local setup required
+- ✅ Perfect for model training
+- ✅ Pre-configured environment
 
-**🌟 [MetaSkill Repository](https://github.com/bacoco/MetaSkill)** - Universal skills for Claude Code and other LLMs
+**💻 Local Machine**
+- ✅ Full control and customization
+- ✅ Works with or without GPU
+- ✅ Best for development
+- ✅ Docker support
 
-**Available skills:**
-- 🧠 **SOUL** - Universal memory system with automatic session tracking
-- ⚡ **NEXUS** - Automatic skill generator based on usage patterns
-- 🛠️ **skill-creator** - Official guide for creating effective skills
+---
 
-**Installation:**
-```bash
-# Clone MetaSkill repository
-git clone https://github.com/bacoco/MetaSkill.git
-cd MetaSkill
+## 🔥 Google Colab Setup (Recommended for Training)
 
-# Copy skills to your project
-cp -r .claude/skills /path/to/your/project/.claude/
+### Why Google Colab?
+- **Free GPU access**: T4 (16GB), V100 (16GB), A100 (40GB) available
+- **No setup required**: Pre-installed CUDA, PyTorch, transformers
+- **Perfect for training**: Ideal for fine-tuning DeepSeek-OCR models
+- **Persistent storage**: Mount Google Drive for model checkpoints
 
-# Install SOUL git hooks
-cd /path/to/your/project/.claude/skills/soul/scripts
-./install.sh
+### Step-by-Step Colab Setup
+
+**1. Open Google Colab**
+```
+https://colab.research.google.com/
 ```
 
-See the [MetaSkill README](https://github.com/bacoco/MetaSkill) for complete documentation and usage guides.
+**2. Enable GPU Runtime**
+```
+Runtime → Change runtime type → Hardware accelerator → GPU → Save
+```
+
+**3. Setup DeepSynth in Colab**
+```python
+# Install dependencies
+!pip install torch torchvision transformers datasets huggingface_hub pillow python-dotenv flask
+
+# Clone repository
+!git clone https://github.com/bacoco/deepseek-synthesia.git
+%cd deepseek-synthesia
+
+# Setup environment
+!cp .env.example .env
+
+# Add your HuggingFace token (get it from https://huggingface.co/settings/tokens)
+import os
+from google.colab import userdata
+
+# Store your HF token in Colab secrets (left sidebar → 🔑 Secrets)
+# Then uncomment and run:
+# os.environ['HF_TOKEN'] = userdata.get('HF_TOKEN')
+
+# Or set it directly (less secure):
+os.environ['HF_TOKEN'] = 'hf_your_token_here'
+
+# Verify GPU availability
+import torch
+print(f"CUDA available: {torch.cuda.is_available()}")
+print(f"GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'None'}")
+```
+
+**4. Run Training Pipeline**
+```python
+# Quick test (100 samples)
+os.environ['MAX_SAMPLES_PER_SPLIT'] = '100'
+!python run_complete_multilingual_pipeline.py
+
+# Full training (all datasets)
+# !python run_complete_multilingual_pipeline.py
+```
+
+**5. Save Model to Google Drive**
+```python
+# Mount Google Drive
+from google.colab import drive
+drive.mount('/content/drive')
+
+# Copy trained model to Drive
+!cp -r ./deepsynth-ocr-summarizer /content/drive/MyDrive/DeepSynth/
+print("✅ Model saved to Google Drive!")
+```
+
+### Colab Training Tips
+
+**Memory Management:**
+```python
+# Clear GPU memory if needed
+import torch
+torch.cuda.empty_cache()
+
+# Monitor GPU usage
+!nvidia-smi
+```
+
+**Persistent Sessions:**
+```python
+# Keep session alive (run in background)
+import time
+while True:
+    time.sleep(3600)  # Sleep 1 hour
+    print("🔄 Session keepalive")
+```
+
+**Download Results:**
+```python
+# Download trained model
+from google.colab import files
+!zip -r deepsynth-model.zip ./deepsynth-ocr-summarizer/
+files.download('deepsynth-model.zip')
+```
+
+---
+
+## 💻 Local Machine Setup
+
+### Option 1: Direct Installation (Recommended for Development)
+
+**Requirements:**
+- Python 3.9+
+- CUDA 11.8+ (for GPU training)
+- 16GB+ RAM
+- 50GB+ free disk space
+
+**Setup:**
+```bash
+# Clone repository
+git clone https://github.com/bacoco/deepseek-synthesia.git
+cd deepseek-synthesia
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# venv\Scripts\activate   # Windows
+
+# Install dependencies
+pip install torch torchvision transformers datasets huggingface_hub pillow python-dotenv flask
+
+# Setup environment
+cp .env.example .env
+# Edit .env and add your HF_TOKEN
+
+# Test setup
+python test_setup.py
+
+# Run web interface (CPU mode)
+source .envrc && python -m apps.web
+
+# Run training pipeline
+python run_complete_multilingual_pipeline.py
+```
+
+### Option 2: Docker Setup (GPU Training)
+
+**Requirements:**
+- Docker + Docker Compose
+- NVIDIA Docker runtime
+- NVIDIA GPU with 16GB+ VRAM
+
+**Setup:**
+```bash
+# Clone repository
+git clone https://github.com/bacoco/deepseek-synthesia.git
+cd deepseek-synthesia
+
+# Setup environment
+cp .env.example .env
+# Edit .env and add your HF_TOKEN
+
+# Build and run with GPU
+docker compose -f docker-compose.gpu.yml up --build
+
+# Access web interface
+open http://localhost:7860
+```
+
+**Docker Commands:**
+```bash
+# GPU training
+docker compose -f docker-compose.gpu.yml up
+
+# CPU development
+docker compose -f docker-compose.cpu.yml up
+
+# Interactive shell
+docker compose -f docker-compose.gpu.yml exec deepsynth bash
+
+# View logs
+docker compose logs -f deepsynth
+```
+
+---
+
+## 🎯 Training Your Model
+
+### Quick Start Training
+
+**1. Prepare Dataset (5-10 minutes)**
+```bash
+# Test with small dataset
+export MAX_SAMPLES_PER_SPLIT=100
+python run_complete_multilingual_pipeline.py
+```
+
+**2. Fine-tune Model (30-60 minutes on GPU)**
+```bash
+# The pipeline automatically starts training after dataset preparation
+# Monitor progress in the console output
+```
+
+**3. Evaluate Results**
+```bash
+# Benchmark your trained model
+python run_benchmark.py \
+    --model ./deepsynth-ocr-summarizer \
+    --benchmark cnn_dailymail \
+    --max-samples 1000
+```
+
+### Production Training
+
+**Full Dataset (Recommended for best results):**
+```bash
+# Process all 1.29M+ samples (2-4 hours)
+python run_complete_multilingual_pipeline.py
+
+# Expected output:
+# ✅ French (MLSUM): 392,902 samples
+# ✅ Spanish (MLSUM): 266,367 samples
+# ✅ German (MLSUM): 220,748 samples
+# ✅ English (CNN/DailyMail): 287,113 samples
+# ✅ English (XSum): ~50,000 samples
+# ✅ Legal (BillSum): 22,218 samples
+# 🎯 Total: ~1.29M multilingual examples
+```
+
+**Custom Training Parameters:**
+```bash
+# Edit .env for custom settings
+BATCH_SIZE=4                    # Adjust for your GPU memory
+NUM_EPOCHS=3                    # More epochs = better quality
+LEARNING_RATE=1e-5              # Lower = more stable training
+GRADIENT_ACCUMULATION_STEPS=8   # Effective batch size = BATCH_SIZE * this
+MAX_SAMPLES_PER_SPLIT=10000     # Limit samples for testing
+```
+
+### Training Hardware Requirements
+
+| Setup | GPU | VRAM | Training Time | Quality |
+|-------|-----|------|---------------|---------|
+| **Colab Free** | T4 | 16GB | 2-3 hours | ⭐⭐⭐⭐ |
+| **Colab Pro** | V100/A100 | 16-40GB | 1-2 hours | ⭐⭐⭐⭐⭐ |
+| **Local RTX 4090** | RTX 4090 | 24GB | 1-2 hours | ⭐⭐⭐⭐⭐ |
+| **Local RTX 3080** | RTX 3080 | 10GB | 3-4 hours | ⭐⭐⭐⭐ |
+| **CPU Only** | None | 32GB+ RAM | 12-24 hours | ⭐⭐⭐ |
+
+### Monitoring Training
+
+**Real-time Monitoring:**
+```bash
+# Watch training logs
+tail -f training.log
+
+# Monitor GPU usage
+watch -n 1 nvidia-smi
+
+# Check model checkpoints
+ls -la ./deepsynth-ocr-summarizer/
+```
+
+**Training Metrics to Watch:**
+- **Loss decreasing**: Should drop from ~2.0 to ~0.5
+- **ROUGE scores improving**: Target ROUGE-1 > 40
+- **GPU utilization**: Should be 80-95%
+- **Memory usage**: Should be stable (no memory leaks)
 
 ### 🌍 Global Cross-Computer Pipeline
 
@@ -415,12 +667,36 @@ summary = summarizer(long_text, max_length=130, min_length=30)
 
 ## 📖 Documentation
 
+📁 **Complete documentation is now organized in the [`docs/`](docs/) directory**
+
 | Document | Description |
 |----------|-------------|
-| **[PRODUCTION_GUIDE.md](docs/PRODUCTION_GUIDE.md)** | Complete production deployment guide |
-| **[IMAGE_PIPELINE.md](docs/IMAGE_PIPELINE.md)** | Dataset preparation with images |
-| **[DELIVERY_SUMMARY.md](docs/DELIVERY_SUMMARY.md)** | Project delivery summary |
-| **[deepseek-ocr-resume-prd.md](docs/deepseek-ocr-resume-prd.md)** | Product requirements |
+| **[docs/README.md](docs/README.md)** | 📚 Complete documentation index |
+| **[docs/QUICKSTART.md](docs/QUICKSTART.md)** | ⚡ 5-minute quick start guide |
+| **[docs/PRODUCTION_GUIDE.md](docs/PRODUCTION_GUIDE.md)** | 🚀 Production deployment guide |
+| **[docs/IMAGE_PIPELINE.md](docs/IMAGE_PIPELINE.md)** | 🖼️ Dataset preparation with images |
+| **[docs/deepseek-ocr-resume-prd.md](docs/deepseek-ocr-resume-prd.md)** | 📋 Product requirements document |
+
+## 🗂️ Repository Structure
+
+```
+DeepSynth/
+├── 📄 README.md                 # This file - project overview
+├── ⚙️ requirements.txt          # Python dependencies
+├── 🔧 .env.example              # Environment configuration template
+├──
+├── 📚 docs/                     # Complete documentation
+├── 🎯 examples/                 # Example scripts and tutorials
+├── 🔧 tools/                    # Utility tools and scripts
+├── 📜 scripts/                  # Shell scripts and automation
+├──
+├── 💻 src/                      # Source code
+├── 🧪 tests/                    # Test suites
+├── 🐳 deploy/                   # Docker and deployment configs
+├── 📊 benchmarks/               # Benchmark results
+├── 📦 datasets/                 # Local dataset cache
+└── 🎯 trained_model/            # Model outputs
+```
 
 ---
 
