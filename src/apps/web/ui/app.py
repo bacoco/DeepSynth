@@ -203,14 +203,18 @@ def _register_routes(
 
     @app.route("/api/jobs/<job_id>", methods=["DELETE"])
     def delete_job(job_id: str):
-        """Delete a job and its associated data."""
+        """Delete a job and its associated data.
+
+        This now supports force-deleting in-progress jobs to handle stuck/orphaned jobs.
+        """
 
         job = state_manager.get_job(job_id)
         if not job:
             return jsonify({"error": "Job not found"}), 404
 
+        # Allow force-deleting in-progress jobs (for stuck/orphaned jobs)
         if job.status == JobStatus.IN_PROGRESS.value:
-            return jsonify({"error": "Cannot delete running job. Pause it first."}), 400
+            logger.warning(f"Force-deleting in-progress job: {job_id}. This may leave orphaned processes.")
 
         # Delete job files and metadata
         state_manager.delete_job(job_id)
