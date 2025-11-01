@@ -54,8 +54,8 @@ RUN pip3 install --no-cache-dir \
 # Install Python dependencies with fixed datasets version
 RUN pip3 install --no-cache-dir \
     "datasets==2.21.0" \
-    transformers>=4.46.0 \
-    tokenizers>=0.20.0 \
+    transformers==4.46.3 \
+    tokenizers==0.20.3 \
     huggingface_hub>=0.20.3 \
     accelerate>=0.24.0 \
     peft>=0.11.1 \
@@ -73,12 +73,20 @@ RUN pip3 install --no-cache-dir \
     flask>=3.0.0 \
     werkzeug>=3.0.0 \
     pytesseract>=0.3.10 \
-    python-dotenv>=1.0.0
+    python-dotenv>=1.0.0 \
+    addict>=2.4.0 \
+    einops>=0.8.0 \
+    easydict>=1.9
 
 # Install bitsandbytes with CUDA support for QLoRA
 # This enables 4-bit/8-bit quantization for memory-efficient training
 # Updated for CUDA 12.4 compatibility
 RUN pip3 install --no-cache-dir bitsandbytes==0.44.1
+
+# Install flash-attn for DeepSeek-OCR (required by official docs)
+# This may take a while to compile
+RUN pip3 install --no-cache-dir flash-attn>=2.7.3 --no-build-isolation || \
+    echo "Warning: flash-attn installation failed, continuing without it"
 
 # Install Flask for web UI
 RUN pip3 install --no-cache-dir flask flask-cors gunicorn
