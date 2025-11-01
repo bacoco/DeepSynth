@@ -520,6 +520,9 @@ class ModelTrainer:
                 save_checkpoints_to_hub=bool(config.get('save_checkpoints_to_hub', True)),
                 resume_from_checkpoint=config.get('resume_from_checkpoint'),
                 save_metrics_to_hub=bool(config.get('save_metrics_to_hub', True)),
+                # Quick test parameters (for streaming mode optimization)
+                max_train_samples=int(config['max_train_samples']) if config.get('max_train_samples') else None,
+                max_eval_samples=int(config['max_eval_samples']) if config.get('max_eval_samples') else None,
                 # MoE dropout parameters (NEW)
                 expert_dropout_rate=float(config.get('expert_dropout_rate', 0.0)),
                 expert_dropout_min_keep=int(config.get('expert_dropout_min_keep', 1)),

@@ -385,6 +385,9 @@ def _register_routes(
                 "mixed_precision": data.get("mixed_precision", "fp16"),
                 "gradient_accumulation_steps": data.get("gradient_accumulation_steps", 4),
                 "evaluation_split": data.get("evaluation_split"),
+                # Quick test parameters (enable streaming mode for small samples)
+                "max_train_samples": data.get("max_train_samples"),
+                "max_eval_samples": data.get("max_eval_samples"),
                 # MoE Dropout parameters
                 "expert_dropout_rate": data.get("expert_dropout_rate", 0.1),
                 "expert_dropout_min_keep": data.get("expert_dropout_min_keep", 2),
