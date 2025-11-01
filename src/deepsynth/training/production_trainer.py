@@ -375,23 +375,23 @@ class UnifiedProductionTrainer:
         ])
 
         for img in pil_images:
-            # Handle both PIL images and tensors
+            # Convert tensor to PIL if needed for uniform preprocessing
             if torch.is_tensor(img):
-                # Image is already a tensor from dataset transform - skip padding
-                # Just ensure it's the right dtype and size
+                # Convert tensor back to PIL for consistent padding
+                # This ensures ALL images are padded to 1024x1024 regardless of input format
                 if img.shape[0] == 3:  # CHW format
-                    global_tensor = img.to(torch.bfloat16)
-                else:
-                    global_tensor = img.permute(2, 0, 1).to(torch.bfloat16)  # HWC -> CHW
-            else:
-                # PIL image - apply padding and normalization
-                global_view = ImageOps.pad(
-                    img,
-                    (base_size, base_size),
-                    color=(127, 127, 127)  # Mean of 0.5 * 255
-                )
-                # Transform and convert to bfloat16
-                global_tensor = image_transform(global_view).to(torch.bfloat16)
+                    img = transforms.ToPILImage()(img)
+                else:  # HWC format
+                    img = transforms.ToPILImage()(img.permute(2, 0, 1))
+
+            # Apply uniform padding to ALL images (both original PIL and converted)
+            global_view = ImageOps.pad(
+                img,
+                (base_size, base_size),
+                color=(127, 127, 127)  # Mean of 0.5 * 255
+            )
+            # Transform and convert to bfloat16
+            global_tensor = image_transform(global_view).to(torch.bfloat16)
 
             images_ori_list.append(global_tensor)
 
