@@ -570,15 +570,20 @@ class ModelTrainer:
                         # Streaming mode: Take first N samples (fast, no full download)
                         # For quick tests, we don't care about specific indices - just grab what we need fast
                         logger.info(f"  Using streaming mode (quick test - taking first {max_train_samples} samples)")
+                        logger.info(f"  Loading dataset in streaming mode from {repo}...")
                         ds_stream = load_dataset(repo, split="train", streaming=True)
+                        logger.info(f"  Dataset stream created, iterating to collect {max_train_samples} samples...")
 
                         # Take only the first max_train_samples
                         collected_samples = []
-                        for sample in ds_stream.take(min(max_train_samples, len(repo_indices))):
+                        for i, sample in enumerate(ds_stream.take(max_train_samples)):
                             collected_samples.append(sample)
+                            if (i + 1) % 100 == 0:
+                                logger.info(f"    Collected {i + 1}/{max_train_samples} samples...")
 
                         # Convert to regular dataset
                         from datasets import Dataset
+                        logger.info(f"  Converting {len(collected_samples)} samples to dataset...")
                         ds_filtered = Dataset.from_list(collected_samples)
                         logger.info(f"  ✅ Loaded {len(ds_filtered)} samples via streaming (NO full dataset download!)")
                     else:

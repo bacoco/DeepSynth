@@ -30,7 +30,7 @@ except Exception as e:
 }
 
 # Check if model is already cached
-MODEL_CACHE_PATH="/root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-OCR"
+MODEL_CACHE_PATH="/root/.cache/huggingface/models--deepseek-ai--DeepSeek-OCR"
 
 if [ -d "$MODEL_CACHE_PATH" ]; then
     echo "✅ DeepSeek-OCR model already cached"
