@@ -17,6 +17,8 @@ services:
       - ../benchmarks:/app/benchmarks
       # Mount logs
       - ../logs:/app/logs
+      # Mount HuggingFace cache for model persistence
+      - ../huggingface_cache:/root/.cache/huggingface
     environment:
       # HuggingFace Configuration
       - HF_TOKEN=${HF_TOKEN}

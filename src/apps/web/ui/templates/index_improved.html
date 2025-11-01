@@ -805,21 +805,48 @@
                     <div id="split-status" class="split-status"></div>
                 </div>
 
-                <!-- Model Configuration -->
+                <!-- Model Configuration & HuggingFace -->
                 <div class="form-section">
-                    <h3>4. Model Configuration</h3>
+                    <h3>4. Model Configuration & HuggingFace</h3>
                     <div class="form-row">
                         <div class="form-group">
                             <label for="hub_model_id">HuggingFace Model Name*</label>
                             <input type="text" id="hub_model_id" value="baconnier/deepsynth-multilingual-v1" required>
                             <small class="help-text">Format: username/model-name (will be created if doesn't exist)</small>
                         </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="push_to_hub" name="push_to_hub" checked>
+                                📤 Push model to HuggingFace Hub
+                            </label>
+                            <small class="help-text">Upload trained model to HuggingFace</small>
+                        </div>
                         <div class="form-group">
                             <label>
                                 <input type="checkbox" id="hub_private" checked>
-                                Private model on HuggingFace
+                                🔒 Private model on HuggingFace
                             </label>
                             <small class="help-text">Keep model private until you're ready to share</small>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="save_checkpoints_to_hub" name="save_checkpoints_to_hub" checked>
+                                💾 Upload checkpoints to HuggingFace
+                            </label>
+                            <small class="help-text">Save each epoch checkpoint to HuggingFace</small>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="save_metrics_to_hub" name="save_metrics_to_hub" checked>
+                                📊 Upload metrics to HuggingFace
+                            </label>
+                            <small class="help-text">Upload metrics.json with training statistics</small>
                         </div>
                     </div>
                 </div>
@@ -1235,41 +1262,6 @@
                     </div>
                 </div>
 
-                <div class="form-section">
-                    <h3>Save Model to HuggingFace</h3>
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="push_to_hub" name="push_to_hub">
-                            Push model to HuggingFace Hub
-                        </label>
-                    </div>
-                    <div class="form-group">
-                        <label for="hub_model_id">Model ID (username/model-name)</label>
-                        <input type="text" id="hub_model_id" name="hub_model_id"
-                               placeholder="username/model-name">
-                    </div>
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="hub_private" name="hub_private">
-                            Make model private on HuggingFace
-                        </label>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>
-                                <input type="checkbox" id="save_checkpoints_to_hub" name="save_checkpoints_to_hub" checked>
-                                Upload checkpoints to HuggingFace
-                            </label>
-                        </div>
-                        <div class="form-group">
-                            <label>
-                                <input type="checkbox" id="save_metrics_to_hub" name="save_metrics_to_hub" checked>
-                                Upload metrics.json to HuggingFace
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
                 <input type="hidden" id="selected_preset" name="preset">
                 <button type="submit" class="btn btn-primary">🎯 Start Training</button>
             </form>
@@ -1394,11 +1386,15 @@
                         card.classList.add('selected');
                     }
 
+                    const samplesText = ds.train_samples ?
+                        `📊 ${ds.train_samples.toLocaleString()} samples` :
+                        '⚠️ Size unknown';
+
                     card.innerHTML = `
                         <div class="dataset-checkmark">✓</div>
                         <div class="dataset-flag">${ds.flag}</div>
                         <div class="dataset-name">${ds.name}</div>
-                        <div class="dataset-info">Language: ${ds.language}</div>
+                        <div class="dataset-info">${samplesText}</div>
                         <div class="dataset-modified">${ds.last_modified ? new Date(ds.last_modified).toLocaleDateString() : 'N/A'}</div>
                     `;
 
@@ -1456,12 +1452,24 @@
             try {
                 // Collect dataset sizes from loaded data (no need to re-fetch!)
                 const dataset_sizes = {};
+                const datasetsWithoutSize = [];
+
                 Array.from(selectedDatasets).forEach(repo => {
                     const dataset = allDatasets.find(d => d.repo === repo);
                     if (dataset && dataset.train_samples) {
                         dataset_sizes[repo] = dataset.train_samples;
+                    } else {
+                        datasetsWithoutSize.push(dataset ? dataset.name : repo);
                     }
                 });
+
+                // Warn if some datasets don't have size info
+                if (datasetsWithoutSize.length > 0) {
+                    showToast(`Warning: ${datasetsWithoutSize.join(', ')} missing size info and will be skipped`, 'error');
+                    btn.disabled = false;
+                    btn.textContent = '🎯 Create Train/Benchmark Split';
+                    return;
+                }
 
                 const response = await fetch('/api/datasets/prepare-split', {
                     method: 'POST',

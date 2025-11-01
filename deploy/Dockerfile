@@ -103,6 +103,13 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:5000/api/health || exit 1
 
+# Copy and set up entrypoint script for model pre-download
+COPY deploy/entrypoint.sh /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
+
+# Set entrypoint to initialize cache and download models
+ENTRYPOINT ["/entrypoint.sh"]
+
 # Run the web UI
 # Supports both standard fine-tuning and LoRA/QLoRA training
 # Configure via web UI at http://localhost:5000
