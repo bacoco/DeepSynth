@@ -321,28 +321,74 @@ def _register_routes(
         try:
             data = request.json or {}
 
-            required_fields = [
-                "model_name",
-                "output_dir",
-                "dataset_path",
-                "trainer_type",
-            ]
+            # Support both old single dataset path and new multi-dataset approach
+            if "dataset_path" in data:
+                # Old single dataset approach
+                required_fields = [
+                    "model_name",
+                    "output_dir",
+                    "dataset_path",
+                    "trainer_type",
+                ]
+                config = {
+                    "model_name": data["model_name"],
+                    "output_dir": data["output_dir"],
+                    "dataset_path": data["dataset_path"],
+                    "trainer_type": data["trainer_type"],
+                }
+            else:
+                # New multi-dataset approach
+                required_fields = [
+                    "model_name",
+                    "output_dir",
+                    "dataset_repos",
+                    "split_id",
+                    "trainer_type",
+                ]
+                config = {
+                    "model_name": data["model_name"],
+                    "output_dir": data["output_dir"],
+                    "dataset_repos": data["dataset_repos"],
+                    "split_id": data["split_id"],
+                    "trainer_type": data["trainer_type"],
+                }
+
             for field in required_fields:
                 if field not in data:
                     return jsonify({"error": f"Missing required field: {field}"}), 400
 
-            config = {
-                "model_name": data["model_name"],
-                "output_dir": data["output_dir"],
-                "dataset_path": data["dataset_path"],
-                "trainer_type": data["trainer_type"],
-                "hf_username": data.get(
-                    "hf_username", os.environ.get("HF_USERNAME")
-                ),
+            # Add common configuration fields
+            config.update({
+                "hf_username": data.get("hf_username", os.environ.get("HF_USERNAME")),
                 "hf_model_repo": data.get("hf_model_repo"),
                 "hf_token": data.get("hf_token", os.environ.get("HF_TOKEN")),
                 "training_config": data.get("training_config"),
-            }
+                # Add all the additional training parameters from the form
+                "hub_model_id": data.get("hub_model_id"),
+                "hub_private": data.get("hub_private", True),
+                "push_to_hub": data.get("push_to_hub", True),
+                "save_checkpoints_to_hub": data.get("save_checkpoints_to_hub", True),
+                "save_metrics_to_hub": data.get("save_metrics_to_hub", True),
+                "batch_size": data.get("batch_size", 2),
+                "num_epochs": data.get("num_epochs", 3),
+                "learning_rate": data.get("learning_rate", 5e-5),
+                "max_length": data.get("max_length", 2048),
+                "mixed_precision": data.get("mixed_precision", "fp16"),
+                "gradient_accumulation_steps": data.get("gradient_accumulation_steps", 4),
+                "evaluation_split": data.get("evaluation_split"),
+                # MoE Dropout parameters
+                "expert_dropout_rate": data.get("expert_dropout_rate", 0.1),
+                "expert_dropout_min_keep": data.get("expert_dropout_min_keep", 2),
+                "gate_dropout_rate": data.get("gate_dropout_rate", 0.05),
+                "bidrop_passes": data.get("bidrop_passes", 2),
+                # LoRA/PEFT parameters
+                "use_lora": data.get("use_lora", False),
+                "lora_rank": data.get("lora_rank", 16),
+                "lora_alpha": data.get("lora_alpha", 32),
+                "lora_dropout": data.get("lora_dropout", 0.1),
+                "use_qlora": data.get("use_qlora", False),
+                "qlora_bits": data.get("qlora_bits", 4),
+            })
 
             job_id = state_manager.create_job("model_training", config)
 
