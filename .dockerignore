@@ -49,6 +49,7 @@ trained_model/
 deepseek-summarizer/
 deepseek-ocr-summarizer/
 prepared_data/
+huggingface_cache/
 
 # State (will be mounted as volume)
 web_ui/state/

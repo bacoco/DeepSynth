@@ -904,6 +904,17 @@
                     <div class="info-box">
                         <strong>✨ Optimized for DeepSeek-OCR:</strong> These hyperparameters are tuned for vision-based document understanding.
                     </div>
+
+                    <!-- Quick Presets -->
+                    <div class="form-row" style="margin-bottom: 20px;">
+                        <button type="button" class="btn btn-secondary" onclick="applyQuickTestPreset()" style="margin-right: 10px;">
+                            🧪 Quick Test (500 samples)
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="applyFullTrainingPreset()">
+                            🚀 Full Training (All samples)
+                        </button>
+                    </div>
+
                     <div class="form-row">
                         <div class="form-group">
                             <label for="batch_size">Batch Size</label>
@@ -1875,6 +1886,28 @@
             if (fallbackCard) {
                 fallbackCard.classList.add('selected');
             }
+        }
+
+        // Quick Test Preset - For rapid testing with small dataset
+        function applyQuickTestPreset() {
+            document.getElementById('batch_size').value = 2;
+            document.getElementById('num_epochs').value = 1;
+            document.getElementById('max_train_samples').value = 500;
+            document.getElementById('max_eval_samples').value = 100;
+            document.getElementById('learning_rate').value = '5e-5';
+            document.getElementById('gradient_accumulation_steps').value = 4;
+            showToast('🧪 Quick Test preset applied: 500 samples, 1 epoch', 'success');
+        }
+
+        // Full Training Preset - For production training
+        function applyFullTrainingPreset() {
+            document.getElementById('batch_size').value = 2;
+            document.getElementById('num_epochs').value = 3;
+            document.getElementById('max_train_samples').value = '';
+            document.getElementById('max_eval_samples').value = '';
+            document.getElementById('learning_rate').value = '5e-5';
+            document.getElementById('gradient_accumulation_steps').value = 8;
+            showToast('🚀 Full Training preset applied: All samples, 3 epochs', 'success');
         }
 
         // Show toast notification
