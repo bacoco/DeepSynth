@@ -109,31 +109,92 @@ python run_benchmark.py --model ./your-model --benchmark cnn_dailymail
 
 ## ⚡ Quick Start
 
-### 🎯 Choose Your Setup
+### 🎯 Choose Your Method
 
-**🚀 Google Colab (Recommended for Training)**
-- ✅ Free GPU access (T4, V100, A100)
-- ✅ No local setup required
-- ✅ Perfect for model training
-- ✅ Pre-configured environment
+| Feature | Local Docker | Google Colab Docker |
+|---------|-------------|-------------------|
+| **GPU Access** | Your GPU only | Free T4/V100/A100 |
+| **Setup Time** | ~5 minutes | ~10 minutes |
+| **Internet Required** | No (after setup) | Yes |
+| **Session Limits** | None | ~12 hours |
+| **Storage** | Local disk | Google Drive |
+| **Best For** | Development, Production | Training, Experiments |
+| **Cost** | Hardware cost | Free |
 
-**💻 Local Machine**
-- ✅ Full control and customization
-- ✅ Works with or without GPU
-- ✅ Best for development
-- ✅ Docker support
+**🏠 Choose Local Docker if:**
+- You have a powerful GPU (RTX 3080+)
+- You want unlimited training time
+- You prefer local control
+- You have fast internet for downloads
+
+**☁️ Choose Google Colab if:**
+- You don't have a GPU
+- You want free GPU access
+- You're experimenting/learning
+- You want easy sharing and collaboration
 
 ---
 
-## 🔥 Google Colab Setup (Recommended for Training)
+## 🚀 Method 1: Local Docker Setup (Recommended for Control)
 
-### Why Google Colab?
-- **Free GPU access**: T4 (16GB), V100 (16GB), A100 (40GB) available
-- **No setup required**: Pre-installed CUDA, PyTorch, transformers
-- **Perfect for training**: Ideal for fine-tuning DeepSeek-OCR models
-- **Persistent storage**: Mount Google Drive for model checkpoints
+### Quick Start - Launch Container
+```bash
+# Clone repository
+git clone https://github.com/bacoco/DeepSynth.git
+cd DeepSynth
 
-### Step-by-Step Colab Setup
+# Setup environment
+cp .env.example .env
+# Edit .env and add your HF_TOKEN=hf_your_token_here
+
+# Launch container in background
+cd deploy
+
+# For CPU (development/dataset generation)
+docker compose -f docker-compose.cpu.yml up -d
+
+# For GPU training (requires NVIDIA GPU)
+docker compose -f docker-compose.gpu.yml up -d
+```
+
+### Access the Interface
+- **CPU Container**: http://localhost:5000
+- **GPU Container**: http://localhost:5001
+
+### Container Management
+```bash
+# Check container status
+docker compose -f docker-compose.gpu.yml ps
+
+# View logs
+docker compose -f docker-compose.gpu.yml logs -f
+
+# Stop container
+docker compose -f docker-compose.gpu.yml down
+
+# Restart container
+docker compose -f docker-compose.gpu.yml restart
+```
+
+### Training Workflow
+1. **Open interface** in browser (http://localhost:5001 for GPU)
+2. **Configure HuggingFace** token in the top section
+3. **Select datasets** for training (refresh to load your datasets)
+4. **Configure training** parameters (batch size, epochs, etc.)
+5. **Start training** and monitor progress
+6. **Access trained models** in `./trained_model/` directory
+
+---
+
+## 🔥 Method 2: Google Colab with Docker (Free GPU Access)
+
+### Why This Approach?
+- **Free GPU access**: T4, V100, A100 available
+- **Container isolation**: Clean, reproducible environment
+- **Web interface**: Access DeepSynth UI directly in Colab
+- **Background execution**: Container runs independently
+
+### Step-by-Step Colab Docker Setup
 
 **1. Open Google Colab**
 ```
@@ -145,84 +206,130 @@ https://colab.research.google.com/
 Runtime → Change runtime type → Hardware accelerator → GPU → Save
 ```
 
-**3. Setup DeepSynth in Colab**
+**3. Setup Docker Container**
 ```python
-# Install dependencies
-!pip install torch torchvision transformers datasets huggingface_hub pillow python-dotenv flask
+# Install Docker in Colab
+!apt update
+!apt install -y docker.io
+!systemctl start docker
 
-# Clone repository
-!git clone https://github.com/bacoco/deepseek-synthesia.git
-%cd deepseek-synthesia
+# Clone DeepSynth repository
+!git clone https://github.com/bacoco/DeepSynth.git
+%cd DeepSynth
 
-# Setup environment
-!cp .env.example .env
-
-# Add your HuggingFace token (get it from https://huggingface.co/settings/tokens)
+# Setup environment with your HuggingFace token
 import os
-from google.colab import userdata
+os.environ['HF_TOKEN'] = 'hf_your_token_here'  # Replace with your token
+os.environ['HF_USERNAME'] = 'your-username'    # Replace with your username
 
-# Store your HF token in Colab secrets (left sidebar → 🔑 Secrets)
-# Then uncomment and run:
-# os.environ['HF_TOKEN'] = userdata.get('HF_TOKEN')
+# Write environment file
+with open('.env', 'w') as f:
+    f.write(f"HF_TOKEN={os.environ['HF_TOKEN']}\n")
+    f.write(f"HF_USERNAME={os.environ['HF_USERNAME']}\n")
 
-# Or set it directly (less secure):
-os.environ['HF_TOKEN'] = 'hf_your_token_here'
-
-# Verify GPU availability
-import torch
-print(f"CUDA available: {torch.cuda.is_available()}")
-print(f"GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'None'}")
+print("✅ Environment configured")
 ```
 
-**4. Run Training Pipeline**
+**4. Build and Launch Container**
 ```python
-# Quick test (100 samples)
-os.environ['MAX_SAMPLES_PER_SPLIT'] = '100'
-!python run_complete_multilingual_pipeline.py
+# Build GPU container
+!docker build -f deploy/Dockerfile -t deepsynth:gpu .
 
-# Full training (all datasets)
-# !python run_complete_multilingual_pipeline.py
+# Launch container in background with GPU support
+!docker run -d \
+  --name deepsynth-training \
+  --gpus all \
+  -p 7860:5000 \
+  -e HF_TOKEN=$HF_TOKEN \
+  -e HF_USERNAME=$HF_USERNAME \
+  -v $(pwd)/trained_model:/app/trained_model \
+  deepsynth:gpu
+
+print("🚀 Container launched! Setting up tunnel...")
 ```
 
-**5. Save Model to Google Drive**
+**5. Create Public URL Access**
+```python
+# Install ngrok for public URL
+!pip install pyngrok
+from pyngrok import ngrok
+
+# Create tunnel to container
+public_url = ngrok.connect(7860)
+print(f"🌐 DeepSynth Interface: {public_url}")
+print(f"📱 Click the link above to access your training interface!")
+
+# Keep the tunnel alive
+import time
+print("🔄 Tunnel active - keep this cell running...")
+try:
+    while True:
+        time.sleep(60)
+        print(".", end="", flush=True)
+except KeyboardInterrupt:
+    print("\n🛑 Tunnel stopped")
+```
+
+**6. Monitor Training**
+```python
+# Check container status
+!docker ps
+
+# View training logs
+!docker logs deepsynth-training --tail 50
+
+# Check GPU usage
+!nvidia-smi
+```
+
+**7. Save Results to Google Drive**
 ```python
 # Mount Google Drive
 from google.colab import drive
 drive.mount('/content/drive')
 
-# Copy trained model to Drive
-!cp -r ./deepsynth-ocr-summarizer /content/drive/MyDrive/DeepSynth/
-print("✅ Model saved to Google Drive!")
+# Copy trained models to Drive
+!mkdir -p /content/drive/MyDrive/DeepSynth/
+!cp -r ./trained_model/* /content/drive/MyDrive/DeepSynth/
+print("✅ Models saved to Google Drive!")
+
+# Download model locally (optional)
+from google.colab import files
+!zip -r deepsynth-trained-model.zip ./trained_model/
+files.download('deepsynth-trained-model.zip')
+```
+
+### Colab Container Management
+```python
+# Stop container
+!docker stop deepsynth-training
+
+# Restart container
+!docker start deepsynth-training
+
+# Remove container (cleanup)
+!docker rm -f deepsynth-training
+
+# View container logs
+!docker logs deepsynth-training
 ```
 
 ### Colab Training Tips
 
 **Memory Management:**
 ```python
-# Clear GPU memory if needed
-import torch
-torch.cuda.empty_cache()
-
-# Monitor GPU usage
+# Monitor GPU memory
 !nvidia-smi
+
+# Clear Docker cache if needed
+!docker system prune -f
 ```
 
-**Persistent Sessions:**
-```python
-# Keep session alive (run in background)
-import time
-while True:
-    time.sleep(3600)  # Sleep 1 hour
-    print("🔄 Session keepalive")
-```
-
-**Download Results:**
-```python
-# Download trained model
-from google.colab import files
-!zip -r deepsynth-model.zip ./deepsynth-ocr-summarizer/
-files.download('deepsynth-model.zip')
-```
+**Session Persistence:**
+- The container runs independently of the notebook
+- If Colab disconnects, the container keeps training
+- Reconnect and check logs with `!docker logs deepsynth-training`
+- Access the interface again by creating a new ngrok tunnel
 
 ---
 
