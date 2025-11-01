@@ -713,13 +713,6 @@
                 <strong>⚠️ GPU Required:</strong> Model training requires GPU. Make sure you're using docker-compose.gpu.yml
             </div>
 
-            <div class="form-section">
-                <h3>Select Training Preset</h3>
-                <div id="training-presets" class="preset-selector">
-                    <!-- Will be populated by JavaScript -->
-                </div>
-            </div>
-
             <form id="training-form">
                 <!-- Dataset Selection -->
                 <div class="form-section">
@@ -739,9 +732,20 @@
                     </div>
                 </div>
 
+                <!-- Training Preset Selection -->
+                <div class="form-section">
+                    <h3>2. Select Training Preset</h3>
+                    <div class="info-box">
+                        <strong>ℹ️ Choose a preset configuration</strong> optimized for different scenarios.
+                    </div>
+                    <div id="training-presets" class="preset-selector">
+                        <!-- Will be populated by JavaScript -->
+                    </div>
+                </div>
+
                 <!-- Train/Benchmark Split Configuration -->
                 <div class="form-section">
-                    <h3>2. Configure Train/Benchmark Split</h3>
+                    <h3>3. Configure Train/Benchmark Split</h3>
                     <div class="warning-box">
                         <strong>⚠️ Important:</strong> The benchmark set will be <strong>EXCLUDED</strong> from training and used only for evaluation.
                     </div>
@@ -765,7 +769,7 @@
 
                 <!-- Model Configuration -->
                 <div class="form-section">
-                    <h3>3. Model Configuration</h3>
+                    <h3>4. Model Configuration</h3>
                     <div class="form-row">
                         <div class="form-group">
                             <label for="hub_model_id">HuggingFace Model Name*</label>
@@ -2132,6 +2136,7 @@
             loadTrainingPresets();
             loadGeneratedDatasets();
             loadTrainingCheckpoints();
+            loadDeepSynthDatasets(); // Auto-load datasets on startup
             refreshJobs();
 
             // Auto-refresh jobs every 5 seconds
