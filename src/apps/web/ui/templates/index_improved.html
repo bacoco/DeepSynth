@@ -747,11 +747,22 @@
         <!-- Training Tab -->
         <div id="training-tab" class="tab-content active">
             <h2>Model Training</h2>
-            <div class="warning-box">
-                <strong>⚠️ GPU Required:</strong> Model training requires GPU. Make sure you're using docker-compose.gpu.yml
-            </div>
 
             <form id="training-form">
+                <!-- ONE-CLICK PIPELINE TEST -->
+                <div class="form-section" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 12px; margin-bottom: 30px; text-align: center;">
+                    <h2 style="margin: 0 0 15px 0; font-size: 28px;">🧪 ONE-CLICK PIPELINE TEST</h2>
+                    <p style="margin: 0 0 20px 0; font-size: 16px; opacity: 0.95;">
+                        Test the entire fine-tuning pipeline automatically<br>
+                        <small style="opacity: 0.85;">(500 samples, 1 epoch, ~5-10 minutes)</small>
+                    </p>
+                    <button type="button" class="btn" onclick="runOneClickTest()"
+                            style="background: white; color: #667eea; font-size: 18px; padding: 15px 40px; font-weight: bold; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+                        ▶ START QUICK TEST
+                    </button>
+                    <div id="one-click-status" style="margin-top: 15px; font-size: 14px; min-height: 20px;"></div>
+                </div>
+
                 <!-- Dataset Selection -->
                 <div class="form-section">
                     <h3>1. Select Datasets for Training</h3>
@@ -1908,6 +1919,91 @@
             document.getElementById('learning_rate').value = '5e-5';
             document.getElementById('gradient_accumulation_steps').value = 8;
             showToast('🚀 Full Training preset applied: All samples, 3 epochs', 'success');
+        }
+
+        // ONE-CLICK PIPELINE TEST - Automatic end-to-end test
+        async function runOneClickTest() {
+            const statusDiv = document.getElementById('one-click-status');
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = '⏳ Running...';
+
+            try {
+                statusDiv.innerHTML = '🔄 Step 1/4: Loading datasets...';
+
+                // Step 1: Load datasets if not already loaded
+                if (allDatasets.length === 0) {
+                    await loadDeepSynthDatasets();
+                    await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for load
+                }
+
+                if (allDatasets.length === 0) {
+                    throw new Error('No datasets available. Please generate datasets first.');
+                }
+
+                // Step 2: Select first dataset automatically
+                statusDiv.innerHTML = '🔄 Step 2/4: Selecting dataset...';
+                const firstDataset = allDatasets[0];
+                selectedDatasets.clear();
+                selectedDatasets.add(firstDataset.repo);
+                document.getElementById('selection-count').textContent = '1 dataset(s) selected';
+
+                // Highlight selected dataset
+                document.querySelectorAll('.dataset-card').forEach(card => {
+                    if (card.dataset.repo === firstDataset.repo) {
+                        card.classList.add('selected');
+                    }
+                });
+
+                // Step 3: Create split automatically
+                statusDiv.innerHTML = '🔄 Step 3/4: Creating train/benchmark split...';
+                const splitResponse = await fetch('/api/datasets/prepare-split', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        dataset_repos: [firstDataset.repo],
+                        seed: 42,
+                        benchmark_percentage: 0.1,
+                        stratify: false,
+                        dataset_sizes: {[firstDataset.repo]: 1000} // Use small subset
+                    })
+                });
+
+                if (!splitResponse.ok) {
+                    const error = await splitResponse.json();
+                    throw new Error(error.error || 'Split creation failed');
+                }
+
+                const splitData = await splitResponse.json();
+                currentSplitId = splitData.split_id;
+
+                // Step 4: Configure training parameters
+                statusDiv.innerHTML = '🔄 Step 4/4: Starting training...';
+                applyQuickTestPreset(); // Set 500 samples, 1 epoch
+
+                // Fill minimal required fields
+                document.getElementById('hub_model_id').value = `baconnier/quicktest-${Date.now()}`;
+                document.getElementById('model_name').value = 'deepseek-ai/DeepSeek-OCR';
+                document.getElementById('output_dir_train').value = './trained_model/quicktest';
+
+                // Submit training
+                await submitTraining();
+
+                statusDiv.innerHTML = '✅ Training started! Check the Jobs tab for progress.';
+                showToast('🎉 One-Click Test started successfully!', 'success');
+
+                // Switch to Jobs tab
+                setTimeout(() => {
+                    document.getElementById('jobs-tab').click();
+                }, 2000);
+
+            } catch (error) {
+                console.error('One-Click Test error:', error);
+                statusDiv.innerHTML = `❌ Error: ${error.message}`;
+                showToast(`Test failed: ${error.message}`, 'error');
+                btn.disabled = false;
+                btn.textContent = '▶ START QUICK TEST';
+            }
         }
 
         // Show toast notification

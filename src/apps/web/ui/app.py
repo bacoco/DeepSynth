@@ -742,11 +742,11 @@ def _register_routes(
                         name = ds.id.split('/')[-1]
                         lang_code = name.replace('deepsynth-', '')
 
-                        # Map language codes to flags
+                        # Map language codes to cultural icons
                         lang_flags = {
-                            'fr': '🇫🇷',
-                            'es': '🇪🇸',
-                            'de': '🇩🇪',
+                            'fr': '🗼',  # Eiffel Tower for France
+                            'es': '🎭',  # Flamenco/Culture for Spain
+                            'de': '🏰',  # Castle for Germany
                             'en-news': '📰',
                             'en-arxiv': '📚',
                             'en-xsum': '📺',
@@ -754,7 +754,7 @@ def _register_routes(
                             'qa': '🌍',
                             'qa-msmarco': '🔍',
                             'qa-natural-questions': '❓',
-                            'qa-squad-fr-piaf': '🇫🇷❓'
+                            'qa-squad-fr-piaf': '🗼❓'  # Eiffel Tower + Question
                         }
 
                         # Get train split size if available
