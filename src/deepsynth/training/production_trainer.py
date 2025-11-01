@@ -228,9 +228,30 @@ class UnifiedProductionTrainer:
         # HuggingFace Hub API
         self.api = HfApi()
 
+        # Thread pool for async HuggingFace uploads (prevents blocking training)
+        self.upload_executor = ThreadPoolExecutor(max_workers=1)
+
         # Training state
         self.global_step = 0
         self.train_losses = []
+        self.best_loss = float("inf")
+        self.start_epoch = 0
+
+        # Checkpoint resumption: auto-detect or use specified checkpoint
+        self._checkpoint_to_resume = None
+        if config.resume_from_checkpoint:
+            checkpoint_path = Path(config.resume_from_checkpoint)
+            # Model was already loaded from this checkpoint above
+            # We'll load training state (optimizer, scheduler, epoch) after prepare()
+            if checkpoint_path.exists():
+                self._checkpoint_to_resume = checkpoint_path
+                LOGGER.info("📂 Will resume training state from: %s", checkpoint_path)
+        else:
+            # Auto-detect latest checkpoint in output_dir for seamless resumption
+            latest = find_latest_checkpoint(self.output_dir)
+            if latest:
+                self._checkpoint_to_resume = latest
+                LOGGER.info("🔍 Auto-detected checkpoint to resume from: %s", latest)
 
     def _apply_lora(self) -> None:
         """
@@ -684,6 +705,23 @@ class UnifiedProductionTrainer:
             self.model, self.optimizer, train_loader, scheduler
         )
 
+        # Load checkpoint state if resuming (after prepare() so optimizer/scheduler are ready)
+        if self._checkpoint_to_resume:
+            LOGGER.info("=" * 80)
+            LOGGER.info("Loading checkpoint state for resumption...")
+            LOGGER.info("=" * 80)
+            state = load_checkpoint_state(
+                self._checkpoint_to_resume,
+                self.optimizer,
+                scheduler,
+                self.accelerator,
+            )
+            self.start_epoch = state["epoch"]
+            self.global_step = state["global_step"]
+            self.best_loss = state["best_loss"]
+            self.train_losses = state["train_losses"]
+            LOGGER.info("✅ Training will resume from epoch %d, step %d", self.start_epoch, self.global_step)
+
         LOGGER.info("Starting training: %d samples, %d epochs", len(dataset), self.config.num_epochs)
         LOGGER.info("Total training steps: %d, Warmup steps: %d", num_training_steps, num_warmup_steps)
 
@@ -691,7 +729,7 @@ class UnifiedProductionTrainer:
         total_samples = len(dataset)
         processed_samples = 0
 
-        for epoch in range(self.config.num_epochs):
+        for epoch in range(self.start_epoch, self.config.num_epochs):
             LOGGER.info("=" * 80)
             LOGGER.info("Epoch %d/%d", epoch + 1, self.config.num_epochs)
             LOGGER.info("=" * 80)
@@ -742,7 +780,31 @@ class UnifiedProductionTrainer:
                 if (self.global_step % self.config.save_interval == 0 and
                     self.accelerator.is_local_main_process):
                     checkpoint_dir = self.output_dir / f"checkpoint-{self.global_step}"
+                    # Save model first
                     self.save_checkpoint(checkpoint_dir)
+                    # Save complete training state (optimizer, scheduler, epoch, step, loss)
+                    save_checkpoint_state(
+                        checkpoint_dir,
+                        self.model,
+                        self.optimizer,
+                        scheduler,
+                        self.accelerator,
+                        epoch,
+                        self.global_step,
+                        self.best_loss,
+                        self.train_losses,
+                    )
+                    # Async push to Hub if configured
+                    if (self.config.save_checkpoints_to_hub and
+                        self.config.push_to_hub and
+                        self.config.hub_model_id):
+                        push_to_hub_async(
+                            self.upload_executor,
+                            self.api,
+                            checkpoint_dir,
+                            self.config.hub_model_id,
+                            self.config.hub_token,
+                        )
 
             # Epoch complete
             avg_epoch_loss = epoch_loss / len(train_loader)
@@ -750,19 +812,43 @@ class UnifiedProductionTrainer:
             epoch_time = time.time() - epoch_start_time
             samples_per_sec = total_samples / epoch_time
 
+            # Update best loss
+            if avg_epoch_loss < self.best_loss:
+                self.best_loss = avg_epoch_loss
+                LOGGER.info("🎯 New best loss: %.4f", self.best_loss)
+
             LOGGER.info("Epoch %d complete: avg_loss=%.4f, time=%.1fs, samples/sec=%.1f",
                        epoch + 1, avg_epoch_loss, epoch_time, samples_per_sec)
 
             # Save epoch checkpoint
             if self.accelerator.is_local_main_process:
                 checkpoint_dir = self.output_dir / f"epoch_{epoch + 1}"
+                # Save model first
                 self.save_checkpoint(checkpoint_dir)
+                # Save complete training state
+                save_checkpoint_state(
+                    checkpoint_dir,
+                    self.model,
+                    self.optimizer,
+                    scheduler,
+                    self.accelerator,
+                    epoch + 1,  # Next epoch to resume from
+                    self.global_step,
+                    self.best_loss,
+                    self.train_losses,
+                )
 
-                # Push to Hub if configured
+                # Async push to Hub if configured
                 if (self.config.save_checkpoints_to_hub and
                     self.config.push_to_hub and
                     self.config.hub_model_id):
-                    self.push_checkpoint_to_hub(checkpoint_dir)
+                    push_to_hub_async(
+                        self.upload_executor,
+                        self.api,
+                        checkpoint_dir,
+                        self.config.hub_model_id,
+                        self.config.hub_token,
+                    )
 
         # Training complete
         LOGGER.info("=" * 80)
