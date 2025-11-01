@@ -44,20 +44,35 @@ WORKDIR /app
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install CUDA-enabled PyTorch first (critical for GPU support)
-# Updated versions for availability
-RUN pip3 install --no-cache-dir --index-url https://download.pytorch.org/whl/cu121 \
-    torch==2.5.1+cu121 \
-    torchvision==0.20.1+cu121 \
-    torchaudio==2.5.1+cu121
+# Install compatible PyTorch versions first
+RUN pip3 install --no-cache-dir \
+    torch==2.5.1 \
+    torchvision==0.20.1 \
+    torchaudio==2.5.1
 
-# Install Python dependencies
-# This includes:
-#   - transformers>=4.46.0 (HuggingFace models)
-#   - peft>=0.11.1 (LoRA/QLoRA fine-tuning)
-#   - bitsandbytes>=0.41.0 (4-bit/8-bit quantization)
-#   - accelerate>=0.24.0 (efficient training)
-RUN pip3 install --no-cache-dir -r requirements.txt
+# Install Python dependencies with fixed datasets version
+RUN pip3 install --no-cache-dir \
+    "datasets>=2.14.0,<3.0.0" \
+    transformers>=4.46.0 \
+    tokenizers>=0.20.0 \
+    huggingface_hub>=0.20.3 \
+    accelerate>=0.24.0 \
+    peft>=0.11.1 \
+    rouge-score>=0.1.2 \
+    bert-score>=0.3.13 \
+    nltk>=3.8 \
+    pillow>=9.5.0 \
+    tqdm>=4.65.0 \
+    pandas>=2.0.0 \
+    matplotlib>=3.7.0 \
+    seaborn>=0.12.0 \
+    numpy>=1.24.0 \
+    scipy>=1.10.0 \
+    scikit-learn>=1.3.0 \
+    flask>=3.0.0 \
+    werkzeug>=3.0.0 \
+    pytesseract>=0.3.10 \
+    python-dotenv>=1.0.0
 
 # Install bitsandbytes with CUDA support for QLoRA
 # This enables 4-bit/8-bit quantization for memory-efficient training
@@ -89,5 +104,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 # Run the web UI
 # Supports both standard fine-tuning and LoRA/QLoRA training
-# Configure via web UI at http://localhost:5001
+# Configure via web UI at http://localhost:5000
 CMD ["python3", "-m", "apps.web"]

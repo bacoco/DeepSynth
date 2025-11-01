@@ -627,13 +627,19 @@ def _register_routes(
                             'en-legal': '⚖️'
                         }
 
+                        # Get train split size if available
+                        train_samples = 0
+                        if hasattr(ds_info, 'splits') and 'train' in ds_info.splits:
+                            train_samples = ds_info.splits['train'].num_examples
+
                         deepsynth_datasets.append({
                             "repo": ds.id,
                             "name": name,
                             "language": lang_code,
                             "flag": lang_flags.get(lang_code, '🌍'),
                             "last_modified": ds.lastModified.isoformat() if hasattr(ds, 'lastModified') else None,
-                            "downloads": getattr(ds, 'downloads', 0)
+                            "downloads": getattr(ds, 'downloads', 0),
+                            "train_samples": train_samples
                         })
                     except Exception as e:
                         logger.warning(f"Failed to get info for {ds.id}: {e}")
@@ -681,10 +687,16 @@ def _register_routes(
             benchmark_total = 0
 
             # Create split for each dataset
+            # Note: dataset sizes should be passed from client (already loaded in UI)
+            dataset_sizes = data.get("dataset_sizes", {})
+
             for repo in dataset_repos:
                 logger.info(f"Creating split for {repo}...")
-                ds = load_dataset(repo, split="train")
-                total_samples = len(ds)
+                # Use pre-loaded dataset size from client
+                total_samples = dataset_sizes.get(repo, 0)
+                if total_samples == 0:
+                    logger.warning(f"No size info for {repo}, skipping")
+                    continue
 
                 # Calculate split sizes
                 benchmark_size = int(total_samples * benchmark_pct)

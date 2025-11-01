@@ -1416,11 +1416,21 @@
             btn.textContent = '⏳ Creating split...';
 
             try {
+                // Collect dataset sizes from loaded data (no need to re-fetch!)
+                const dataset_sizes = {};
+                Array.from(selectedDatasets).forEach(repo => {
+                    const dataset = allDatasets.find(d => d.repo === repo);
+                    if (dataset && dataset.train_samples) {
+                        dataset_sizes[repo] = dataset.train_samples;
+                    }
+                });
+
                 const response = await fetch('/api/datasets/prepare-split', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         dataset_repos: Array.from(selectedDatasets),
+                        dataset_sizes: dataset_sizes,
                         seed: seed,
                         benchmark_percentage: benchmarkPct,
                         stratify: true
