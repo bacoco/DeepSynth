@@ -49,6 +49,10 @@ services:
       - DEFAULT_LORA_RANK=16
       - DEFAULT_LORA_ALPHA=32
 
+    # Shared memory size for PyTorch DataLoader multiprocessing
+    # Default Docker shm is 64MB which causes "bus error" with multiple workers
+    shm_size: '8gb'
+
     deploy:
       resources:
         reservations:
