@@ -1982,27 +1982,27 @@
                 applyQuickTestPreset(); // Set 500 samples, 1 epoch
 
                 // Fill minimal required fields
-                document.getElementById('hub_model_id').value = `baconnier/quicktest-${Date.now()}`;
+                document.getElementById('hub_model_id').value = `quicktest-${Date.now()}`;
                 document.getElementById('model_name').value = 'deepseek-ai/DeepSeek-OCR';
                 document.getElementById('output_dir_train').value = './trained_model/quicktest';
 
-                // Submit training
-                await submitTraining();
+                // Submit training form programmatically
+                // The form handler will show success message and switch to jobs tab
+                document.getElementById('training-form').requestSubmit();
 
-                statusDiv.innerHTML = '✅ Training started! Check the Jobs tab for progress.';
-                showToast('🎉 One-Click Test started successfully!', 'success');
-
-                // Switch to Jobs tab
-                setTimeout(() => {
-                    document.getElementById('jobs-tab').click();
-                }, 2000);
+                // Success - form handler will take over from here
+                statusDiv.innerHTML = '✅ Configuration complete! Submitting training...';
 
             } catch (error) {
                 console.error('One-Click Test error:', error);
                 statusDiv.innerHTML = `❌ Error: ${error.message}`;
                 showToast(`Test failed: ${error.message}`, 'error');
-                btn.disabled = false;
-                btn.textContent = '▶ START QUICK TEST';
+            } finally {
+                // Re-enable button after a delay
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.textContent = '▶ START QUICK TEST';
+                }, 2000);
             }
         }
 
