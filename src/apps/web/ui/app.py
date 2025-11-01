@@ -757,18 +757,23 @@ def _register_routes(
                             'qa-squad-fr-piaf': '🗼❓'  # Eiffel Tower + Question
                         }
 
-                        # Get train split size if available
-                        train_samples = 0
-                        try:
-                            from datasets import load_dataset_builder
-                            builder = load_dataset_builder(ds.id, token=hf_token)
-                            if builder.info.splits and 'train' in builder.info.splits:
-                                train_samples = builder.info.splits['train'].num_examples
-                        except Exception as split_error:
-                            logger.debug(f"Could not get split info for {ds.id}: {split_error}")
-                            # Fallback: try ds_info.splits
-                            if hasattr(ds_info, 'splits') and 'train' in ds_info.splits:
-                                train_samples = ds_info.splits['train'].num_examples
+                        # Get train split size - use known sizes for speed
+                        # These are approximate sizes from the actual datasets
+                        known_sizes = {
+                            'deepsynth-fr': 424789,
+                            'deepsynth-es': 290645,
+                            'deepsynth-de': 242982,
+                            'deepsynth-en-news': 311971,
+                            'deepsynth-en-xsum': 204017,
+                            'deepsynth-en-legal': 22218,
+                            'deepsynth-en-arxiv': 49976,
+                            'deepsynth-qa': 507437,
+                            'deepsynth-qa-msmarco': 502937,
+                            'deepsynth-qa-natural-questions': 12800,
+                            'deepsynth-qa-squad-fr-piaf': 45000
+                        }
+
+                        train_samples = known_sizes.get(name, 0)
 
                         deepsynth_datasets.append({
                             "repo": ds.id,
