@@ -57,30 +57,27 @@ The complete documentation suite now lives under [`docs/`](docs/README.md). Star
 
 ---
 
-## 🎯 Key Features
+## 🎯 What DeepSynth Does
 
-### 🔥 **Incremental Multilingual Pipeline**
-No complex setup. Resumable processing. Automatic uploads.
+DeepSynth provides **two main workflows**:
 
-```bash
-cp .env.example .env  # Configure once
-python incremental_builder.py  # Process all languages
-```
+### 1. 📊 **Dataset Generation**
+- Convert text documents to visual format (PNG images)
+- Process multilingual datasets (French, Spanish, German, English)
+- Upload prepared datasets to HuggingFace
+- **Use case**: Prepare training data for vision-language models
 
-**What happens automatically:**
-1. ✅ Downloads multilingual datasets (MLSUM, CNN/DailyMail, XSum, BillSum)
-2. ✅ Generates visual representations (PNG images from text)
-3. ✅ Incremental processing with automatic resume on interruption
-4. ✅ Uploads to HuggingFace every 5,000 samples (no data loss)
-5. ✅ Creates unified multilingual dataset with 1.29M+ examples
-6. ✅ Ready for DeepSeek-OCR fine-tuning in any language
+### 2. 🚀 **Model Training**
+- Fine-tune DeepSeek-OCR on your datasets
+- Support for LoRA/QLoRA (memory-efficient training)
+- Web interface for easy configuration
+- **Use case**: Train custom summarization models
 
-### 🧠 **Cutting-Edge Architecture**
-Based on DeepSeek-OCR's groundbreaking vision-language model:
-- **380M parameter visual encoder** (frozen): Extracts semantic features
-- **570M parameter MoE decoder** (fine-tuned): Generates summaries
-- **20x compression ratio**: Efficient document understanding
-- **Multi-modal processing**: Text → Image → Visual Tokens → Summary
+### 🧠 **Architecture**
+- **Vision-Language Model**: Based on DeepSeek-OCR
+- **Text-to-Image**: Converts documents to visual format
+- **Fine-tuning Ready**: LoRA/QLoRA support for efficient training
+- **Web Interface**: Easy-to-use training configuration
 
 ### 📊 **Industry-Standard Benchmarks**
 Compare your model against the best:
@@ -495,36 +492,35 @@ ls -la ./deepsynth-ocr-summarizer/
 - **GPU utilization**: Should be 80-95%
 - **Memory usage**: Should be stable (no memory leaks)
 
-### 🌍 Global Cross-Computer Pipeline
-
-**Works from any computer - automatically resumes where you left off:**
-
-```bash
-cp .env.example .env
-# Add your HF_TOKEN to .env
-./run_global_pipeline.sh
-```
-
-**Features:**
-- ✅ **Cross-computer resumable** - Continue from any machine
-- ✅ **Zero duplicates** - Global state tracking via HuggingFace
-- ✅ **Large batches** - 10,000 samples per upload for efficiency
-- ✅ **Auto-detection** - Finds existing progress automatically
+## ⚡ Quick Start
 
 ### Prerequisites
-- Python 3.9+ with datasets, huggingface_hub, pillow
+- Docker installed
 - HuggingFace account (free)
-- 10GB+ free disk space
+- GPU (for training) or CPU (for dataset generation)
 
-### Legacy Single-Computer Pipeline
-
+### 🚀 Launch DeepSynth
 ```bash
-# Traditional approach (local progress only)
-python test_setup.py                    # Verify setup
-python run_complete_multilingual_pipeline.py  # Run pipeline
+# Clone repository
+git clone https://github.com/bacoco/DeepSynth.git
+cd DeepSynth
+
+# Setup your HuggingFace token
+cp .env.example .env
+# Edit .env: HF_TOKEN=hf_your_token_here
+
+# Launch container
+cd deploy
+docker compose -f docker-compose.gpu.yml up -d  # For training
+# OR
+docker compose -f docker-compose.cpu.yml up -d  # For dataset generation
+
+# Access web interface
+open http://localhost:5001  # GPU
+open http://localhost:5000  # CPU
 ```
 
-**That's it!** Your multilingual dataset will be ready on HuggingFace.
+**That's it!** Configure and train your models through the web interface.
 
 ---
 
@@ -607,44 +603,7 @@ python run_benchmark.py \
 
 ---
 
-## 🌍 Global Cross-Computer Pipeline
 
-### Why Global Pipeline?
-The new global pipeline solves critical issues with the traditional approach:
-
-- **❌ Old Problem**: Local progress files - can't resume from different computers
-- **✅ New Solution**: Progress stored in HuggingFace dataset metadata
-- **❌ Old Problem**: Risk of duplicate processing when switching machines
-- **✅ New Solution**: Global state tracking prevents any duplicates
-- **❌ Old Problem**: Small batches (500 samples) - inefficient uploads
-- **✅ New Solution**: Large batches (10,000 samples) - 20x more efficient
-
-### Cross-Computer Usage Example
-
-**Computer A:**
-```bash
-./run_global_pipeline.sh
-# Processes 50,000 samples, then stops
-```
-
-**Computer B (different machine):**
-```bash
-git clone https://github.com/bacoco/deepseek-synthesia
-cd deepseek-synthesia
-cp .env.example .env  # Add same HF_TOKEN
-./run_global_pipeline.sh
-# Automatically detects existing 50,000 samples
-# Continues from sample 50,001 - no duplicates!
-```
-
-### Technical Details
-- **Progress Storage**: HuggingFace dataset README.md metadata
-- **Duplicate Prevention**: Tracks exact sample indices processed
-- **Batch Size**: 10,000 samples per upload (configurable)
-- **Memory Efficiency**: Automatic cleanup after successful uploads
-- **Error Recovery**: Graceful handling of interruptions
-
-See **[DATASET.md](docs/DATASET.md)** for complete documentation.
 
 ## 🔧 Advanced Usage
 
