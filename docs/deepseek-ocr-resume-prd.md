@@ -20,7 +20,6 @@ Texte/PDF → Image 2D → DeepEncoder (frozen, 380M) → Tokens Visuels 20x →
 ### Guides d'Installation
 - **Guide Complet 2025** : https://skywork.ai/blog/ai-agent/how-to-install-run-deepseek-ocr-2025-guide/
 - **vLLM Integration** : https://docs.vllm.ai/projects/recipes/en/latest/DeepSynth/DeepSeek-OCR.html
-- **Colab Officiel** : https://huggingface.co/deepseek-ai/DeepSeek-OCR/discussions/27
 - **Simon Willison Demo** : https://simonwillison.net/2025/Oct/20/deepseek-ocr-claude-code/
 
 ## 📊 Datasets Hugging Face

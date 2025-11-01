@@ -4,7 +4,7 @@
 #   - LoRA fine-tuning (2-16M parameters)
 #   - QLoRA with 4-bit/8-bit quantization (memory-efficient)
 #   - Optional text encoder for instruction-based training
-FROM nvidia/cuda:12.4-cudnn8-devel-ubuntu22.04
+FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
