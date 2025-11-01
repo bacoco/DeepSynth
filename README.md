@@ -110,25 +110,24 @@ python run_benchmark.py --model ./your-model --benchmark cnn_dailymail
 
 | Feature | Local Docker | Google Colab Docker |
 |---------|-------------|-------------------|
-| **GPU Access** | Your GPU only | Free T4/V100/A100 |
+| **GPU Access** | Your GPU (or CPU fallback) | Free T4/V100/A100 |
 | **Setup Time** | ~5 minutes | ~10 minutes |
 | **Internet Required** | No (after setup) | Yes |
 | **Session Limits** | None | ~12 hours |
 | **Storage** | Local disk | Google Drive |
-| **Best For** | Development, Production | Training, Experiments |
+| **Best For** | Production, Development | Experiments, Learning |
 | **Cost** | Hardware cost | Free |
 
 **🏠 Choose Local Docker if:**
-- You have a powerful GPU (RTX 3080+)
+- You have a GPU (or want to test without GPU)
 - You want unlimited training time
-- You prefer local control
-- You have fast internet for downloads
+- You prefer local control and privacy
 
 **☁️ Choose Google Colab if:**
 - You don't have a GPU
 - You want free GPU access
-- You're experimenting/learning
-- You want easy sharing and collaboration
+- You're experimenting or learning
+- You want easy sharing
 
 ---
 
@@ -146,17 +145,12 @@ cp .env.example .env
 
 # Launch container in background
 cd deploy
-
-# For CPU (development/dataset generation)
-docker compose -f docker-compose.cpu.yml up -d
-
-# For GPU training (requires NVIDIA GPU)
 docker compose -f docker-compose.gpu.yml up -d
 ```
 
 ### Access the Interface
-- **CPU Container**: http://localhost:5000
-- **GPU Container**: http://localhost:5001
+- **Web Interface**: http://localhost:5001
+- **Auto-detects**: GPU (training) or CPU (testing) mode
 
 ### Container Management
 ```bash
@@ -174,11 +168,11 @@ docker compose -f docker-compose.gpu.yml restart
 ```
 
 ### Training Workflow
-1. **Open interface** in browser (http://localhost:5001 for GPU)
+1. **Open interface** in browser (http://localhost:5001)
 2. **Configure HuggingFace** token in the top section
 3. **Select datasets** for training (refresh to load your datasets)
 4. **Configure training** parameters (batch size, epochs, etc.)
-5. **Start training** and monitor progress
+5. **Start training** and monitor progress (uses GPU if available)
 6. **Access trained models** in `./trained_model/` directory
 
 ---
@@ -509,16 +503,18 @@ cd DeepSynth
 cp .env.example .env
 # Edit .env: HF_TOKEN=hf_your_token_here
 
-# Launch container
+# Launch container (auto-detects GPU)
 cd deploy
-docker compose -f docker-compose.gpu.yml up -d  # For training
-# OR
-docker compose -f docker-compose.cpu.yml up -d  # For dataset generation
+docker compose -f docker-compose.gpu.yml up -d
 
 # Access web interface
-open http://localhost:5001  # GPU
-open http://localhost:5000  # CPU
+open http://localhost:5001
 ```
+
+**The container automatically:**
+- ✅ **Uses GPU** if available (for training)
+- ✅ **Falls back to CPU** if no GPU (for testing/dataset generation)
+- ✅ **Same interface** regardless of hardware
 
 **That's it!** Configure and train your models through the web interface.
 
