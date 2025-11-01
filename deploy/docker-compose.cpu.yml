@@ -4,7 +4,7 @@ services:
   deepsynth-dataset-generator:
     build:
       context: ..
-      dockerfile: deploy/Dockerfile.cpu
+      dockerfile: deploy/Dockerfile
     container_name: deepsynth-dataset-generator-cpu
     ports:
       - "5000:5000"
@@ -36,6 +36,8 @@ services:
       # Disable GPU for dataset generation
       - CUDA_VISIBLE_DEVICES=""
       - NO_CUDA=1
+      - TORCH_USE_CUDA_DSA=0
+      - CUDA_LAUNCH_BLOCKING=0
 
     restart: unless-stopped
 
