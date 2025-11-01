@@ -52,7 +52,7 @@ RUN pip3 install --no-cache-dir \
 
 # Install Python dependencies with fixed datasets version
 RUN pip3 install --no-cache-dir \
-    "datasets>=2.14.0,<3.0.0" \
+    "datasets==2.21.0" \
     transformers>=4.46.0 \
     tokenizers>=0.20.0 \
     huggingface_hub>=0.20.3 \
