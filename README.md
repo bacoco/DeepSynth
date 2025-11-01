@@ -11,13 +11,14 @@
 [![Multilingual](https://img.shields.io/badge/languages-5+-green.svg)](#supported-languages)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**One command. Six datasets. Infinite possibilities.**
+**Docker + Web Interface. Multiple datasets. Easy training.**
 
 ```bash
-python run_complete_multilingual_pipeline.py
+docker compose -f deploy/docker-compose.gpu.yml up -d
+open http://localhost:5001
 ```
 
-Automatically downloads MLSUM data (3.3GB), processes 1.29M+ multilingual examples with incremental HuggingFace uploads, visual text encoding, and resumable pipeline—all optimized for production scale.
+Launch the container, access the web interface, configure your training, and start fine-tuning DeepSeek-OCR models with an intuitive GUI.
 
 ## 📚 Documentation index
 
@@ -90,10 +91,7 @@ Compare your model against the best:
 | **PubMed** | Medical abstracts | 45.97 | 🎯 Test now |
 | **SAMSum** | Dialogue (14.7k) | 53.4 (BART) | 🎯 Test now |
 
-```bash
-# Benchmark your model
-python run_benchmark.py --model ./your-model --benchmark cnn_dailymail
-```
+Use the web interface to benchmark your trained models against standard datasets.
 
 ### 🎨 **Production-Ready Deployment**
 - **REST API**: Flask server with comprehensive endpoints
@@ -324,167 +322,11 @@ files.download('deepsynth-trained-model.zip')
 
 ---
 
-## 💻 Local Machine Setup
 
-### Option 1: Direct Installation (Recommended for Development)
-
-**Requirements:**
-- Python 3.9+
-- CUDA 11.8+ (for GPU training)
-- 16GB+ RAM
-- 50GB+ free disk space
-
-**Setup:**
-```bash
-# Clone repository
-git clone https://github.com/bacoco/deepseek-synthesia.git
-cd deepseek-synthesia
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# venv\Scripts\activate   # Windows
-
-# Install dependencies
-pip install torch torchvision transformers datasets huggingface_hub pillow python-dotenv flask
-
-# Setup environment
-cp .env.example .env
-# Edit .env and add your HF_TOKEN
-
-# Test setup
-python test_setup.py
-
-# Run web interface (CPU mode)
-source .envrc && python -m apps.web
-
-# Run training pipeline
-python run_complete_multilingual_pipeline.py
-```
-
-### Option 2: Docker Setup (GPU Training)
-
-**Requirements:**
-- Docker + Docker Compose
-- NVIDIA Docker runtime
-- NVIDIA GPU with 16GB+ VRAM
-
-**Setup:**
-```bash
-# Clone repository
-git clone https://github.com/bacoco/deepseek-synthesia.git
-cd deepseek-synthesia
-
-# Setup environment
-cp .env.example .env
-# Edit .env and add your HF_TOKEN
-
-# Build and run with GPU
-docker compose -f docker-compose.gpu.yml up --build
-
-# Access web interface
-open http://localhost:7860
-```
-
-**Docker Commands:**
-```bash
-# GPU training
-docker compose -f docker-compose.gpu.yml up
-
-# CPU development
-docker compose -f docker-compose.cpu.yml up
-
-# Interactive shell
-docker compose -f docker-compose.gpu.yml exec deepsynth bash
-
-# View logs
-docker compose logs -f deepsynth
-```
 
 ---
 
-## 🎯 Training Your Model
 
-### Quick Start Training
-
-**1. Prepare Dataset (5-10 minutes)**
-```bash
-# Test with small dataset
-export MAX_SAMPLES_PER_SPLIT=100
-python run_complete_multilingual_pipeline.py
-```
-
-**2. Fine-tune Model (30-60 minutes on GPU)**
-```bash
-# The pipeline automatically starts training after dataset preparation
-# Monitor progress in the console output
-```
-
-**3. Evaluate Results**
-```bash
-# Benchmark your trained model
-python run_benchmark.py \
-    --model ./deepsynth-ocr-summarizer \
-    --benchmark cnn_dailymail \
-    --max-samples 1000
-```
-
-### Production Training
-
-**Full Dataset (Recommended for best results):**
-```bash
-# Process all 1.29M+ samples (2-4 hours)
-python run_complete_multilingual_pipeline.py
-
-# Expected output:
-# ✅ French (MLSUM): 392,902 samples
-# ✅ Spanish (MLSUM): 266,367 samples
-# ✅ German (MLSUM): 220,748 samples
-# ✅ English (CNN/DailyMail): 287,113 samples
-# ✅ English (XSum): ~50,000 samples
-# ✅ Legal (BillSum): 22,218 samples
-# 🎯 Total: ~1.29M multilingual examples
-```
-
-**Custom Training Parameters:**
-```bash
-# Edit .env for custom settings
-BATCH_SIZE=4                    # Adjust for your GPU memory
-NUM_EPOCHS=3                    # More epochs = better quality
-LEARNING_RATE=1e-5              # Lower = more stable training
-GRADIENT_ACCUMULATION_STEPS=8   # Effective batch size = BATCH_SIZE * this
-MAX_SAMPLES_PER_SPLIT=10000     # Limit samples for testing
-```
-
-### Training Hardware Requirements
-
-| Setup | GPU | VRAM | Training Time | Quality |
-|-------|-----|------|---------------|---------|
-| **Colab Free** | T4 | 16GB | 2-3 hours | ⭐⭐⭐⭐ |
-| **Colab Pro** | V100/A100 | 16-40GB | 1-2 hours | ⭐⭐⭐⭐⭐ |
-| **Local RTX 4090** | RTX 4090 | 24GB | 1-2 hours | ⭐⭐⭐⭐⭐ |
-| **Local RTX 3080** | RTX 3080 | 10GB | 3-4 hours | ⭐⭐⭐⭐ |
-| **CPU Only** | None | 32GB+ RAM | 12-24 hours | ⭐⭐⭐ |
-
-### Monitoring Training
-
-**Real-time Monitoring:**
-```bash
-# Watch training logs
-tail -f training.log
-
-# Monitor GPU usage
-watch -n 1 nvidia-smi
-
-# Check model checkpoints
-ls -la ./deepsynth-ocr-summarizer/
-```
-
-**Training Metrics to Watch:**
-- **Loss decreasing**: Should drop from ~2.0 to ~0.5
-- **ROUGE scores improving**: Target ROUGE-1 > 40
-- **GPU utilization**: Should be 80-95%
-- **Memory usage**: Should be stable (no memory leaks)
 
 ## ⚡ Quick Start
 
@@ -532,23 +374,13 @@ summary = summarizer.summarize_text(long_article)
 ```
 
 ### 🔬 **Research Assistant**
-Process academic papers automatically:
-```bash
-python run_benchmark.py --model ./model --benchmark arxiv
-```
+Process academic papers through the web interface
 
 ### 💼 **Business Intelligence**
-Generate executive summaries from reports:
-```bash
-curl -X POST http://localhost:5000/summarize/file \
-    -F "file=@quarterly_report.pdf"
-```
+Generate executive summaries from reports via the web UI
 
 ### 📞 **Customer Support**
-Summarize conversation transcripts:
-```bash
-python run_benchmark.py --model ./model --benchmark samsum
-```
+Summarize conversation transcripts using trained models
 
 ---
 
@@ -572,30 +404,12 @@ python run_benchmark.py --model ./model --benchmark samsum
 
 ### Benchmark Your Model
 
-```bash
-# Full evaluation with all metrics
-python run_benchmark.py \
-    --model ./deepsynth-ocr-summarizer \
-    --benchmark cnn_dailymail \
-    --max-samples 1000
+Use the web interface to evaluate your trained models against standard benchmarks. The interface provides:
 
-# Output:
-# ======================================================================
-# BENCHMARK: CNN/DailyMail
-# ======================================================================
-#
-# ROUGE Scores:
-#   ROUGE-1: 42.35 (P: 44.12, R: 41.23)
-#   ROUGE-2: 19.87 (P: 21.45, R: 18.76)
-#   ROUGE-L: 39.12 (P: 40.89, R: 37.98)
-#
-# BERTScore:
-#   F1: 87.23 (P: 88.12, R: 86.45)
-#
-# Comparison to SOTA:
-#   ROUGE-1: Your 42.35 vs SOTA 44.16
-#   📊 Your model is competitive with SOTA (within 5 points)
-```
+- **ROUGE Scores**: Overlap-based metrics (ROUGE-1, ROUGE-2, ROUGE-L)
+- **BERTScore**: Semantic similarity evaluation
+- **Comparison to SOTA**: See how your model compares to state-of-the-art
+- **Multiple Benchmarks**: CNN/DailyMail, XSum, arXiv, PubMed, SAMSum
 
 ---
 
@@ -856,16 +670,15 @@ This project uses the DeepSeek-OCR model license. For commercial applications:
 ## 🚀 Get Started Now
 
 ```bash
-# 1. Quick test (100 samples, ~20 minutes)
-cp .env.example .env  # Add your HF_TOKEN
-echo "MAX_SAMPLES_PER_SPLIT=100" >> .env
-python run_complete_pipeline.py
+# 1. Clone and setup
+git clone https://github.com/bacoco/DeepSynth.git
+cd DeepSynth && cp .env.example .env
 
-# 2. Benchmark evaluation
-python run_benchmark.py --model ./deepsynth-ocr-summarizer --benchmark cnn_dailymail
+# 2. Launch container
+cd deploy && docker compose -f docker-compose.gpu.yml up -d
 
-# 3. Production deployment
-MODEL_PATH=./deepsynth-ocr-summarizer python -m deepsynth.inference.api_server
+# 3. Access web interface
+open http://localhost:5001
 ```
 
 **Your AI-powered summarization system is just minutes away.** 🎉
