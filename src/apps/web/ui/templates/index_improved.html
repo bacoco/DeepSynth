@@ -1941,16 +1941,20 @@
                     throw new Error('No datasets available. Please generate datasets first.');
                 }
 
-                // Step 2: Select first dataset automatically
-                statusDiv.innerHTML = '🔄 Step 2/4: Selecting dataset...';
-                const firstDataset = allDatasets[0];
+                // Step 2: Select French dataset automatically
+                statusDiv.innerHTML = '🔄 Step 2/4: Selecting French dataset...';
+                const frenchDataset = allDatasets.find(ds => ds.name === 'deepsynth-fr');
+                if (!frenchDataset) {
+                    throw new Error('French dataset (deepsynth-fr) not found. Please generate it first.');
+                }
+
                 selectedDatasets.clear();
-                selectedDatasets.add(firstDataset.repo);
+                selectedDatasets.add(frenchDataset.repo);
                 document.getElementById('selection-count').textContent = '1 dataset(s) selected';
 
                 // Highlight selected dataset
                 document.querySelectorAll('.dataset-card').forEach(card => {
-                    if (card.dataset.repo === firstDataset.repo) {
+                    if (card.dataset.repo === frenchDataset.repo) {
                         card.classList.add('selected');
                     }
                 });
@@ -1961,11 +1965,11 @@
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
-                        dataset_repos: [firstDataset.repo],
+                        dataset_repos: [frenchDataset.repo],
                         seed: 42,
                         benchmark_percentage: 0.1,
                         stratify: false,
-                        dataset_sizes: {[firstDataset.repo]: 1000} // Use small subset
+                        dataset_sizes: {[frenchDataset.repo]: 1000} // Use small subset
                     })
                 });
 
