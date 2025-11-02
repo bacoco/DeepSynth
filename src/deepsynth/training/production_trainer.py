@@ -944,11 +944,14 @@ class UnifiedProductionTrainer:
         if self.accelerator.is_local_main_process:
             self.save_checkpoint(self.output_dir)
 
-            # Save metrics
+            # Save metrics (sanitized - remove sensitive data)
             metrics_path = self.output_dir / "metrics.json"
+            config_dict = asdict(self.config)
+            # Remove sensitive fields before saving
+            config_dict.pop("hub_token", None)  # Don't expose API tokens
             with open(metrics_path, "w") as f:
                 json.dump({
-                    "config": asdict(self.config),
+                    "config": config_dict,
                     "metrics": metrics,
                 }, f, indent=2)
 
@@ -1022,10 +1025,13 @@ class UnifiedProductionTrainer:
         if self.accelerator.is_main_process:
             self.tokenizer.save_pretrained(output_dir)
 
-            # Save training config
+            # Save training config (sanitized - remove sensitive data)
             config_path = output_dir / "training_config.json"
+            config_dict = asdict(self.config)
+            # Remove sensitive fields before saving
+            config_dict.pop("hub_token", None)  # Don't expose API tokens
             with open(config_path, "w") as f:
-                json.dump(asdict(self.config), f, indent=2)
+                json.dump(config_dict, f, indent=2)
 
             LOGGER.info("✓ Checkpoint saved successfully")
 
