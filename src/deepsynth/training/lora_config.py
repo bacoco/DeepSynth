@@ -255,6 +255,50 @@ LORA_PRESETS = {
         use_double_quantization=False,
         compute_dtype="float16",
     ),
+    # Tiny data preset (3-10 samples) - Optimized for very small datasets
+    "tiny_data": LoRAConfig(
+        enabled=True,
+        rank=16,
+        alpha=32,
+        dropout=0.1,  # Higher dropout for overfitting prevention
+        target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "down_proj"],  # Attention + partial MLP
+    ),
+    # Balanced preset (10-50 samples) - Good trade-off between capacity and overfitting
+    "balanced": LoRAConfig(
+        enabled=True,
+        rank=32,
+        alpha=64,
+        dropout=0.08,
+        target_modules=[
+            "q_proj", "k_proj", "v_proj", "o_proj",  # Attention
+            "gate_proj", "up_proj", "down_proj"  # Full MLP
+        ],
+    ),
+    # Router-focused preset - Specialized for MoE router adaptation
+    "router_focused": LoRAConfig(
+        enabled=True,
+        rank=16,
+        alpha=32,
+        dropout=0.08,
+        target_modules=[
+            "q_proj", "k_proj", "v_proj", "o_proj",
+            "down_proj",
+            "router", "gate"  # MoE router modules
+        ],
+        modules_to_save=["router", "gate"],  # Full training for router
+    ),
+    # High capacity preset (50+ samples) - Maximum LoRA capacity with router training
+    "high_capacity_moe": LoRAConfig(
+        enabled=True,
+        rank=64,
+        alpha=128,
+        dropout=0.05,
+        target_modules=[
+            "q_proj", "k_proj", "v_proj", "o_proj",  # Attention
+            "gate_proj", "up_proj", "down_proj",  # Full MLP
+            "router", "gate"  # MoE router
+        ],
+    ),
 }
 
 
@@ -278,10 +322,35 @@ def get_lora_preset(preset_name: str) -> LoRAConfig:
     return LORA_PRESETS[preset_name]
 
 
+def get_recommended_preset(num_samples: int) -> LoRAConfig:
+    """Get recommended LoRA preset based on dataset size.
+
+    Args:
+        num_samples: Number of training samples
+
+    Returns:
+        Recommended LoRA configuration
+
+    Example:
+        >>> config = get_recommended_preset(25)  # Returns 'standard' preset
+        >>> config.rank
+        16
+    """
+    if num_samples <= 10:
+        return LORA_PRESETS["minimal"]  # rank=4, for 3-10 samples
+    elif num_samples <= 50:
+        return LORA_PRESETS["standard"]  # rank=16, for 10-50 samples
+    elif num_samples <= 200:
+        return LORA_PRESETS["balanced"]  # rank=32, for 50-200 samples
+    else:
+        return LORA_PRESETS["high_capacity"]  # rank=64, for 200+ samples
+
+
 __all__ = [
     "LoRAConfig",
     "QLoRAConfig",
     "MultiAdapterConfig",
     "LORA_PRESETS",
     "get_lora_preset",
+    "get_recommended_preset",
 ]

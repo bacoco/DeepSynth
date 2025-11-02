@@ -44,6 +44,7 @@ from .model_utils import (
 )
 from .moe_dropout import ExpertGradientDropout, GateGradientDropout
 from .text_encoder import TextEncoderModule
+from .scheduler import create_warmup_scheduler
 from deepsynth.data.transforms import create_training_transform, create_inference_transform
 
 LOGGER = logging.getLogger(__name__)
@@ -689,16 +690,28 @@ class UnifiedProductionTrainer:
         # Create DataLoader
         train_loader = self._create_dataloader(dataset, shuffle=True)
 
-        # Create learning rate scheduler
+        # Create learning rate scheduler with warmup support
         num_training_steps = len(train_loader) * self.config.num_epochs
-        num_warmup_steps = self.config.optimizer.warmup_steps
 
-        scheduler = get_scheduler(
-            "cosine",
+        # Use warmup_ratio if specified, otherwise use warmup_steps
+        if self.config.optimizer.warmup_ratio is not None:
+            num_warmup_steps = int(num_training_steps * self.config.optimizer.warmup_ratio)
+            LOGGER.info("Using warmup_ratio=%.3f → %d warmup steps",
+                       self.config.optimizer.warmup_ratio, num_warmup_steps)
+        else:
+            num_warmup_steps = self.config.optimizer.warmup_steps
+            LOGGER.info("Using warmup_steps=%d", num_warmup_steps)
+
+        # Create scheduler using the custom warmup-aware scheduler
+        scheduler = create_warmup_scheduler(
             optimizer=self.optimizer,
-            num_warmup_steps=num_warmup_steps,
+            scheduler_type=self.config.optimizer.scheduler_type,
             num_training_steps=num_training_steps,
+            num_warmup_steps=num_warmup_steps,
         )
+
+        LOGGER.info("Scheduler: %s with %d warmup steps",
+                   self.config.optimizer.scheduler_type, num_warmup_steps)
 
         # Prepare for distributed training
         self.model, self.optimizer, train_loader, scheduler = self.accelerator.prepare(

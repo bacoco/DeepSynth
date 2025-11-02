@@ -410,6 +410,9 @@ def _register_routes(
                 "lora_dropout": data.get("lora_dropout", 0.1),
                 "use_qlora": data.get("use_qlora", False),
                 "qlora_bits": data.get("qlora_bits", 4),
+                # Scheduler parameters
+                "scheduler_type": data.get("scheduler_type", "cosine_with_warmup"),
+                "warmup_ratio": data.get("warmup_ratio"),  # Optional, None = use warmup_steps instead
             })
 
             job_id = state_manager.create_job("model_training", config)

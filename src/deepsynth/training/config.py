@@ -10,6 +10,8 @@ class OptimizerConfig:
     learning_rate: float = 2e-5
     weight_decay: float = 0.0
     warmup_steps: int = 0
+    warmup_ratio: Optional[float] = None  # Alternative to warmup_steps (0.0-1.0)
+    scheduler_type: str = "cosine_with_warmup"  # cosine_with_warmup, linear_with_warmup, constant_with_warmup, polynomial
 
 
 @dataclass
@@ -134,6 +136,12 @@ class TrainerConfig:
             "text_encoder_trainable": self.text_encoder_trainable,
             "instruction_prompt": self.instruction_prompt,
             "use_text_projection": self.use_text_projection,
+            # Optimizer/Scheduler parameters
+            "learning_rate": self.optimizer.learning_rate,
+            "weight_decay": self.optimizer.weight_decay,
+            "warmup_steps": self.optimizer.warmup_steps,
+            "warmup_ratio": self.optimizer.warmup_ratio,
+            "scheduler_type": self.optimizer.scheduler_type,
         }
 
 
