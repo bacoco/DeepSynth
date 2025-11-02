@@ -13,6 +13,7 @@ import logging
 import math
 import time
 from concurrent.futures import ThreadPoolExecutor
+import os
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional, Tuple, Union
@@ -364,13 +365,17 @@ class UnifiedProductionTrainer:
 
     def _create_dataloader(self, dataset: Dataset, shuffle: bool = True) -> DataLoader:
         """Create DataLoader with proper settings."""
+        # Choose sensible defaults for constrained environments
+        num_workers = int(os.environ.get("DS_NUM_WORKERS", "4" if torch.cuda.is_available() else "0"))
+        pin_memory = torch.cuda.is_available()
+
         return DataLoader(
             dataset,
             batch_size=self.config.batch_size,
             shuffle=shuffle,
-            num_workers=4,  # Parallel data loading
-            pin_memory=True,  # Faster GPU transfer
-            drop_last=True,  # Drop incomplete batches
+            num_workers=num_workers,  # Parallel data loading
+            pin_memory=pin_memory,  # Faster GPU transfer on CUDA
+            drop_last=False,  # Keep incomplete batches for tiny datasets
             collate_fn=self._collate_batch,
         )
 
@@ -688,6 +693,13 @@ class UnifiedProductionTrainer:
         # Create DataLoader
         train_loader = self._create_dataloader(dataset, shuffle=True)
 
+        # Guard against empty datasets early to avoid silent no-op training
+        if len(dataset) == 0:
+            raise ValueError(
+                "Training dataset is empty. Ensure your dataset selection/split has samples "
+                "or reduce filters."
+            )
+
         # Create learning rate scheduler with warmup support
         num_training_steps = len(train_loader) * self.config.num_epochs
 
@@ -748,6 +760,22 @@ class UnifiedProductionTrainer:
             self.best_loss = state["best_loss"]
             self.train_losses = state["train_losses"]
             LOGGER.info("✅ Training will resume from epoch %d, step %d", self.start_epoch, self.global_step)
+
+        # Create HuggingFace repository before training starts
+        # This ensures background checkpoint uploads don't fail with 404 errors
+        if self.config.push_to_hub and self.config.hub_model_id:
+            try:
+                LOGGER.info("📦 Creating/verifying HuggingFace repository: %s", self.config.hub_model_id)
+                self.api.create_repo(
+                    repo_id=self.config.hub_model_id,
+                    repo_type="model",
+                    private=self.config.hub_private,
+                    exist_ok=True,  # Don't fail if repo already exists
+                    token=self.config.hub_token,
+                )
+                LOGGER.info("✅ Repository ready for uploads")
+            except Exception as e:
+                LOGGER.warning("⚠️  Could not create repository (may already exist): %s", e)
 
         LOGGER.info("Starting training: %d samples, %d epochs", len(dataset), self.config.num_epochs)
         LOGGER.info("Total training steps: %d, Warmup steps: %d", num_training_steps, num_warmup_steps)
