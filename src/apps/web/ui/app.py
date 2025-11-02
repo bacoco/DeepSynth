@@ -384,7 +384,7 @@ def _register_routes(
                 "training_config": data.get("training_config"),
                 # Add all the additional training parameters from the form
                 "hub_model_id": data.get("hub_model_id"),
-                "hub_private": data.get("hub_private", True),
+                "hub_private": data.get("hub_private", False),  # PUBLIC by default
                 "push_to_hub": data.get("push_to_hub", True),
                 "save_checkpoints_to_hub": data.get("save_checkpoints_to_hub", True),
                 "save_metrics_to_hub": data.get("save_metrics_to_hub", True),
@@ -404,7 +404,7 @@ def _register_routes(
                 "gate_dropout_rate": data.get("gate_dropout_rate", 0.05),
                 "bidrop_passes": data.get("bidrop_passes", 2),
                 # LoRA/PEFT parameters
-                "use_lora": data.get("use_lora", False),
+                "use_lora": data.get("use_lora", True),  # Enable LoRA by default
                 "lora_rank": data.get("lora_rank", 16),
                 "lora_alpha": data.get("lora_alpha", 32),
                 "lora_dropout": data.get("lora_dropout", 0.1),
