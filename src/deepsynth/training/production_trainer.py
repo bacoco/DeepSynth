@@ -1068,8 +1068,8 @@ class UnifiedProductionTrainer:
 
             def _http_bulk_then_files() -> bool:
                 # Force legacy HTTP upload path (disable xet/hf_transfer backends)
-                os.environ.setdefault("HF_HUB_ENABLE_HF_TRANSFER", "0")
-                os.environ.setdefault("HF_HUB_ENABLE_XET", "0")
+                os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "0"
+                os.environ["HF_HUB_ENABLE_XET"] = "0"
                 try:
                     # Upload only final artifacts; ignore intermediate checkpoints to avoid conflicts
                     self.api.upload_folder(
