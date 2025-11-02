@@ -615,13 +615,11 @@ class UnifiedProductionTrainer:
             )
             # text_embeddings shape: (batch_size, 4096)
 
-        # Forward pass with DeepSeek-OCR format (following infer() pattern)
-        # Convert images_spatial_crop tensor to list for model compatibility
-        images_spatial_crop_list = images_spatial_crop.tolist()
-
+        # Forward pass with DeepSeek-OCR format
+        # Keep images_spatial_crop as tensor (model expects tensor, not list)
         forward_kwargs = {
             "images": images_tuples,  # List of (crop, ori) tuples
-            "images_spatial_crop": images_spatial_crop_list,  # [[1, 1], [1, 1], ...]
+            "images_spatial_crop": images_spatial_crop,  # Tensor: [[1, 1], [1, 1], ...]
             "images_seq_mask": images_seq_mask,  # Boolean mask for image tokens
             "input_ids": input_ids,
             "attention_mask": attention_mask,
