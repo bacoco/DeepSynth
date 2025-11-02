@@ -691,6 +691,22 @@ class UnifiedProductionTrainer:
         # Create learning rate scheduler with warmup support
         num_training_steps = len(train_loader) * self.config.num_epochs
 
+        # Auto-adapt save_interval for small datasets
+        # This ensures checkpoints are saved even for test/small datasets
+        if num_training_steps <= 10:
+            # Very small dataset: save every 50% (at least 2 checkpoints)
+            adaptive_save_interval = max(1, num_training_steps // 2)
+            LOGGER.info("📊 Small dataset detected (%d steps) → adaptive save_interval=%d (was %d)",
+                       num_training_steps, adaptive_save_interval, self.config.save_interval)
+            self.config.save_interval = adaptive_save_interval
+        elif num_training_steps <= 50:
+            # Medium dataset: save 3-4 times during training
+            adaptive_save_interval = max(2, num_training_steps // 3)
+            LOGGER.info("📊 Medium dataset detected (%d steps) → adaptive save_interval=%d (was %d)",
+                       num_training_steps, adaptive_save_interval, self.config.save_interval)
+            self.config.save_interval = adaptive_save_interval
+        # else: use configured save_interval (default 500 for large datasets)
+
         # Use warmup_ratio if specified, otherwise use warmup_steps
         if self.config.optimizer.warmup_ratio is not None:
             num_warmup_steps = int(num_training_steps * self.config.optimizer.warmup_ratio)
