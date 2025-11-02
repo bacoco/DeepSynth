@@ -53,6 +53,8 @@ class JobState:
     # Error tracking
     last_error: Optional[str] = None
     error_count: int = 0
+    # Human-readable status message for UI
+    status_message: Optional[str] = None
 
     def __post_init__(self):
         if self.processed_hashes is None:
@@ -205,6 +207,7 @@ class StateManager:
             "unique_samples": len(self.get_processed_hashes(job_id)),
             "error_count": job.error_count,
             "last_error": job.last_error,
+            "status_message": job.status_message,
             "hf_dataset_repo": job.hf_dataset_repo,
             "dataset_url": f"https://huggingface.co/datasets/{job.hf_dataset_repo}" if job.hf_dataset_repo else None,
         }

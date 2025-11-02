@@ -29,6 +29,9 @@ class TrainerConfig:
     log_interval: int = 10
     save_interval: int = 500
     push_to_hub: bool = True
+    # NOTE: Use consistent repository name for tests and production
+    # ❌ AVOID: Timestamped names like f"baconnier/test-{int(time.time())}"
+    # ✅ PREFER: Fixed names like "baconnier/deepsynth-test" or "baconnier/deepsynth-ocr-finetuned"
     hub_model_id: str = "baconnier/deepsynth-ocr-finetuned"
     hub_private: bool = False
     hub_token: Optional[str] = None  # Set via HF_TOKEN environment variable

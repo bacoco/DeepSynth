@@ -459,12 +459,12 @@ class DeepSynthLoRATrainer:
 
         # Save model
         if self.config.use_lora:
-            # Save LoRA adapters
-            self.model.save_pretrained(path)
+            # Save LoRA adapters; prefer .bin to avoid safetensors upload issues
+            self.model.save_pretrained(path, safe_serialization=False)
             LOGGER.info(f"Saved LoRA adapters to {path}")
         else:
             # Save full model
-            self.model.save_pretrained(path)
+            self.model.save_pretrained(path, safe_serialization=False)
             LOGGER.info(f"Saved model to {path}")
 
         # Save tokenizer

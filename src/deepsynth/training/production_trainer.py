@@ -13,6 +13,8 @@ import logging
 import math
 import time
 from concurrent.futures import ThreadPoolExecutor
+import tempfile
+import shutil
 import os
 from dataclasses import asdict
 from pathlib import Path
@@ -232,6 +234,14 @@ class UnifiedProductionTrainer:
 
         # Thread pool for async HuggingFace uploads (prevents blocking training)
         self.upload_executor = ThreadPoolExecutor(max_workers=1)
+        # Control intermediate checkpoint uploads to Hub. Disabled by default to avoid
+        # MerkleDB shard conflicts on rapid successive uploads; can be enabled via env.
+        self._upload_intermediate_to_hub = (
+            os.environ.get("DS_UPLOAD_INTERMEDIATE", "0") == "1"
+            and bool(config.save_checkpoints_to_hub)
+            and bool(config.push_to_hub)
+            and bool(config.hub_model_id)
+        )
 
         # Training state
         self.global_step = 0
@@ -719,6 +729,12 @@ class UnifiedProductionTrainer:
             self.config.save_interval = adaptive_save_interval
         # else: use configured save_interval (default 500 for large datasets)
 
+        # For small runs, avoid intermediate Hub uploads to prevent conflicts
+        if not self._upload_intermediate_to_hub:
+            LOGGER.info(
+                "☑ Skipping intermediate checkpoint uploads to Hub. Set DS_UPLOAD_INTERMEDIATE=1 to enable."
+            )
+
         # Use warmup_ratio if specified, otherwise use warmup_steps
         if self.config.optimizer.warmup_ratio is not None:
             num_warmup_steps = int(num_training_steps * self.config.optimizer.warmup_ratio)
@@ -850,9 +866,7 @@ class UnifiedProductionTrainer:
                         self.train_losses,
                     )
                     # Async push to Hub if configured
-                    if (self.config.save_checkpoints_to_hub and
-                        self.config.push_to_hub and
-                        self.config.hub_model_id):
+                    if self._upload_intermediate_to_hub:
                         push_to_hub_async(
                             self.upload_executor,
                             self.api,
@@ -860,6 +874,8 @@ class UnifiedProductionTrainer:
                             self.config.hub_model_id,
                             self.config.hub_token,
                         )
+                    else:
+                        LOGGER.info("⏭️  Skipping intermediate checkpoint upload to Hub (DS_UPLOAD_INTERMEDIATE not enabled)")
 
             # Epoch complete
             avg_epoch_loss = epoch_loss / len(train_loader)
@@ -894,9 +910,7 @@ class UnifiedProductionTrainer:
                 )
 
                 # Async push to Hub if configured
-                if (self.config.save_checkpoints_to_hub and
-                    self.config.push_to_hub and
-                    self.config.hub_model_id):
+                if self._upload_intermediate_to_hub:
                     push_to_hub_async(
                         self.upload_executor,
                         self.api,
@@ -904,6 +918,8 @@ class UnifiedProductionTrainer:
                         self.config.hub_model_id,
                         self.config.hub_token,
                     )
+                else:
+                    LOGGER.info("⏭️  Skipping intermediate checkpoint upload to Hub (DS_UPLOAD_INTERMEDIATE not enabled)")
 
         # Training complete
         LOGGER.info("=" * 80)
@@ -1000,6 +1016,7 @@ class UnifiedProductionTrainer:
             output_dir,
             is_main_process=self.accelerator.is_main_process,
             save_function=self.accelerator.save,
+            safe_serialization=False,
         )
 
         if self.accelerator.is_main_process:
@@ -1046,13 +1063,110 @@ class UnifiedProductionTrainer:
             except Exception as e:
                 LOGGER.warning("Repo creation warning: %s", e)
 
-            # Upload
-            self.api.upload_folder(
-                folder_path=str(self.output_dir),
-                repo_id=repo_id,
-                repo_type="model",
-                token=self.config.hub_token,
-            )
+            # Determine backend preference
+            backend = os.environ.get("DS_PUSH_BACKEND", "http").lower()
+
+            def _http_bulk_then_files() -> bool:
+                # Force legacy HTTP upload path (disable xet/hf_transfer backends)
+                os.environ.setdefault("HF_HUB_ENABLE_HF_TRANSFER", "0")
+                os.environ.setdefault("HF_HUB_ENABLE_XET", "0")
+                try:
+                    # Upload only final artifacts; ignore intermediate checkpoints to avoid conflicts
+                    self.api.upload_folder(
+                        folder_path=str(self.output_dir),
+                        repo_id=repo_id,
+                        repo_type="model",
+                        token=self.config.hub_token,
+                        ignore_patterns=["checkpoint-*", "epoch_*"],
+                        commit_message="Upload final model artifacts (skip intermediate checkpoints)",
+                    )
+                    return True
+                except Exception as upload_err:
+                    LOGGER.warning("Bulk upload failed (%s). Falling back to per-file uploads.", upload_err)
+                    ok = True
+                    for item in self.output_dir.iterdir():
+                        if item.is_dir():
+                            if item.name.startswith("checkpoint-") or item.name.startswith("epoch_"):
+                                continue
+                            # Skip subdirectories in fallback mode
+                            continue
+                        try:
+                            self.api.upload_file(
+                                path_or_fileobj=str(item),
+                                path_in_repo=item.name,
+                                repo_id=repo_id,
+                                repo_type="model",
+                                token=self.config.hub_token,
+                                commit_message=f"Upload {item.name}",
+                            )
+                            LOGGER.info("✓ Uploaded %s", item.name)
+                        except Exception as file_err:
+                            ok = False
+                            LOGGER.error("Failed to upload %s: %s", item.name, file_err)
+                    return ok
+
+            def _git_push() -> bool:
+                try:
+                    from huggingface_hub import Repository
+                except Exception as e:
+                    LOGGER.error("Git backend not available: %s", e)
+                    return False
+
+                tmpdir = Path(tempfile.mkdtemp(prefix="ds_hf_repo_"))
+                try:
+                    repo = Repository(
+                        local_dir=str(tmpdir),
+                        clone_from=repo_id,
+                        token=self.config.hub_token,
+                        repo_type="model",
+                        skip_lfs_files=False,
+                        git_user="deepsynth-bot",
+                        git_email="bot@deepsynth.local",
+                    )
+                    # Copy final artifacts (exclude checkpoints/epochs)
+                    for item in self.output_dir.iterdir():
+                        if item.name.startswith("checkpoint-") or item.name.startswith("epoch_"):
+                            continue
+                        dest = tmpdir / item.name
+                        if item.is_dir():
+                            # Shallow copy directory
+                            shutil.copytree(item, dest, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(item, dest)
+
+                    # Configure .gitattributes for large files
+                    gitattributes = tmpdir / ".gitattributes"
+                    if not gitattributes.exists():
+                        gitattributes.write_text("*.bin filter=lfs diff=lfs merge=lfs -text\n*.safetensors filter=lfs diff=lfs merge=lfs -text\n")
+
+                    repo.git_add(all=True)
+                    repo.git_commit("Upload final model artifacts (git backend)")
+                    repo.git_push()
+                    return True
+                except Exception as ge:
+                    LOGGER.error("Git push failed: %s", ge)
+                    return False
+                finally:
+                    try:
+                        shutil.rmtree(tmpdir)
+                    except Exception:
+                        pass
+
+            success = False
+            if backend == "git":
+                LOGGER.info("Using DS_PUSH_BACKEND=git for Hub upload")
+                success = _git_push()
+                if not success:
+                    LOGGER.info("Falling back to HTTP upload after git failure")
+                    success = _http_bulk_then_files()
+            else:
+                success = _http_bulk_then_files()
+                if not success:
+                    LOGGER.info("Falling back to git upload after HTTP failure")
+                    success = _git_push()
+
+            if not success:
+                raise RuntimeError("All upload backends failed")
 
             LOGGER.info("✓ Model pushed to Hub: https://huggingface.co/%s", repo_id)
         except Exception as e:

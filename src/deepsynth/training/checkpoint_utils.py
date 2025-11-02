@@ -187,11 +187,16 @@ def push_to_hub_async(
     def _push():
         try:
             LOGGER.info(f"🚀 [Background] Pushing checkpoint to Hub: {repo_id}")
+            # Prefer legacy HTTP upload; avoid xet/hf_transfer to reduce shard issues
+            import os as _os
+            _os.environ.setdefault("HF_HUB_ENABLE_HF_TRANSFER", "0")
+            _os.environ.setdefault("HF_HUB_ENABLE_XET", "0")
             api.upload_folder(
                 folder_path=str(checkpoint_dir),
                 repo_id=repo_id,
                 repo_type="model",
                 token=token,
+                use_hf_transfer=False,
             )
             LOGGER.info(f"✅ [Background] Checkpoint pushed successfully: {checkpoint_dir.name}")
         except Exception as e:

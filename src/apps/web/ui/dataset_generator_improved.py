@@ -74,6 +74,7 @@ class IncrementalDatasetGenerator:
             max_samples = config.get('max_samples')
             total_samples = len(source_ds) if not max_samples else min(max_samples, len(source_ds))
             job.total_samples = total_samples
+            job.status_message = f"Loaded source dataset ({total_samples} samples). Starting generation…"
             self.state_manager.update_job(job)
 
             # Process samples incrementally
@@ -180,6 +181,7 @@ class IncrementalDatasetGenerator:
 
                     # Update progress
                     job.processed_samples += 1
+                    job.status_message = f"Generating dataset: {job.processed_samples}/{total_samples} processed"
                     self.state_manager.update_job(job)
 
                     # Progress callback
@@ -214,6 +216,7 @@ class IncrementalDatasetGenerator:
 
             # Mark job as completed
             job.status = JobStatus.COMPLETED.value
+            job.status_message = "Dataset generation completed"
             self.state_manager.update_job(job)
 
             logger.info(f"Dataset generation completed. Processed: {job.processed_samples}")
@@ -333,6 +336,8 @@ class IncrementalDatasetGenerator:
             batch_size = int(config.get('batch_size', 5000))
 
             logger.info(f"Generating Q&A dataset with sources: {qa_sources}")
+            job.status_message = "Preparing Q&A dataset generation…"
+            self.state_manager.update_job(job)
             logger.info(f"Target resolution: {target_resolution}")
             logger.info(f"Batch size: {batch_size}")
 
@@ -348,6 +353,7 @@ class IncrementalDatasetGenerator:
             if estimated_total == 0:
                 estimated_total = sum(default_estimates.get(source, 0) for source in qa_sources) or sum(default_estimates.values())
             job.total_samples = estimated_total
+            job.status_message = f"Q&A generation started; target ~{estimated_total} samples"
             self.state_manager.update_job(job)
 
             hf_token = config.get('hf_token') or os.environ.get('HF_TOKEN')
@@ -392,6 +398,7 @@ class IncrementalDatasetGenerator:
                     job.processed_samples = total_uploaded
                     if not job.hf_dataset_repo:
                         job.hf_dataset_repo = repo_id
+                    job.status_message = f"Uploading Q&A shards: {total_uploaded}/{job.total_samples} samples uploaded"
                     self.state_manager.update_job(job)
                     if progress_callback:
                         total_target = job.total_samples or total_uploaded
@@ -495,6 +502,16 @@ class ModelTrainer:
             # Determine trainer type
             trainer_type = config.get('trainer_type', 'production')
             logger.info(f"Using trainer type: {trainer_type}")
+
+            # Apply upload backend environment controls (affect production_trainer behavior)
+            try:
+                ds_push_backend = str(config.get('ds_push_backend') or '').strip().lower()
+                if ds_push_backend in ('git', 'http'):
+                    os.environ['DS_PUSH_BACKEND'] = ds_push_backend
+                ds_upload_intermediate = bool(config.get('ds_upload_intermediate', False))
+                os.environ['DS_UPLOAD_INTERMEDIATE'] = '1' if ds_upload_intermediate else '0'
+            except Exception as _env_exc:
+                logger.warning(f"Could not apply upload backend env toggles: {_env_exc}")
 
             # Create trainer config
             optimizer_config = OptimizerConfig(
@@ -624,10 +641,22 @@ class ModelTrainer:
                     return
                 job_state.total_samples = total or job_state.total_samples
                 job_state.processed_samples = processed
+                job_state.status_message = f"Training in progress: {processed}/{total} steps"
                 self.state_manager.update_job(job_state)
 
             # Train on combined dataset
             logger.info(f"Starting training on {len(combined_dataset)} samples...")
+
+            # Initialize job progress totals early so UI doesn't flag job as stuck
+            try:
+                job_state = self.state_manager.get_job(job_id)
+                if job_state:
+                    job_state.total_samples = int(len(combined_dataset)) * int(trainer_config.num_epochs)
+                    job_state.processed_samples = 0
+                    job_state.status_message = "Initializing trainer and starting training…"
+                    self.state_manager.update_job(job_state)
+            except Exception as _init_exc:  # defensive: never block training due to progress init
+                logger.warning(f"Could not initialize job progress totals: {_init_exc}")
 
             if trainer_type == 'production':
                 # Production trainer has train() method that accepts dataset directly
@@ -657,6 +686,7 @@ class ModelTrainer:
 
             # Update job
             job.status = JobStatus.COMPLETED.value
+            job.status_message = "Training completed"
             job.model_output_path = trainer_config.output_dir
             job.training_checkpoint = checkpoints.get('last_checkpoint')
             job.config['metrics'] = metrics

@@ -413,6 +413,9 @@ def _register_routes(
                 # Scheduler parameters
                 "scheduler_type": data.get("scheduler_type", "cosine_with_warmup"),
                 "warmup_ratio": data.get("warmup_ratio"),  # Optional, None = use warmup_steps instead
+                # Upload backend controls
+                "ds_push_backend": data.get("ds_push_backend"),
+                "ds_upload_intermediate": data.get("ds_upload_intermediate", False),
             })
 
             job_id = state_manager.create_job("model_training", config)

@@ -907,3 +907,126 @@ Ces recommandations permettent:
 3. Comparer métriques avant/après
 4. Documenter résultats dans README
 
+---
+
+## Fix HuggingFace Upload (production_trainer.py:1081)
+
+### Problème Identifié
+
+**Bug:** Paramètre invalide `use_hf_transfer=False` passé à `upload_folder()` causant l'erreur:
+```
+TypeError: HfApi.upload_folder() got an unexpected keyword argument 'use_hf_transfer'
+```
+
+### Solution Appliquée
+
+**Fichier:** `src/deepsynth/training/production_trainer.py:1074-1081`
+
+**Avant** (incorrect):
+```python
+self.api.upload_folder(
+    folder_path=str(self.output_dir),
+    repo_id=repo_id,
+    repo_type="model",
+    token=self.config.hub_token,
+    ignore_patterns=["checkpoint-*", "epoch_*"],
+    commit_message="Upload final model artifacts (skip intermediate checkpoints)",
+    use_hf_transfer=False,  # ❌ INVALIDE - n'existe pas dans l'API
+)
+```
+
+**Après** (corrigé):
+```python
+self.api.upload_folder(
+    folder_path=str(self.output_dir),
+    repo_id=repo_id,
+    repo_type="model",
+    token=self.config.hub_token,
+    ignore_patterns=["checkpoint-*", "epoch_*"],
+    commit_message="Upload final model artifacts (skip intermediate checkpoints)",
+)
+```
+
+**Explication:** Les variables d'environnement `HF_HUB_ENABLE_XET=0` et `HF_HUB_ENABLE_HF_TRANSFER=0` (lignes 1070-1071) désactivent déjà les backends XET. Le paramètre `use_hf_transfer` n'existe pas dans l'API `upload_folder()`.
+
+### Résultats du Test
+
+**Succès partiel:**
+- ✅ Training réussi (2 samples, LoRA activé)
+- ✅ Uploads intermédiaires correctement ignorés (4x "⏭️ Skipping..." logs)
+- ✅ 7/8 fichiers uploadés avec succès:
+  - .gitattributes, README.md, adapter_config.json, metrics.json
+  - special_tokens_map.json, tokenizer.json, tokenizer_config.json, training_config.json
+- ⚠️ `adapter_model.safetensors` (~17MB) toujours en échec avec erreur MerkleDB
+
+**Erreur MerkleDB persistante:**
+```
+ERROR: Failed to upload adapter_model.safetensors: Data processing error: MerkleDB Shard error: File I/O error
+Processing Files (0 / 0): |          |  0.00B /  0.00B
+```
+
+**Cause:** Problème infrastructure HuggingFace XET affectant le compte `baconnier`, spécifiquement pour les fichiers >10MB. Même avec Legacy HTTP backend activé et XET désactivé.
+
+### Workarounds Disponibles
+
+1. **Désactiver push_to_hub temporairement:**
+```python
+config = TrainerConfig(
+    push_to_hub=False,  # Upload manuel via Web UI
+    ...
+)
+```
+
+2. **Tester avec compte HuggingFace différent:**
+```python
+config = TrainerConfig(
+    hub_model_id="autre-compte/model-test",
+    ...
+)
+```
+
+3. **Git Backend** (requiert git-lfs dans container):
+```bash
+# Installer dans le container
+apt-get update && apt-get install -y git git-lfs && git lfs install
+
+# Puis définir variables d'environnement
+export DS_PUSH_BACKEND=git
+```
+
+### Gestion des Repositories de Test
+
+**❌ MAUVAISE PRATIQUE** (crée repos multiples):
+```python
+import time
+repo_name = f'baconnier/test-{int(time.time())}'  # ❌ Ne pas faire!
+```
+
+**✅ BONNE PRATIQUE** (réutilise même repo):
+```python
+repo_name = 'baconnier/deepsynth-test'  # ✅ Nom constant pour tests
+```
+
+**Avantages:**
+- Pas d'accumulation de repos de test
+- HuggingFace account propre
+- Facilite debugging (historique de commits)
+
+### Fichiers Modifiés
+
+1. **production_trainer.py** (ligne 1081): Suppression paramètre invalide
+2. **Tous les tests:** Utilisation nom de repo constant "baconnier/deepsynth-test"
+
+### Verification
+
+Pour tester le fix:
+```bash
+docker cp C:\Users\loic\DeepSynth\src\deepsynth\training\production_trainer.py \
+    deepsynth-trainer-gpu:/app/src/deepsynth/training/production_trainer.py
+
+# Test dans container
+docker exec deepsynth-trainer-gpu python3 -c "
+# Code de test avec push_to_hub=True
+"
+```
+

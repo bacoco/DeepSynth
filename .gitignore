@@ -47,3 +47,4 @@ test_images_output/
 src/apps/web/ui/state/
 deploy/web_ui/state/
 .claude/settings.local.json
+trained_model/

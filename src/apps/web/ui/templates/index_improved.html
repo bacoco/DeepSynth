@@ -839,6 +839,25 @@
                         </div>
                     </div>
 
+                    <!-- Upload Backend Controls -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="push_backend">Upload Backend</label>
+                            <select id="push_backend">
+                                <option value="http">HTTP (no XET/hf_transfer)</option>
+                                <option value="git">Git (git-lfs)</option>
+                            </select>
+                            <small class="help-text">Use Git if HTTP uploads fail. Both skip intermediate checkpoints.</small>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="upload_intermediate_checkpoints">
+                                ⏫ Upload intermediate checkpoints (not recommended)
+                            </label>
+                            <small class="help-text">May cause frequent Hub writes; leave disabled for stability.</small>
+                        </div>
+                    </div>
+
                     <div class="form-row">
                         <div class="form-group">
                             <label>
@@ -2139,6 +2158,9 @@
                 push_to_hub: true,  // Always push to hub
                 save_checkpoints_to_hub: true,  // Always save checkpoints
                 save_metrics_to_hub: true,  // Always save metrics
+                // Upload backend toggles
+                ds_push_backend: document.getElementById('push_backend').value,
+                ds_upload_intermediate: document.getElementById('upload_intermediate_checkpoints').checked,
 
                 // Training parameters
                 model_name: document.getElementById('model_name').value,
