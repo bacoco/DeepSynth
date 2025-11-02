@@ -26,12 +26,12 @@ class TrainerConfig:
     optimizer: OptimizerConfig = field(default_factory=OptimizerConfig)
     log_interval: int = 10
     save_interval: int = 500
-    push_to_hub: bool = False
-    hub_model_id: Optional[str] = None
+    push_to_hub: bool = True
+    hub_model_id: str = "baconnier/deepsynth-ocr-finetuned"
     hub_private: bool = False
-    hub_token: Optional[str] = None
+    hub_token: Optional[str] = None  # Set via HF_TOKEN environment variable
     evaluation_split: Optional[str] = "validation"
-    save_checkpoints_to_hub: bool = False
+    save_checkpoints_to_hub: bool = True
     resume_from_checkpoint: Optional[str] = None
     metrics_output_path: Optional[str] = None
     save_metrics_to_hub: bool = True
@@ -56,7 +56,7 @@ class TrainerConfig:
     horizontal_flip_prob: float = 0.3  # Probability of horizontal flip
 
     # LoRA/PEFT configuration
-    use_lora: bool = False  # Enable LoRA fine-tuning
+    use_lora: bool = True  # Enable LoRA fine-tuning
     lora_rank: int = 16  # LoRA rank (r)
     lora_alpha: int = 32  # LoRA alpha scaling factor
     lora_dropout: float = 0.05  # LoRA dropout rate

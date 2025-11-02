@@ -61,7 +61,7 @@ def save_checkpoint_state(
 
         # Save optimizer state
         optimizer_path = output_dir / "optimizer.pt"
-        torch.save(accelerator.unwrap_model(optimizer).state_dict(), optimizer_path)
+        torch.save(optimizer.state_dict(), optimizer_path)
 
         # Save scheduler state
         scheduler_path = output_dir / "scheduler.pt"
