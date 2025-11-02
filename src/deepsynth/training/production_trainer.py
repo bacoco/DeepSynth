@@ -908,6 +908,12 @@ class UnifiedProductionTrainer:
                     "metrics": metrics,
                 }, f, indent=2)
 
+            # Wait for background uploads to complete before final push
+            if self.config.push_to_hub and self.config.save_checkpoints_to_hub:
+                LOGGER.info("⏳ Waiting for background checkpoint uploads to complete...")
+                self.upload_executor.shutdown(wait=True)
+                LOGGER.info("✓ All background uploads completed")
+
             # Push to Hub
             if self.config.push_to_hub and self.config.hub_model_id:
                 self.push_to_hub(self.config.hub_model_id)
