@@ -28,10 +28,9 @@ class PDFPreprocessor:
     def convert(self, payload: bytes | str | Path) -> List[Image.Image]:
         data = self._read_bytes(payload)
         pages = self.page_renderer(data, self.config)
+        pages = list(pages)
         if self.config.max_pages is not None:
-            pages = list(pages)[: self.config.max_pages]
-        else:
-            pages = list(pages)
+            pages = pages[: self.config.max_pages]
         if not pages:
             raise ValueError("PDF conversion produced no pages")
         return [page.convert("RGB") for page in pages]
