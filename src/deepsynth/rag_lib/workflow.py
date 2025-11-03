@@ -73,7 +73,7 @@ def query_corpus(
     top_k: int = 5,
     agg: Optional[str] = None,
     prompt_override: Optional[str] = None,
-):
+) -> "QueryAnswer":
     """Query the corpus with optional LoRA adapter activation."""
 
     if lora_manager is not None:
