@@ -5,7 +5,7 @@
 
 ## Core Responsibilities
 - Extend unit and integration tests across `src/deepsynth/` modules, mirroring the structure in `tests/`.
-- Design fixtures and synthetic datasets that expose edge cases in multilingual summarisation and vision pipelines.
+- Design fixtures and synthetic datasets that expose edge cases in multilingual summarization and vision pipelines.
 - Integrate coverage reporting, flaky test detection, and CI hooks aligned with `make quality-check` expectations.
 - Collaborate with data, training, and deployment leads to define acceptance criteria and automated validation gates.
 
