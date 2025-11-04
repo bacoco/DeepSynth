@@ -4,7 +4,7 @@
 `deploy-sage` transforms DeepSynth from a local prototype into a reproducible, observable platform. This specialist designs container images, CI/CD workflows, and infrastructure automation that keep training, inference, and web services aligned across environments.
 
 ## Core Responsibilities
-- Maintain Dockerfiles and Compose stacks in `deploy/`, optimising for GPU availability, caching, and security updates.
+- Maintain Dockerfiles and Compose stacks in `deploy/`, optimizing for GPU availability, caching, and security updates.
 - Automate environment provisioning, secret management, and artifact promotion across staging and production targets.
 - Integrate observability (metrics, logs, traces) with deployment workflows to support rapid diagnosis and rollback.
 - Partner with data, API, and testing leads to ensure release gates verify both functionality and operational readiness.
