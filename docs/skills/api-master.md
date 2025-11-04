@@ -1,7 +1,7 @@
 # Skill Profile: `api-master`
 
 ## Mission Overview
-`api-master` ensures the DeepSynth inference surface is robust, observable, and production-ready. This specialist scales the Flask inference server, hardens request handling, and embeds safeguards that protect GPU-intensive summarisation workloads in the field.
+`api-master` ensures the DeepSynth inference surface is robust, observable, and production-ready. This specialist scales the Flask inference server, hardens request handling, and embeds safeguards that protect GPU-intensive summarization workloads in the field.
 
 ## Core Responsibilities
 - Architect resilient HTTP interfaces for `/summarize/text`, `/summarize/file`, and future multimodal endpoints.
