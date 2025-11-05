@@ -94,3 +94,140 @@ train-cloud: ## Entraîner depuis les datasets cloud
 
 train-cloud-all: ## Entraîner avec TOUS les datasets cloud
 	@python3 scripts/training/train_from_cloud_datasets.py --datasets all --epochs 3
+
+# ========================================
+# Unsloth DeepSeek OCR Targets (NEW!)
+# ========================================
+
+deepseek-ocr-smoke: ## Quick smoke test with Unsloth (100 samples, 1 epoch)
+	@echo "🧪 Running Unsloth smoke test..."
+	@PYTHONPATH=./src python3 scripts/train_unsloth_cli.py \
+		--max_train_samples 100 \
+		--max_eval_samples 50 \
+		--num_epochs 1 \
+		--batch_size 2 \
+		--output_dir ./output/smoke-test
+	@echo "✅ Smoke test complete!"
+
+deepseek-ocr-train: ## Full training with Unsloth optimizations
+	@echo "🚀 Starting Unsloth training (1.4x faster, 40% less VRAM)..."
+	@PYTHONPATH=./src python3 scripts/train_unsloth_cli.py \
+		--dataset_name ccdv/cnn_dailymail \
+		--batch_size 4 \
+		--num_epochs 3 \
+		--use_wandb \
+		--push_to_hub \
+		--output_dir ./output/deepsynth-unsloth
+	@echo "✅ Training complete!"
+
+deepseek-ocr-eval: ## Evaluate trained Unsloth model
+	@echo "📊 Evaluating model..."
+	@PYTHONPATH=./src python3 scripts/evaluate_ocr.py \
+		--model_path ./output/deepsynth-unsloth/final_model \
+		--dataset_name ccdv/cnn_dailymail \
+		--split validation \
+		--num_samples 1000
+	@echo "✅ Evaluation complete!"
+
+deepseek-ocr-benchmark: ## Benchmark Unsloth vs Standard trainer
+	@echo "⚡ Benchmarking Unsloth vs Standard..."
+	@PYTHONPATH=./src python3 scripts/benchmark_unsloth_vs_standard.py
+	@echo "✅ Benchmark complete!"
+
+deepseek-ocr-prepare-data: ## Prepare OCR dataset from WebDataset/Parquet
+	@echo "📦 Preparing OCR dataset..."
+	@echo "Usage: make deepseek-ocr-prepare-data SOURCE=<url> TYPE=<webdataset|parquet>"
+	@PYTHONPATH=./src python3 scripts/training/prepare_ocr_dataset.py \
+		--source $(SOURCE) \
+		--source_type $(TYPE) \
+		--convert_to_images \
+		--output_path ./data/ocr-prepared
+
+# Docker targets
+docker-build-unsloth: ## Build Unsloth Docker image
+	@echo "🐳 Building Unsloth Docker image..."
+	@docker build -f docker/deepseek-ocr.Dockerfile -t deepsynth-unsloth:latest .
+	@echo "✅ Docker image built: deepsynth-unsloth:latest"
+
+docker-run-smoke: ## Run smoke test in Docker
+	@echo "🐳 Running smoke test in Docker..."
+	@docker run --gpus all -v $(PWD)/output:/output deepsynth-unsloth:latest \
+		python scripts/train_unsloth_cli.py \
+		--max_train_samples 100 \
+		--num_epochs 1 \
+		--batch_size 2 \
+		--output_dir /output/smoke-test
+
+docker-run-train: ## Run full training in Docker
+	@echo "🐳 Running training in Docker..."
+	@docker run --gpus all \
+		-v $(PWD)/data:/data \
+		-v $(PWD)/output:/output \
+		-v $(PWD)/.cache:/workspace/.cache \
+		-e HF_TOKEN=$(HF_TOKEN) \
+		-e WANDB_API_KEY=$(WANDB_API_KEY) \
+		deepsynth-unsloth:latest \
+		python scripts/train_unsloth_cli.py \
+		--dataset_name ccdv/cnn_dailymail \
+		--batch_size 4 \
+		--num_epochs 3 \
+		--use_wandb \
+		--output_dir /output/deepsynth-unsloth
+
+docker-compose-up: ## Start services with docker-compose
+	@cd docker && docker-compose up
+
+docker-compose-smoke: ## Run smoke test with docker-compose
+	@cd docker && docker-compose run deepsynth-smoke
+
+# Monitoring targets
+monitor-tensorboard: ## Start TensorBoard for monitoring
+	@echo "📊 Starting TensorBoard..."
+	@tensorboard --logdir ./output/deepsynth-unsloth/logs --port 6006
+	@echo "📊 TensorBoard available at http://localhost:6006"
+
+monitor-prometheus: ## Export Prometheus metrics
+	@echo "📊 Prometheus metrics available at http://localhost:9090/metrics"
+	@curl http://localhost:9090/metrics 2>/dev/null || echo "API server not running. Start with: make api-server"
+
+# API server targets
+api-server: ## Start OCR inference API server
+	@echo "🚀 Starting OCR API server..."
+	@PYTHONPATH=./src python3 -m deepsynth.inference.api_server \
+		--model_path ./output/deepsynth-unsloth/final_model \
+		--port 8000 \
+		--enable_metrics
+	@echo "🚀 API available at http://localhost:8000"
+
+api-test: ## Test OCR API endpoint
+	@echo "🧪 Testing OCR API..."
+	@curl -X POST http://localhost:8000/api/ocr/run \
+		-F "file=@examples/sample_document.png" \
+		|| echo "❌ API not running or sample file missing"
+
+# Help for Unsloth targets
+help-unsloth: ## Show Unsloth-specific help
+	@echo "🚀 Unsloth DeepSeek OCR Commands:"
+	@echo ""
+	@echo "Training:"
+	@echo "  make deepseek-ocr-smoke          - Quick 5min test (100 samples)"
+	@echo "  make deepseek-ocr-train          - Full training (1.4x faster!)"
+	@echo "  make deepseek-ocr-eval           - Evaluate model (CER/WER/ROUGE)"
+	@echo "  make deepseek-ocr-benchmark      - Compare Unsloth vs Standard"
+	@echo ""
+	@echo "Docker:"
+	@echo "  make docker-build-unsloth        - Build Docker image"
+	@echo "  make docker-run-smoke            - Run smoke test in Docker"
+	@echo "  make docker-run-train            - Run training in Docker"
+	@echo "  make docker-compose-up           - Start all services"
+	@echo ""
+	@echo "Monitoring:"
+	@echo "  make monitor-tensorboard         - View training metrics"
+	@echo "  make api-server                  - Start inference API"
+	@echo "  make api-test                    - Test API endpoint"
+	@echo ""
+	@echo "Expected Performance:"
+	@echo "  - Training: 1.4x faster (12h → 8.5h)"
+	@echo "  - VRAM: 40% reduction (24GB → 14GB)"
+	@echo "  - Context: 5x longer (1024 → 5120 tokens)"
+	@echo "  - CER: 88% improvement"

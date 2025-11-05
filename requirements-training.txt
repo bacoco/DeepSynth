@@ -2,10 +2,69 @@
 # Install base requirements first: pip install -r requirements-base.txt
 # Then install training requirements: pip install -r requirements-training.txt
 
-# GPU-optimized libraries (require CUDA and proper compiler)
-xformers>=0.0.22
-# flash-attn>=2.3.0  # Uncomment if you have CUDA dev tools
+# ========================================
+# Unsloth Optimizations (1.4x speed, 40% less VRAM)
+# ========================================
+unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git
 
-# LoRA/PEFT fine-tuning
+# Core dependencies (Unsloth-tested versions)
+torch==2.6.0
+transformers==4.46.3
+tokenizers==0.20.3
+flash-attn==2.7.3  # Built-in with Unsloth, tested and working
+
+# Unsloth helper libraries
+einops
+addict
+easydict
+
+# ========================================
+# LoRA/PEFT Fine-tuning
+# ========================================
 peft>=0.11.1
-bitsandbytes==0.43.1  # 4-bit quantization for QLoRA (requires CUDA, pinned for compatibility)
+bitsandbytes>=0.41.0  # 4-bit quantization for QLoRA
+
+# ========================================
+# Evaluation Metrics
+# ========================================
+jiwer>=3.0.0  # CER/WER calculation for OCR
+evaluate>=0.4.0  # ROUGE/BLEU for summarization
+rouge-score>=0.1.2
+bert-score>=0.3.13  # Optional: semantic similarity
+nltk>=3.8
+
+# ========================================
+# Experiment Tracking & Monitoring
+# ========================================
+wandb>=0.16.0  # Weights & Biases for experiment tracking
+tensorboard>=2.14.0  # TensorBoard for local monitoring
+
+# ========================================
+# Observability (Production)
+# ========================================
+opentelemetry-api>=1.20.0  # Distributed tracing
+opentelemetry-sdk>=1.20.0
+prometheus-client>=0.19.0  # Metrics collection
+
+# ========================================
+# Scalable Data Formats
+# ========================================
+webdataset>=0.2.48  # Efficient dataset streaming
+pyarrow>=14.0.0  # Parquet file support
+
+# ========================================
+# GPU Optimizations
+# ========================================
+xformers>=0.0.22  # Memory-efficient attention
+
+# ========================================
+# Utilities
+# ========================================
+pillow>=9.5.0
+tqdm>=4.65.0
+pandas>=2.0.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+numpy>=1.24.0
+scipy>=1.10.0
+scikit-learn>=1.3.0

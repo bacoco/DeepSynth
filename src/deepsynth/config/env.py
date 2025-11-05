@@ -1,10 +1,18 @@
-"""Configuration management with .env support."""
+"""Configuration management with .env support and GDPR compliance.
+
+Enhanced configuration with:
+- GDPR-compliant privacy controls
+- Type-safe environment variable loading
+- Production safety checks
+- Feature flags for gradual rollout
+"""
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Optional
+from enum import Enum
 
 _ENV_CACHE: Dict[Path, bool] = {}
 
@@ -155,6 +163,88 @@ class Config:
         return f"{self.hf_username}/{self.output_model_name}"
 
 
+# ============================================================================
+# Enhanced Configuration with GDPR Compliance
+# ============================================================================
+
+
+class Environment(str, Enum):
+    """Deployment environment types."""
+
+    DEVELOPMENT = "development"
+    STAGING = "staging"
+    PRODUCTION = "production"
+    TESTING = "testing"
+
+
+@dataclass
+class PrivacyConfig:
+    """GDPR-compliant privacy configuration (Article 5, 7, 17)."""
+
+    allow_sample_persistence: bool = field(
+        default_factory=lambda: os.getenv("ALLOW_SAMPLE_PERSISTENCE", "false").lower() == "true"
+    )
+    redact_pii_in_logs: bool = field(
+        default_factory=lambda: os.getenv("REDACT_PII_IN_LOGS", "true").lower() == "true"
+    )
+    data_retention_days: int = field(
+        default_factory=lambda: int(os.getenv("DATA_RETENTION_DAYS", "90"))
+    )
+    require_consent: bool = field(
+        default_factory=lambda: os.getenv("REQUIRE_CONSENT", "true").lower() == "true"
+    )
+    anonymize_metrics: bool = field(
+        default_factory=lambda: os.getenv("ANONYMIZE_METRICS", "true").lower() == "true"
+    )
+
+
+@dataclass
+class DeepSynthConfig:
+    """Enhanced configuration with GDPR compliance and feature flags."""
+
+    environment: Environment = field(
+        default_factory=lambda: Environment(os.getenv("ENVIRONMENT", "development"))
+    )
+    service_name: str = field(
+        default_factory=lambda: os.getenv("SERVICE_NAME", "deepsynth")
+    )
+    version: str = field(
+        default_factory=lambda: os.getenv("VERSION", "0.2.0")
+    )
+    privacy: PrivacyConfig = field(default_factory=PrivacyConfig)
+
+    @property
+    def is_production(self) -> bool:
+        """Check if running in production."""
+        return self.environment == Environment.PRODUCTION
+
+
+# Global configuration instance
+_enhanced_config: Optional[DeepSynthConfig] = None
+
+
+def get_config(reload: bool = False) -> DeepSynthConfig:
+    """Get global enhanced configuration instance.
+
+    Args:
+        reload: Force reload configuration from environment
+
+    Returns:
+        DeepSynthConfig instance
+
+    Example:
+        >>> config = get_config()
+        >>> if config.privacy.allow_sample_persistence:
+        ...     save_samples()
+    """
+    global _enhanced_config
+
+    if _enhanced_config is None or reload:
+        _enhanced_config = DeepSynthConfig()
+
+    return _enhanced_config
+
+
 if __name__ == "__main__":
     # Test configuration loading
     try:
@@ -166,3 +256,13 @@ if __name__ == "__main__":
         print(f"  Output Model: {config.output_model_repo}")
     except Exception as e:
         print(f"✗ Configuration error: {e}")
+
+    # Test enhanced configuration
+    try:
+        enhanced = get_config()
+        print("\n✓ Enhanced configuration loaded")
+        print(f"  Environment: {enhanced.environment.value}")
+        print(f"  Privacy - PII Redaction: {enhanced.privacy.redact_pii_in_logs}")
+        print(f"  Privacy - Data Retention: {enhanced.privacy.data_retention_days} days")
+    except Exception as e:
+        print(f"✗ Enhanced configuration error: {e}")

@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  # Training service with GPU support
+  deepsynth-train:
+    build:
+      context: ..
+      dockerfile: docker/deepseek-ocr.Dockerfile
+    image: deepsynth-unsloth:latest
+    container_name: deepsynth-train
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - CUDA_VISIBLE_DEVICES=0
+      - HF_TOKEN=${HF_TOKEN}
+      - WANDB_API_KEY=${WANDB_API_KEY}
+      - DEEPSYNTH_ENABLE_METRICS=true
+      - DEEPSYNTH_OCR_SAVE_SAMPLES=false
+    volumes:
+      - ../data:/data
+      - ../output:/output
+      - ../.cache:/workspace/.cache
+      - ../logs:/workspace/logs
+    shm_size: '16gb'  # Shared memory for DataLoader workers
+    command: >
+      python scripts/train_unsloth_cli.py
+      --dataset_name ccdv/cnn_dailymail
+      --batch_size 4
+      --num_epochs 3
+      --use_wandb
+      --output_dir /output/deepsynth-unsloth
+
+  # Inference API service
+  deepsynth-api:
+    build:
+      context: ..
+      dockerfile: docker/deepseek-ocr.Dockerfile
+    image: deepsynth-unsloth:latest
+    container_name: deepsynth-api
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - CUDA_VISIBLE_DEVICES=0
+      - DEEPSYNTH_ENABLE_METRICS=true
+      - DEEPSYNTH_DEFAULT_MODEL=/models/deepsynth-unsloth
+    volumes:
+      - ../output:/models
+      - ../logs:/workspace/logs
+    ports:
+      - "8000:8000"
+      - "9090:9090"  # Prometheus metrics
+    shm_size: '8gb'
+    command: >
+      python -m deepsynth.inference.api_server
+      --model_path /models/deepsynth-unsloth/final_model
+      --port 8000
+      --enable_metrics
+
+  # Smoke test service
+  deepsynth-smoke:
+    build:
+      context: ..
+      dockerfile: docker/deepseek-ocr.Dockerfile
+    image: deepsynth-unsloth:latest
+    container_name: deepsynth-smoke
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - CUDA_VISIBLE_DEVICES=0
+    volumes:
+      - ../output:/output
+    command: >
+      python scripts/train_unsloth_cli.py
+      --max_train_samples 100
+      --max_eval_samples 50
+      --num_epochs 1
+      --batch_size 2
+      --output_dir /output/smoke-test
