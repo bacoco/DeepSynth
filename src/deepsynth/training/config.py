@@ -81,6 +81,26 @@ class TrainerConfig:
     instruction_prompt: str = "Summarize this text:"  # Instruction prepended to text
     use_text_projection: bool = False  # Use learnable projection from text to vision dim
 
+    # ========================================
+    # Unsloth Optimizations (NEW!)
+    # ========================================
+    use_unsloth: bool = True  # Enable Unsloth optimizations (1.4x speed, 40% VRAM)
+    unsloth_gradient_checkpointing: bool = True  # Use "unsloth" gradient checkpointing mode
+    unsloth_max_seq_length_multiplier: int = 5  # Context length multiplier (1-10), default 5x
+    use_rslora: bool = False  # Rank-stabilized LoRA (experimental)
+    use_loftq: bool = False  # LoftQ initialization (quantization-aware)
+
+    # Evaluation settings (for UnslothDeepSynthTrainer)
+    eval_steps: int = 500  # Evaluate every N steps
+    early_stopping_patience: int = 3  # Stop after N evals without improvement
+    metric_for_best_model: str = "cer"  # Metric to track for best model (cer, wer, rouge1, etc.)
+    greater_is_better: bool = False  # False for CER/WER, True for ROUGE
+
+    # Monitoring & logging
+    use_wandb: bool = False  # Enable Weights & Biases logging
+    wandb_project: str = "deepsynth-unsloth"  # Wandb project name
+    wandb_run_name: Optional[str] = None  # Wandb run name (None = auto-generate)
+
     def to_dict(self) -> dict:
         """Return a serialisable representation used by the web UI."""
 
@@ -145,7 +165,136 @@ class TrainerConfig:
             "warmup_steps": self.optimizer.warmup_steps,
             "warmup_ratio": self.optimizer.warmup_ratio,
             "scheduler_type": self.optimizer.scheduler_type,
+            # Unsloth parameters (NEW!)
+            "use_unsloth": self.use_unsloth,
+            "unsloth_gradient_checkpointing": self.unsloth_gradient_checkpointing,
+            "unsloth_max_seq_length_multiplier": self.unsloth_max_seq_length_multiplier,
+            "use_rslora": self.use_rslora,
+            "use_loftq": self.use_loftq,
+            "eval_steps": self.eval_steps,
+            "early_stopping_patience": self.early_stopping_patience,
+            "metric_for_best_model": self.metric_for_best_model,
+            "greater_is_better": self.greater_is_better,
+            "use_wandb": self.use_wandb,
+            "wandb_project": self.wandb_project,
+            "wandb_run_name": self.wandb_run_name,
         }
 
 
-__all__ = ["TrainerConfig", "OptimizerConfig"]
+@dataclass
+class InferenceConfig:
+    """Configuration for inference-time generation with optimized parameters.
+
+    This class provides fine-grained control over generation quality, speed,
+    and diversity. Use different settings for different use cases:
+
+    - Fast generation: temperature=0, num_beams=1, do_sample=False
+    - Quality generation: temperature=0, num_beams=4, do_sample=False
+    - Diverse generation: temperature=0.7, top_p=0.9, do_sample=True
+
+    Attributes:
+        max_new_tokens: Maximum tokens to generate
+        temperature: Sampling temperature (0=greedy, >0=sampling)
+        top_p: Nucleus sampling threshold
+        top_k: Top-k sampling threshold
+        num_beams: Number of beams for beam search
+        do_sample: Enable sampling vs greedy decoding
+        repetition_penalty: Penalty for repeating tokens
+        length_penalty: Penalty for sequence length
+        early_stopping: Stop when all beams finish
+        base_size: Base image resolution (Unsloth-specific)
+        image_size: Processed image size (Unsloth-specific)
+        crop_mode: Enable crop mode for better quality
+
+    Example:
+        >>> # Quality-focused config
+        >>> config = InferenceConfig(
+        ...     temperature=0,
+        ...     num_beams=4,
+        ...     max_new_tokens=512,
+        ... )
+        >>> # Fast config
+        >>> config = InferenceConfig(
+        ...     temperature=0,
+        ...     num_beams=1,
+        ...     max_new_tokens=256,
+        ... )
+    """
+
+    # Generation parameters
+    max_new_tokens: int = 512
+    temperature: float = 0.7  # 0 = greedy, >0 = sampling
+    top_p: float = 0.9  # Nucleus sampling
+    top_k: int = 50  # Top-k sampling
+    num_beams: int = 4  # Beam search (use 1 for faster sampling)
+    do_sample: bool = True  # Enable sampling vs greedy
+
+    # Penalties
+    repetition_penalty: float = 1.2
+    length_penalty: float = 1.0
+
+    # Early stopping
+    early_stopping: bool = True  # Stop when all beams finish
+
+    # Unsloth-specific image processing
+    base_size: int = 1024  # Base image resolution
+    image_size: int = 640  # Processed image size
+    crop_mode: bool = True  # Enable crop mode for better quality
+
+    # Special tokens
+    pad_token_id: Optional[int] = None
+    eos_token_id: Optional[int] = None
+
+    def to_generate_kwargs(self) -> dict:
+        """Convert to kwargs for model.generate().
+
+        Returns:
+            Dictionary of generation parameters
+        """
+        return {
+            "max_new_tokens": self.max_new_tokens,
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+            "top_k": self.top_k,
+            "num_beams": self.num_beams,
+            "do_sample": self.do_sample,
+            "repetition_penalty": self.repetition_penalty,
+            "length_penalty": self.length_penalty,
+            "early_stopping": self.early_stopping,
+            "pad_token_id": self.pad_token_id,
+            "eos_token_id": self.eos_token_id,
+        }
+
+    @classmethod
+    def fast(cls) -> "InferenceConfig":
+        """Preset for fast generation (greedy decoding)."""
+        return cls(
+            temperature=0,
+            num_beams=1,
+            do_sample=False,
+            max_new_tokens=256,
+        )
+
+    @classmethod
+    def quality(cls) -> "InferenceConfig":
+        """Preset for quality generation (beam search)."""
+        return cls(
+            temperature=0,
+            num_beams=4,
+            do_sample=False,
+            max_new_tokens=512,
+        )
+
+    @classmethod
+    def diverse(cls) -> "InferenceConfig":
+        """Preset for diverse generation (nucleus sampling)."""
+        return cls(
+            temperature=0.7,
+            top_p=0.9,
+            num_beams=1,
+            do_sample=True,
+            max_new_tokens=512,
+        )
+
+
+__all__ = ["TrainerConfig", "OptimizerConfig", "InferenceConfig"]
