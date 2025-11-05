@@ -330,7 +330,7 @@ tests/rag/
 ## 📚 References & Credits
 
 **Based On:**
-- DeepSeek-OCR: [arxiv:2510.18234](https://arxiv.org/abs/2510.18234)
+- DeepSeek-OCR: technical report (link pending publication)
 - ColBERT: [arxiv:2004.12832](https://arxiv.org/abs/2004.12832)
 - PLAID: [arxiv:2205.09707](https://arxiv.org/abs/2205.09707)
 - Token-Direct Visual RAG PRD (provided by user)

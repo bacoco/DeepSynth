@@ -7,7 +7,7 @@ vision encoder and supports two operating modes:
 """
 from __future__ import annotations
 
-from typing import Any, Dict, Literal, Optional, Tuple
+from typing import Any, Dict, Iterable, Literal, Optional, Tuple
 
 import numpy as np
 import torch
@@ -102,71 +102,12 @@ class TokenDirectEncoder:
         if normalize is None:
             normalize = self.normalize
 
-        # Preprocess image if needed
-        if isinstance(image, Image.Image):
-            if self.processor is not None:
-                inputs = self.processor(images=image, return_tensors="pt")
-                inputs = {k: v.to(self.device) for k, v in inputs.items()}
-            else:
-                # Fallback: assume model accepts PIL images directly
-                inputs = {"pixel_values": image}
-        elif isinstance(image, torch.Tensor):
-            inputs = {"pixel_values": image.to(self.device)}
-        else:
-            raise TypeError(f"Unsupported image type: {type(image)}")
-
-        # Encode image
-        with torch.no_grad():
-            # Try different model APIs
-            if hasattr(self.model, 'get_vision_embeddings'):
-                # Some models have explicit vision embedding methods
-                outputs = self.model.get_vision_embeddings(**inputs)
-                tokens = outputs
-            elif hasattr(self.model, 'vision_model'):
-                # Models with separate vision tower
-                outputs = self.model.vision_model(**inputs)
-                tokens = outputs.last_hidden_state if hasattr(outputs, 'last_hidden_state') else outputs[0]
-            else:
-                # Standard forward pass
-                outputs = self.model(**inputs, return_dict=True, output_hidden_states=True)
-
-                # Extract vision tokens from outputs
-                if hasattr(outputs, 'encoder_hidden_states') and outputs.encoder_hidden_states is not None:
-                    tokens = outputs.encoder_hidden_states[-1]  # Last encoder layer
-                elif hasattr(outputs, 'last_hidden_state'):
-                    tokens = outputs.last_hidden_state
-                elif hasattr(outputs, 'hidden_states'):
-                    tokens = outputs.hidden_states[-1]  # Last layer
-                else:
-                    tokens = outputs[0]
-
-        # Handle batch dimension
-        if tokens.ndim == 3:
-            tokens = tokens[0]  # [M, D]
-
-        # Convert to float32 for processing
-        tokens = tokens.to(torch.float32)
-
-        # Apply mode-specific processing (if supported by model)
-        # Note: This is a placeholder - actual implementation would depend on
-        # how DeepSeek-OCR exposes token selection/compression controls
-        config = self.mode_configs[mode]
-        if mode == "coarse" and tokens.shape[0] > config["target_tokens"][1]:
-            # Downsample tokens for coarse mode
-            target_count = min(config["target_tokens"][1], tokens.shape[0])
-            indices = torch.linspace(0, tokens.shape[0] - 1, target_count).long()
-            tokens = tokens[indices]
-
-        # Normalize if requested
-        if normalize:
-            tokens = F.normalize(tokens, dim=-1, p=2)
-
-        # Extract layout information
-        layout = None
-        if return_layout:
-            layout = self._extract_layout(tokens, outputs)
-
-        return tokens.cpu().numpy(), layout
+        return self._encode_single(
+            image,
+            mode=mode,
+            normalize=normalize,
+            return_layout=return_layout,
+        )
 
     def _extract_layout(
         self,
@@ -201,12 +142,12 @@ class TokenDirectEncoder:
             "H": h,
             "W": w,
             "num_tokens": num_tokens,
-            "patch_size": getattr(outputs, "patch_size", 16),  # Common default
+            "patch_size": getattr(outputs, "patch_size", 16) if outputs is not None else 16,
             "hidden_dim": tokens.shape[-1],
         }
 
         # Add image size if available
-        if hasattr(outputs, "image_size"):
+        if outputs is not None and hasattr(outputs, "image_size"):
             layout["image_size"] = outputs.image_size
 
         return layout
@@ -229,10 +170,155 @@ class TokenDirectEncoder:
         Returns:
             List of (tokens, layout) tuples.
         """
-        return [
-            self.encode(img, mode=mode, normalize=normalize, return_layout=return_layout)
-            for img in images
-        ]
+        if not images:
+            return []
+
+        if normalize is None:
+            normalize = self.normalize
+
+        if self.processor is None and any(isinstance(img, Image.Image) for img in images):
+            return [
+                self._encode_single(img, mode, normalize, return_layout)
+                for img in images
+            ]
+
+        inputs = self._prepare_inputs(images)
+        tokens, raw_outputs = self._forward_encoder(inputs)
+
+        if tokens.ndim == 2:
+            tokens = tokens.unsqueeze(0)
+
+        tokens = tokens.to(torch.float32)
+
+        results: list[Tuple[np.ndarray, Optional[Dict[str, Any]]]] = []
+        for idx in range(tokens.shape[0]):
+            sample_tokens = tokens[idx]
+            processed_tokens = self._apply_mode(sample_tokens, mode)
+            if normalize:
+                processed_tokens = F.normalize(processed_tokens, dim=-1, p=2)
+
+            layout = None
+            if return_layout:
+                layout = self._extract_layout(processed_tokens, raw_outputs)
+
+            results.append((processed_tokens.cpu().numpy(), layout))
+
+        return results
+
+    def _encode_single(
+        self,
+        image: Image.Image | torch.Tensor,
+        *,
+        mode: Literal["coarse", "full"],
+        normalize: bool,
+        return_layout: bool,
+    ) -> Tuple[np.ndarray, Optional[Dict[str, Any]]]:
+        inputs = self._prepare_single_input(image)
+        return self._encode_from_inputs(
+            inputs,
+            mode=mode,
+            normalize=normalize,
+            return_layout=return_layout,
+        )
+
+    def _prepare_inputs(
+        self,
+        images: Iterable[Image.Image | torch.Tensor],
+    ) -> Dict[str, torch.Tensor]:
+        image_list = list(images)
+        if not image_list:
+            raise ValueError("No images provided for encoding")
+
+        if self.processor is not None and all(isinstance(img, Image.Image) for img in image_list):
+            processed = self.processor(images=image_list, return_tensors="pt")
+            return {k: v.to(self.device) for k, v in processed.items()}
+
+        pixel_tensors = []
+        for image in image_list:
+            if isinstance(image, torch.Tensor):
+                pixel_tensors.append(image.to(self.device))
+            elif self.processor is not None and isinstance(image, Image.Image):
+                single = self.processor(images=image, return_tensors="pt")
+                pixel_tensors.append(single["pixel_values"][0].to(self.device))
+            else:
+                raise TypeError(
+                    "Unsupported image type or missing processor for PIL images"
+                )
+
+        return {"pixel_values": torch.stack(pixel_tensors)}
+
+    def _prepare_single_input(
+        self, image: Image.Image | torch.Tensor
+    ) -> Dict[str, Any]:
+        if isinstance(image, Image.Image):
+            if self.processor is not None:
+                processed = self.processor(images=image, return_tensors="pt")
+                return {k: v.to(self.device) for k, v in processed.items()}
+            return {"pixel_values": image}
+        if isinstance(image, torch.Tensor):
+            return {"pixel_values": image.to(self.device)}
+        raise TypeError(f"Unsupported image type: {type(image)}")
+
+    def _encode_from_inputs(
+        self,
+        inputs: Dict[str, Any],
+        *,
+        mode: Literal["coarse", "full"],
+        normalize: bool,
+        return_layout: bool,
+    ) -> Tuple[np.ndarray, Optional[Dict[str, Any]]]:
+        tokens, raw_outputs = self._forward_encoder(inputs)
+
+        if tokens.ndim == 3:
+            tokens = tokens[0]
+
+        tokens = tokens.to(torch.float32)
+        processed_tokens = self._apply_mode(tokens, mode)
+        if normalize:
+            processed_tokens = F.normalize(processed_tokens, dim=-1, p=2)
+
+        layout = None
+        if return_layout:
+            layout = self._extract_layout(processed_tokens, raw_outputs)
+
+        return processed_tokens.cpu().numpy(), layout
+
+    def _forward_encoder(
+        self, inputs: Dict[str, Any]
+    ) -> Tuple[torch.Tensor, Any]:
+        with torch.no_grad():
+            if hasattr(self.model, "get_vision_embeddings"):
+                tokens = self.model.get_vision_embeddings(**inputs)
+                raw_outputs = None
+            elif hasattr(self.model, "vision_model"):
+                raw_outputs = self.model.vision_model(**inputs)
+                if not hasattr(raw_outputs, "last_hidden_state"):
+                    raise AttributeError(
+                        "vision_model outputs must expose last_hidden_state"
+                    )
+                tokens = raw_outputs.last_hidden_state
+            else:
+                raw_outputs = self.model(**inputs, return_dict=True)
+                if not hasattr(raw_outputs, "last_hidden_state"):
+                    raise AttributeError(
+                        "Model outputs must include last_hidden_state for vision tokens"
+                    )
+                tokens = raw_outputs.last_hidden_state
+
+        return tokens, raw_outputs
+
+    def _apply_mode(
+        self,
+        tokens: torch.Tensor,
+        mode: Literal["coarse", "full"],
+    ) -> torch.Tensor:
+        config = self.mode_configs[mode]
+        if mode == "coarse" and tokens.shape[0] > config["target_tokens"][1]:
+            target_count = min(config["target_tokens"][1], tokens.shape[0])
+            tokens = tokens.unsqueeze(0).transpose(1, 2)
+            tokens = F.adaptive_avg_pool1d(tokens, target_count)
+            tokens = tokens.transpose(1, 2).squeeze(0)
+        return tokens
 
 
 __all__ = ["TokenDirectEncoder"]

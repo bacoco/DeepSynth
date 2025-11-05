@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import List, Optional
 
+import json
+
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -29,6 +31,9 @@ class QueryExpander:
         device: Device to run model on ("cuda", "cpu", or "auto").
         load_in_8bit: Whether to load model in 8-bit precision to save memory.
         max_new_tokens: Maximum tokens to generate per expansion.
+        temperature: Sampling temperature for generation.
+        min_variant_words: Minimum words expected per variant.
+        max_variant_words: Maximum words expected per variant.
 
     Examples:
         >>> expander = QueryExpander()
@@ -47,13 +52,13 @@ For the given query, generate {num_variants} alternative search queries that:
 - Use different wordings and synonyms
 - Include relevant abbreviations or expansions
 - Cover different aspects of the question
-- Are concise (5-15 words each)
+- Are concise (between {min_words} and {max_words} words each)
 
-Return ONLY the alternative queries, one per line, without numbering or explanations.
+Return the result as a JSON array of strings with no additional commentary.
 
 Original query: {query}
 
-Alternative queries:"""
+JSON:"""
 
     def __init__(
         self,
@@ -63,11 +68,15 @@ Alternative queries:"""
         load_in_8bit: bool = False,
         max_new_tokens: int = 200,
         temperature: float = 0.7,
+        min_variant_words: int = 3,
+        max_variant_words: int = 20,
     ) -> None:
         self.model_name = model_name
         self.num_variants = num_variants
         self.max_new_tokens = max_new_tokens
         self.temperature = temperature
+        self.min_variant_words = min_variant_words
+        self.max_variant_words = max_variant_words
 
         # Load model and tokenizer
         model_kwargs = {"torch_dtype": torch.float16}
@@ -110,6 +119,8 @@ Alternative queries:"""
         # Build prompt
         prompt = self.EXPANSION_PROMPT_TEMPLATE.format(
             num_variants=num_variants,
+            min_words=self.min_variant_words,
+            max_words=self.max_variant_words,
             query=query,
         )
 
@@ -150,36 +161,33 @@ Alternative queries:"""
         Returns:
             List of extracted variant queries.
         """
-        # Remove the prompt from response
+        # Remove the prompt from response when possible
         if prompt in response:
-            variants_text = response[len(prompt):].strip()
-        else:
-            # Try to find the variants section
-            markers = ["Alternative queries:", "Variants:", "alternative queries:"]
-            for marker in markers:
-                if marker in response:
-                    variants_text = response.split(marker)[-1].strip()
-                    break
-            else:
-                # Just use everything after the original query
-                variants_text = response.strip()
+            response = response.split(prompt, 1)[-1].strip()
 
-        # Split by newlines and clean
-        lines = [line.strip() for line in variants_text.split("\n")]
+        response = response.strip()
 
-        # Filter out empty lines, numbering, and other artifacts
-        variants = []
-        for line in lines:
-            # Skip empty lines
-            if not line:
-                continue
+        variants: List[str] = []
 
-            # Remove common prefixes (1., -, *, etc.)
-            cleaned = line.lstrip("0123456789.-*• ")
-
-            # Skip very short or very long variants
-            if 3 <= len(cleaned.split()) <= 20:
-                variants.append(cleaned)
+        try:
+            parsed = json.loads(response)
+            if isinstance(parsed, list):
+                for item in parsed:
+                    if not isinstance(item, str):
+                        continue
+                    word_count = len(item.split())
+                    if self.min_variant_words <= word_count <= self.max_variant_words:
+                        variants.append(item.strip())
+        except json.JSONDecodeError:
+            # Fallback to line-based parsing for unexpected outputs
+            lines = [line.strip() for line in response.split("\n")]
+            for line in lines:
+                if not line:
+                    continue
+                cleaned = line.lstrip("0123456789.-*• ")
+                word_count = len(cleaned.split())
+                if self.min_variant_words <= word_count <= self.max_variant_words:
+                    variants.append(cleaned)
 
         return variants
 
@@ -199,10 +207,50 @@ Alternative queries:"""
         Returns:
             List of lists, where each inner list contains original + variants.
         """
-        return [
-            self.expand(q, num_variants, include_original)
-            for q in queries
+        if not queries:
+            return []
+
+        if num_variants is None:
+            num_variants = self.num_variants
+
+        prompts = [
+            self.EXPANSION_PROMPT_TEMPLATE.format(
+                num_variants=num_variants,
+                min_words=self.min_variant_words,
+                max_words=self.max_variant_words,
+                query=query,
+            )
+            for query in queries
         ]
+
+        inputs = self.tokenizer(
+            prompts,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+        ).to(self.device)
+
+        with torch.no_grad():
+            outputs = self.model.generate(
+                **inputs,
+                max_new_tokens=self.max_new_tokens,
+                temperature=self.temperature,
+                do_sample=True,
+                top_p=0.9,
+                pad_token_id=self.tokenizer.eos_token_id,
+            )
+
+        responses = self.tokenizer.batch_decode(outputs, skip_special_tokens=True)
+
+        expanded_queries: List[List[str]] = []
+        for query, prompt, response in zip(queries, prompts, responses):
+            variants = self._extract_variants(response, prompt)[:num_variants]
+            if include_original:
+                expanded_queries.append([query] + variants)
+            else:
+                expanded_queries.append(variants)
+
+        return expanded_queries
 
 
 __all__ = ["QueryExpander"]

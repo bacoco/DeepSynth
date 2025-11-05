@@ -7,11 +7,12 @@ all tokens.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import torch
 from transformers.modeling_outputs import BaseModelOutput
+from torch.nn.utils.rnn import pad_sequence
 
 
 class MaskedDecoder:
@@ -103,25 +104,16 @@ class MaskedDecoder:
         Returns:
             Decoded text transcript.
         """
-        # Apply masking if requested and winners provided
-        if self.masked and winner_indices is not None:
-            masked_indices = self._create_mask(
-                winner_indices=winner_indices,
-                layout=layout,
-                top_r=self.top_r,
-                halo=self.halo,
-            )
-            vision_tokens = vision_tokens[masked_indices]
-
-        # Decode tokens
-        transcript = self._decode_tokens(
-            vision_tokens=vision_tokens,
-            prompt=prompt or self.prompt_template,
+        transcripts = self.decode_batch(
+            [vision_tokens],
+            [layout],
+            [winner_indices],
+            prompts=[prompt] if prompt is not None else None,
             max_new_tokens=max_new_tokens,
             **generation_kwargs,
         )
 
-        return transcript
+        return transcripts[0]
 
     def _create_mask(
         self,
@@ -173,68 +165,6 @@ class MaskedDecoder:
         # Return sorted indices
         return np.array(sorted(expanded), dtype=np.int64)
 
-    def _decode_tokens(
-        self,
-        vision_tokens: np.ndarray,
-        prompt: str,
-        max_new_tokens: int,
-        **generation_kwargs: Any,
-    ) -> str:
-        """Decode vision tokens using DeepSeek decoder.
-
-        Args:
-            vision_tokens: Masked or full vision tokens [M', D].
-            prompt: Transcription prompt.
-            max_new_tokens: Maximum tokens to generate.
-            **generation_kwargs: Additional generation arguments.
-
-        Returns:
-            Decoded text.
-        """
-        # Convert to tensor
-        tokens_tensor = torch.from_numpy(vision_tokens).to(self.device)
-
-        # Add batch dimension if needed
-        if tokens_tensor.ndim == 2:
-            tokens_tensor = tokens_tensor.unsqueeze(0)  # [1, M', D]
-
-        # Create encoder outputs for decoder
-        encoder_outputs = BaseModelOutput(last_hidden_state=tokens_tensor)
-
-        # Tokenize prompt
-        prompt_inputs = self.tokenizer(
-            prompt,
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-        ).to(self.device)
-
-        # Set default generation parameters
-        gen_kwargs = {
-            "max_new_tokens": max_new_tokens,
-            "num_beams": 1,
-            "do_sample": False,
-            "pad_token_id": self.tokenizer.eos_token_id,
-        }
-        gen_kwargs.update(generation_kwargs)
-
-        # Generate text
-        with torch.no_grad():
-            outputs = self.model.generate(
-                **prompt_inputs,
-                encoder_outputs=encoder_outputs,
-                **gen_kwargs,
-            )
-
-        # Decode to text
-        text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-
-        # Remove prompt from output if it was echoed
-        if text.startswith(prompt):
-            text = text[len(prompt):].strip()
-
-        return text
-
     def decode_batch(
         self,
         vision_tokens_list: list[np.ndarray],
@@ -257,27 +187,101 @@ class MaskedDecoder:
         Returns:
             List of decoded transcripts.
         """
-        if prompts is None:
-            prompts = [None] * len(vision_tokens_list)
+        if not vision_tokens_list:
+            return []
+
+        resolved_prompts = self._resolve_prompts(prompts, len(vision_tokens_list))
+        masked_tokens = [
+            self._apply_mask(tokens, layout, winners)
+            for tokens, layout, winners in zip(
+                vision_tokens_list, layouts, winner_indices_list
+            )
+        ]
+
+        generated = self._batched_generate(
+            masked_tokens,
+            resolved_prompts,
+            max_new_tokens=max_new_tokens,
+            **generation_kwargs,
+        )
 
         transcripts = []
-        for tokens, layout, winners, prompt in zip(
-            vision_tokens_list,
-            layouts,
-            winner_indices_list,
-            prompts,
-        ):
-            transcript = self.decode(
-                vision_tokens=tokens,
-                layout=layout,
-                winner_indices=winners,
-                prompt=prompt,
-                max_new_tokens=max_new_tokens,
-                **generation_kwargs,
-            )
-            transcripts.append(transcript)
+        for text, prompt in zip(generated, resolved_prompts):
+            if prompt in text:
+                text = text.split(prompt, 1)[-1].strip()
+            transcripts.append(text)
 
         return transcripts
+
+    def _resolve_prompts(
+        self, prompts: Optional[List[Optional[str]]], batch_size: int
+    ) -> List[str]:
+        if prompts is None:
+            return [self.prompt_template for _ in range(batch_size)]
+        if len(prompts) != batch_size:
+            raise ValueError("Prompts length must match batch size")
+        return [prompt or self.prompt_template for prompt in prompts]
+
+    def _apply_mask(
+        self,
+        vision_tokens: np.ndarray,
+        layout: Dict[str, Any],
+        winner_indices: Optional[np.ndarray],
+    ) -> np.ndarray:
+        tokens = vision_tokens
+        if self.masked and winner_indices is not None:
+            masked_indices = self._create_mask(
+                winner_indices=winner_indices,
+                layout=layout,
+                top_r=self.top_r,
+                halo=self.halo,
+            )
+            tokens = tokens[masked_indices]
+        return tokens
+
+    def _batched_generate(
+        self,
+        token_batches: List[np.ndarray],
+        prompts: List[str],
+        *,
+        max_new_tokens: int,
+        **generation_kwargs: Any,
+    ) -> List[str]:
+        token_tensors = [torch.from_numpy(tokens).to(self.device) for tokens in token_batches]
+        padded_tokens = pad_sequence(token_tensors, batch_first=True)
+
+        encoder_attention_mask = torch.zeros(
+            padded_tokens.size(0), padded_tokens.size(1), device=self.device
+        )
+        for idx, tensor in enumerate(token_tensors):
+            encoder_attention_mask[idx, : tensor.size(0)] = 1
+
+        encoder_outputs = BaseModelOutput(last_hidden_state=padded_tokens)
+
+        prompt_inputs = self.tokenizer(
+            prompts,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+        ).to(self.device)
+
+        gen_kwargs = {
+            "max_new_tokens": max_new_tokens,
+            "num_beams": 1,
+            "do_sample": False,
+            "pad_token_id": self.tokenizer.eos_token_id,
+            "encoder_attention_mask": encoder_attention_mask,
+        }
+        gen_kwargs.update(generation_kwargs)
+
+        with torch.no_grad():
+            outputs = self.model.generate(
+                **prompt_inputs,
+                encoder_outputs=encoder_outputs,
+                **gen_kwargs,
+            )
+
+        return self.tokenizer.batch_decode(outputs, skip_special_tokens=True)
 
 
 __all__ = ["MaskedDecoder"]
