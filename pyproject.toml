@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "deepsynth"
-version = "0.1.0"
-description = "DeepSynth training and inference components"
+version = "0.2.0"  # Updated for Unsloth integration
+description = "DeepSynth training and inference with Unsloth optimizations"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.12"  # Required for Unsloth optimizations
 
 [tool.setuptools]
 package-dir = {"" = "src"}

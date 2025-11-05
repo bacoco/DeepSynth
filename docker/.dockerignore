@@ -1,0 +1,64 @@
+# Docker ignore file for DeepSynth
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+venv-*/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# Data directories (mount as volumes instead)
+data/
+output/
+work/
+mlsum_data/
+
+# Cache
+.cache/
+*.cache
+
+# Logs
+logs/
+*.log
+
+# Checkpoints (large files)
+*.pt
+*.pth
+*.bin
+*.safetensors
+checkpoint-*/
+deepsynth-*/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Tests
+tests/
+.pytest_cache/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Other
+.DS_Store
+*.ipynb_checkpoints
