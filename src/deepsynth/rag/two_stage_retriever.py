@@ -30,6 +30,15 @@ class RetrievalResult:
     winner_indices: np.ndarray
     metadata: Dict[str, Any]
     stage1_rank: Optional[int] = None
+    full_tokens: Optional[np.ndarray] = None
+
+
+@dataclass
+class Stage1Candidate:
+    """Normalized representation of a coarse search result."""
+
+    page_id: str
+    score: float
 
 
 class TokenStore(Protocol):
@@ -177,11 +186,13 @@ class TwoStageRetriever:
 
             # Collect candidates (use max score if page appears in multiple variants)
             for result in results:
-                page_id = result.doc_id if hasattr(result, 'doc_id') else result.page_id
-                score = result.score
+                candidate = self._normalize_candidate(result)
 
-                if page_id not in all_candidates or score > all_candidates[page_id]:
-                    all_candidates[page_id] = score
+                if (
+                    candidate.page_id not in all_candidates
+                    or candidate.score > all_candidates[candidate.page_id]
+                ):
+                    all_candidates[candidate.page_id] = candidate.score
 
         # If using union strategy, return all unique candidates
         # Otherwise, return top-N by score
@@ -202,6 +213,22 @@ class TwoStageRetriever:
             )[:top_n]
             return {page_id: rank for rank, (page_id, _) in enumerate(sorted_candidates)}
 
+    def _normalize_candidate(self, result: Any) -> Stage1Candidate:
+        """Normalize raw index results to the internal candidate format."""
+
+        if hasattr(result, "page_id"):
+            page_id = result.page_id
+        elif hasattr(result, "doc_id"):
+            page_id = result.doc_id
+        else:
+            raise AttributeError("Index results must expose a 'page_id' attribute")
+
+        score = getattr(result, "score", None)
+        if score is None:
+            raise AttributeError("Index results must expose a 'score' attribute")
+
+        return Stage1Candidate(page_id=page_id, score=score)
+
     def _stage2_rerank(
         self,
         query_tokens_list: List[np.ndarray],
@@ -218,13 +245,13 @@ class TwoStageRetriever:
         Returns:
             List of RetrievalResult objects.
         """
-        scores: List[tuple[float, str, np.ndarray, int]] = []
+        scores: List[tuple[float, str, np.ndarray, int, np.ndarray]] = []
 
         for page_id, stage1_rank in candidates.items():
             # Load full tokens for this page
             try:
                 doc_tokens = self.full_store.load(page_id)  # [M, D]
-            except Exception:
+            except (KeyError, FileNotFoundError):
                 # Skip pages that can't be loaded
                 continue
 
@@ -239,14 +266,14 @@ class TwoStageRetriever:
                     max_score = score
                     best_winners = winners
 
-            scores.append((max_score, page_id, best_winners, stage1_rank))
+            scores.append((max_score, page_id, best_winners, stage1_rank, doc_tokens))
 
         # Sort by score (descending) and take top-K
         scores.sort(key=lambda x: x[0], reverse=True)
 
         # Build results
         results: List[RetrievalResult] = []
-        for score, page_id, winners, stage1_rank in scores[:top_k]:
+        for score, page_id, winners, stage1_rank, doc_tokens in scores[:top_k]:
             metadata = self.full_store.get_metadata(page_id)
 
             results.append(
@@ -256,6 +283,7 @@ class TwoStageRetriever:
                     winner_indices=winners,
                     metadata=metadata,
                     stage1_rank=stage1_rank,
+                    full_tokens=doc_tokens,
                 )
             )
 

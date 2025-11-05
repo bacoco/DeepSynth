@@ -19,14 +19,8 @@ Usage:
     python examples/token_direct_rag_example.py
 """
 
-import sys
-from pathlib import Path
-
-# Add src to path for local development
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
 import torch
-from transformers import AutoModel, AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModel, AutoModelForCausalLM, AutoProcessor, AutoTokenizer
 
 from deepsynth.rag import (
     LLMAnswerer,
@@ -38,6 +32,8 @@ from deepsynth.rag import (
     TokenDirectPipeline,
     TwoStageRetriever,
 )
+from deepsynth.data.transforms.text_to_image import TextToImageConverter
+from deepsynth.rag import StateRef
 
 
 # Simple in-memory token store for this example
@@ -52,7 +48,6 @@ class SimpleTokenStore:
         """Save tokens and layout for a page."""
         self.tokens[page_id] = tokens
         self.metadata[page_id] = {
-            "full_tokens": tokens,
             "layout": layout,
         }
 
@@ -87,6 +82,10 @@ def main():
         torch_dtype=torch.float16,
         device_map=device,
     )
+    deepseek_processor = AutoProcessor.from_pretrained(
+        "deepseek-ai/DeepSeek-OCR",
+        trust_remote_code=True,
+    )
     deepseek_tokenizer = AutoTokenizer.from_pretrained(
         "deepseek-ai/DeepSeek-OCR",
         trust_remote_code=True,
@@ -111,7 +110,7 @@ def main():
     # Encoder for converting images to vision tokens
     encoder = TokenDirectEncoder(
         model=deepseek_model,
-        processor=None,  # DeepSeek-OCR handles preprocessing internally
+        processor=deepseek_processor,
         device=device,
         normalize=True,
     )
@@ -223,8 +222,6 @@ decode only relevant portions of the page, achieving 60-84% speedup.
     ]
 
     # Convert to images and index
-    from deepsynth.data.transforms.text_to_image import TextToImageConverter
-
     text_converter = TextToImageConverter(
         font_size=18,
         max_width=1600,
@@ -246,8 +243,6 @@ decode only relevant portions of the page, achieving 60-84% speedup.
         print(f"    Full: {full_tokens.shape[0]} tokens")
 
         # Add to coarse index for retrieval
-        from deepsynth.rag import StateRef
-
         coarse_index.add_chunk(
             doc_id=doc["page_id"],
             chunk_id="0",

@@ -138,9 +138,11 @@ Answer:"""
         # Decode
         answer = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-        # Extract answer (remove prompt)
+        # Extract answer (remove prompt and prefix)
+        if prompt in answer:
+            answer = answer.split(prompt, 1)[-1].strip()
         if "Answer:" in answer:
-            answer = answer.split("Answer:")[-1].strip()
+            answer = answer.split("Answer:", 1)[-1].strip()
 
         return answer
 
@@ -257,10 +259,12 @@ class TokenDirectPipeline:
 
         # 3. Encode query images to vision tokens
         encode_start = time.time()
-        query_tokens_list = []
-        for img in query_images:
-            tokens, _ = self.encoder.encode(img, mode="coarse", normalize=True)
-            query_tokens_list.append(tokens)
+        query_tokens_list = [tokens for tokens, _ in self.encoder.encode_batch(
+            query_images,
+            mode="coarse",
+            normalize=True,
+            return_layout=False,
+        )]
 
         if metadata is not None:
             metadata["query_encoding_time"] = time.time() - encode_start
@@ -284,7 +288,7 @@ class TokenDirectPipeline:
 
         for rank, result in enumerate(retrieval_results):
             # Get vision tokens and layout
-            full_tokens = result.metadata.get("full_tokens")
+            full_tokens = result.full_tokens
             layout = result.metadata.get("layout")
 
             if full_tokens is None or layout is None:

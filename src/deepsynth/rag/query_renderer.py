@@ -75,6 +75,33 @@ class QueryImageRenderer:
             except OSError:
                 pass
 
+        # Attempt to locate a monospace font via matplotlib's font manager if available
+        try:
+            from matplotlib import font_manager  # type: ignore
+
+            candidate_families = [
+                "DejaVu Sans Mono",
+                "Liberation Mono",
+                "Courier New",
+                "Consolas",
+                "Courier",
+            ]
+            for family in candidate_families:
+                try:
+                    font_path = font_manager.findfont(
+                        font_manager.FontProperties(family=family),
+                        fallback_to_default=False,
+                    )
+                except (ValueError, RuntimeError):
+                    continue
+
+                try:
+                    return ImageFont.truetype(font_path, self.font_size)
+                except OSError:
+                    continue
+        except ImportError:
+            pass
+
         # Try common monospace fonts
         common_fonts = [
             "DejaVuSansMono.ttf",
@@ -84,7 +111,6 @@ class QueryImageRenderer:
             "CourierNew.ttf",
             "Consolas.ttf",
             "LiberationMono-Regular.ttf",
-            "/System/Library/Fonts/Courier.dfont",  # macOS
         ]
 
         for font_name in common_fonts:
