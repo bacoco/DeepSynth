@@ -1,494 +1,137 @@
-# 🚀 DeepSynth Multilingual Summarization Framework
+# 🚀 DeepSynth Vision-Language Summarization & RAG Platform
 
-> **Transform any document into actionable insights with state-of-the-art multilingual AI summarization**
->
-> _DeepSynth is powered by the open-source DeepSeek-OCR foundation model._
-
-> _Repository note_: the GitHub slug remains `bacoco/deepseek-synthesia` until the migration to the `deepsynth` organisation is complete.
+> Multilingual document understanding with parallel dataset generation, Unsloth-optimised fine-tuning, retrieval, and production-ready inference.
 
 [![Production Ready](https://img.shields.io/badge/production-ready-green.svg)](docs/PRODUCTION_GUIDE.md)
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![Multilingual](https://img.shields.io/badge/languages-5+-green.svg)](#supported-languages)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**Docker + Web Interface. Multiple datasets. Easy training.**
+DeepSynth turns large multilingual document collections into concise summaries using a vision-language stack derived from DeepSeek-OCR. The project couples high-throughput dataset preparation, Unsloth-powered training, retrieval-augmented generation, and multiple deployment surfaces (REST API, CLI, web UI, Docker).
 
+---
+
+## 🔥 Highlights
+
+- **Parallel multilingual dataset builder** – generate seven Hugging Face datasets (CNN/DailyMail, XSum, arXiv, BillSum, MLSUM FR/ES/DE) with resumable automation and logging via `scripts/generate_all_datasets.sh`.【F:scripts/generate_all_datasets.sh†L1-L118】
+- **Unsloth fine-tuning CLI** – `scripts/train_unsloth_cli.py` exposes end-to-end DeepSeek OCR training with QLoRA, WandB/TensorBoard hooks, checkpointing, and multi-backend dataset loaders.【F:scripts/train_unsloth_cli.py†L1-L146】
+- **Retrieval-augmented inference** – the `deepsynth.rag` package ingests encoded document states, performs multi-vector search, and fuses answers for advanced QA workflows.【F:src/deepsynth/rag/pipeline.py†L1-L172】
+- **Production services** – run summarisation through a Flask REST API or the configurable web dashboard (`python -m src.apps.web`).【F:src/deepsynth/inference/api_server.py†L1-L98】【F:src/apps/web/__main__.py†L1-L15】
+
+---
+
+## ⚙️ Getting started
+
+### 1. Clone and create an environment
 ```bash
-docker compose -f deploy/docker-compose.gpu.yml up -d
-open http://localhost:5001
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements-base.txt
+pip install -r requirements-training.txt
 ```
+> Or run `make setup` to execute the scripted installation (installs fonts and optional CUDA wheels).
 
-Launch the container, access the web interface, configure your training, and start fine-tuning DeepSeek-OCR models with an intuitive GUI.
-
-## 📚 Documentation index
-
-The complete documentation suite now lives under [`docs/`](docs/README.md). Start with the [documentation index](docs/README.md) for curated links to architecture, delivery reports, deployment instructions, and UI guides.
-
----
-
-## 💡 Why DeepSynth Multilingual Summarization?
-
-### The Problem
-- **Global information overload**: Millions of documents in multiple languages to process
-- **Language barriers**: Traditional models work well only in English
-- **Time-consuming manual summarization**: Hours spent reading lengthy multilingual content
-- **Traditional NLP limitations**: Text-only models miss visual context and document structure
-
-### Our Solution
-✨ **Multilingual vision-powered summarization** that understands documents like humans do:
-- **5+ languages supported**: French, Spanish, German, English, and more
-- **20x compression**: Condenses documents efficiently through visual encoding
-- **Incremental processing**: Resumable pipeline with automatic HuggingFace uploads
-- **Production-ready**: From multilingual datasets to deployed model in minutes, not weeks
-
-## 🌍 Supported Languages & Datasets
-
-| Language | Dataset | Examples | Status |
-|----------|---------|----------|--------|
-| 🇫🇷 **French** | MLSUM French | 392,902 | ✅ Priority #1 |
-| 🇪🇸 **Spanish** | MLSUM Spanish | 266,367 | ✅ Priority #2 |
-| 🇩🇪 **German** | MLSUM German | 220,748 | ✅ Priority #3 |
-| 🇺🇸 **English News** | CNN/DailyMail | 287,113 | ✅ Priority #4 |
-| 🇺🇸 **English BBC** | XSum Reduced | ~50,000 | ✅ Priority #5 |
-| 📜 **Legal English** | BillSum | 22,218 | ✅ Priority #6 |
-
-**Total: ~1.29M+ multilingual summarization examples**
-
-> **Note**: MLSUM English and Chinese are not available in the original dataset. English coverage is provided through CNN/DailyMail and XSum alternatives.
-
----
-
-## 🎯 What DeepSynth Does
-
-DeepSynth provides **two main workflows**:
-
-### 1. 📊 **Dataset Generation**
-- Convert text documents to visual format (PNG images)
-- Process multilingual datasets (French, Spanish, German, English)
-- Upload prepared datasets to HuggingFace
-- **Use case**: Prepare training data for vision-language models
-
-### 2. 🚀 **Model Training**
-- Fine-tune DeepSeek-OCR on your datasets
-- Support for LoRA/QLoRA (memory-efficient training)
-- Web interface for easy configuration
-- **Use case**: Train custom summarization models
-
-### 🧠 **Architecture**
-- **Vision-Language Model**: Based on DeepSeek-OCR
-- **Text-to-Image**: Converts documents to visual format
-- **Fine-tuning Ready**: LoRA/QLoRA support for efficient training
-- **Web Interface**: Easy-to-use training configuration
-
-### 📊 **Industry-Standard Benchmarks**
-Compare your model against the best:
-
-| Benchmark | Description | Typical ROUGE-1 | Your Model |
-|-----------|-------------|-----------------|------------|
-| **CNN/DailyMail** | News articles (287k) | 44.16 (BART) | 🎯 Test now |
-| **XSum** | Extreme summarization (204k) | 47.21 (Pegasus) | 🎯 Test now |
-| **arXiv** | Scientific papers | 46.23 (Longformer) | 🎯 Test now |
-| **PubMed** | Medical abstracts | 45.97 | 🎯 Test now |
-| **SAMSum** | Dialogue (14.7k) | 53.4 (BART) | 🎯 Test now |
-
-Use the web interface to benchmark your trained models against standard datasets.
-
-### 🎨 **Production-Ready Deployment**
-- **REST API**: Flask server with comprehensive endpoints
-- **Batch processing**: Handle thousands of documents
-- **Model versioning**: Track experiments and iterations
-- **HuggingFace integration**: Instant model sharing
-- **Docker support**: Containerized deployment
-
----
-
-## ⚡ Quick Start
-
-### 🎯 Docker Setup
-
-**Requirements:**
-- Docker installed
-- GPU (recommended for training) or CPU (for dataset generation)
-- HuggingFace account (free)
-
----
-
-## 🚀 Local Docker Setup
-
-### Quick Start - Launch Container
+### 2. Configure Hugging Face access
 ```bash
-# Clone repository
-git clone https://github.com/bacoco/DeepSynth.git
-cd DeepSynth
-
-# Setup environment
 cp .env.example .env
-# Edit .env and add your HF_TOKEN=hf_your_token_here
-
-# Launch container in background
-cd deploy
-docker compose -f docker-compose.gpu.yml up -d
+# edit .env to add HF_TOKEN, HF_USERNAME, and dataset limits
 ```
 
-### Access the Interface
-- **Web Interface**: http://localhost:5001
-- **Auto-detects**: GPU (training) or CPU (testing) mode
-
-### Container Management
+### 3. Quick validation (optional)
 ```bash
-# Check container status
-docker compose -f docker-compose.gpu.yml ps
-
-# View logs
-docker compose -f docker-compose.gpu.yml logs -f
-
-# Stop container
-docker compose -f docker-compose.gpu.yml down
-
-# Restart container
-docker compose -f docker-compose.gpu.yml restart
+make test-quick
 ```
-
-### Training Workflow
-1. **Open interface** in browser (http://localhost:5001)
-2. **Configure HuggingFace** token in the top section
-3. **Select datasets** for training (refresh to load your datasets)
-4. **Configure training** parameters (batch size, epochs, etc.)
-5. **Start training** and monitor progress (uses GPU if available)
-6. **Access trained models** in `./trained_model/` directory
+This runs the fast pytest suite with `PYTHONPATH=./src` as defined in the Makefile.【F:Makefile†L12-L40】
 
 ---
 
-## 📚 Use Cases
+## 🧱 Core workflows
 
-### 📰 **News Aggregation**
-Summarize hundreds of news articles daily:
+### Multilingual dataset generation
+Use the orchestration script to prepare and upload all datasets in parallel:
+```bash
+./scripts/generate_all_datasets.sh
+```
+It validates your `.env`, boots the virtualenv if needed, cleans temporary directories, and runs the full pipeline (7 workers, resumable uploads, ~1.29M samples).【F:scripts/generate_all_datasets.sh†L1-L120】
+
+### Fine-tuning with Unsloth optimisations
+Launch Unsloth-enhanced training directly from the CLI:
+```bash
+PYTHONPATH=./src python scripts/train_unsloth_cli.py \
+    --dataset_name ccdv/cnn_dailymail \
+    --batch_size 4 \
+    --num_epochs 3 \
+    --use_wandb \
+    --output_dir ./output/cnn_dailymail
+```
+The CLI handles Hugging Face datasets or local Parquet/WebDataset sources, configures QLoRA by default, and supports smoke tests, experiment tracking, and hub uploads.【F:scripts/train_unsloth_cli.py†L1-L200】
+
+### Retrieval-augmented answering
+Combine the encoder, multi-vector index, and storage layers to ingest visual states and answer questions:
 ```python
-from deepsynth.inference import DeepSynthSummarizer
-
-summarizer = DeepSynthSummarizer("your-username/model")
-summary = summarizer.summarize_text(long_article)
+from deepsynth.rag.pipeline import IngestChunk, RAGPipeline
+# configure featurizer/index/storage, ingest chunks, then call answer_query()
 ```
+`RAGPipeline` manages ingestion manifests, state storage, vector search, and response fusion for downstream QA tasks.【F:src/deepsynth/rag/pipeline.py†L1-L172】
 
-### 🔬 **Research Assistant**
-Process academic papers through the web interface
-
-### 💼 **Business Intelligence**
-Generate executive summaries from reports via the web UI
-
-### 📞 **Customer Support**
-Summarize conversation transcripts using trained models
+### Serving summaries
+- **REST API:**
+  ```bash
+  MODEL_PATH=./deepsynth-summarizer python -m deepsynth.inference.api_server
+  ```
+  Exposes `/health`, `/summarize/text`, `/summarize/file`, and `/summarize/image` endpoints with automatic model initialisation and payload validation.【F:src/deepsynth/inference/api_server.py†L1-L98】
+- **Web UI:**
+  ```bash
+  python -m src.apps.web
+  ```
+  Launches the Flask interface (port 5000 by default) for configuring datasets, training jobs, and monitoring progress.【F:src/apps/web/__main__.py†L1-L15】
+- **Docker:** GPU-enabled compose files live under `deploy/` for containerised workflows (`docker compose -f deploy/docker-compose.gpu.yml up`).
 
 ---
 
-## 🏆 Performance Metrics
+## 🧠 Architecture deep dive
 
-### Standard Evaluation Metrics
+DeepSynth couples a visual document pipeline with Unsloth-optimised training so the encoder/decoder split stays lightweight while preserving layout fidelity:
 
-**ROUGE Scores** (overlap-based):
-- ROUGE-1: Unigram overlap (typical: 40-47)
-- ROUGE-2: Bigram overlap (typical: 18-28)
-- ROUGE-L: Longest common subsequence (typical: 37-49)
+- **Document rendering pipeline** – dataset builders convert raw text into PNGs on demand, attach image columns, and push resumable shards to the Hugging Face Hub for multi-language coverage.【F:src/deepsynth/data/prepare_and_publish.py†L1-L210】【F:docs/IMAGE_PIPELINE.md†L1-L85】
+- **Frozen vision encoder + QLoRA decoder** – training keeps the DeepSeek-OCR encoder frozen while fine-tuning the mixture-of-experts decoder with low-rank adapters exposed through the Unsloth trainer CLI.【F:scripts/train_unsloth_cli.py†L1-L200】【F:docs/deepseek_ocr_pipeline.md†L1-L120】
+- **Pipeline orchestration** – the `deepsynth.pipelines` package streams samples through shared workers, handles deduplication, and coordinates uploads so dataset generation, training, and evaluation can progress independently.【F:src/deepsynth/pipelines/_dataset_processor.py†L1-L180】【F:docs/architecture/STRUCTURE.md†L1-L88】
 
-**BERTScore** (semantic similarity):
-- Measures meaning, not just words
-- More robust to paraphrasing
-- Typical scores: 85-92
-
-**Compression Ratio**:
-- How efficiently the model summarizes
-- Typical: 3-10x compression
-
-### Benchmark Your Model
-
-Use the web interface to evaluate your trained models against standard benchmarks. The interface provides:
-
-- **ROUGE Scores**: Overlap-based metrics (ROUGE-1, ROUGE-2, ROUGE-L)
-- **BERTScore**: Semantic similarity evaluation
-- **Comparison to SOTA**: See how your model compares to state-of-the-art
-- **Multiple Benchmarks**: CNN/DailyMail, XSum, arXiv, PubMed, SAMSum
+The architecture documentation under `docs/architecture/` expands on these components, including deployment topology and shared volumes for the Docker stacks.【F:docs/architecture/STRUCTURE.md†L1-L88】
 
 ---
 
+## 🖥️ Web UI overview
 
+The bundled UI wraps the end-to-end workflow with job monitoring, preset hyperparameters, and environment-specific Docker targets:
 
-## 🔧 Advanced Usage
+- **Dedicated CPU/GPU stacks** – `docker-compose.cpu.yml` focuses on dataset generation while `docker-compose.gpu.yml` runs the trainer with GPU scheduling; both surface status dashboards via the web UI.【F:docs/ENHANCED_UI_GUIDE.md†L9-L64】
+- **End-to-end orchestration** – tabs for benchmark seeding, custom dataset creation, training, and monitoring map directly to the automation scripts, including Hugging Face uploads and progress metrics.【F:docs/ENHANCED_UI_GUIDE.md†L66-L160】
+- **Local development entry point** – launch with `python -m src.apps.web` to access the same interface without Docker while reusing local credentials and datasets.【F:src/apps/web/__main__.py†L1-L15】
 
-### Custom Dataset Training
-
-```python
-from deepsynth.config import Config
-from data.prepare_and_publish import DatasetPipeline
-
-# Configure for your domain
-config = Config.from_env()
-pipeline = DatasetPipeline("your/dataset", subset=None)
-
-# Prepare and upload
-dataset_dict = pipeline.prepare_all_splits(
-    output_dir=Path("./custom_data"),
-    max_samples=10000
-)
-pipeline.push_to_hub(dataset_dict, "username/custom-dataset")
-```
-
-### Hyperparameter Tuning
-
-Edit `.env` for different configurations:
-
-```bash
-# For better quality (slower training)
-BATCH_SIZE=4
-NUM_EPOCHS=5
-LEARNING_RATE=1e-5
-GRADIENT_ACCUMULATION_STEPS=8
-
-# For faster iteration (lower quality)
-BATCH_SIZE=8
-NUM_EPOCHS=1
-LEARNING_RATE=3e-5
-GRADIENT_ACCUMULATION_STEPS=2
-```
-
-### Deployment Options
-
-**1. REST API Server**
-```bash
-MODEL_PATH=./deepsynth-ocr-summarizer python -m deepsynth.inference.api_server
-
-# Test endpoint
-curl -X POST http://localhost:5000/summarize/text \
-    -H "Content-Type: application/json" \
-    -d '{"text": "Long document...", "max_length": 128}'
-```
-
-**2. Batch Processing**
-```bash
-python -m evaluation.generate \
-    input_documents.jsonl \
-    --model ./deepsynth-ocr-summarizer \
-    --output summaries.jsonl
-```
-
-**3. HuggingFace Inference**
-```python
-from transformers import pipeline
-
-summarizer = pipeline("summarization", model="username/model")
-summary = summarizer(long_text, max_length=130, min_length=30)
-```
+Refer to `docs/ENHANCED_UI_GUIDE.md` for screenshots, presets, and role-based runbooks that align the UI with production and smoke-test scenarios.【F:docs/ENHANCED_UI_GUIDE.md†L1-L160】
 
 ---
 
-## 📊 Architecture Deep Dive
-
-### Visual-Language Pipeline
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Input Document (Text)                    │
-└────────────────────────┬────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────────┐
-│              Text-to-Image Converter                        │
-│  • Renders text as PNG (1600x2200px)                       │
-│  • Preserves layout and structure                          │
-│  • ~85 chars per line, 18pt font                           │
-└────────────────────────┬────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────────┐
-│         DeepEncoder (Frozen - 380M params)                  │
-│  • Visual feature extraction (SAM + CLIP)                   │
-│  • 20x compression (1 visual token ≈ 20 text tokens)       │
-│  • Output: Visual tokens [batch, seq, hidden]              │
-└────────────────────────┬────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────────┐
-│      MoE Decoder (Fine-tuned - 570M active params)          │
-│  • Mixture of Experts architecture                          │
-│  • 3B total params, 570M active per token                   │
-│  • Autoregressive generation                                │
-└────────────────────────┬────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────────┐
-│                  Generated Summary (Text)                    │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Why This Architecture Works
-
-1. **Visual Encoding Advantage**
-   - Captures document layout, not just text
-   - Handles tables, formatting, structure
-   - Natural compression through visual tokens
-
-2. **Frozen Encoder Benefits**
-   - Faster training (only 570M params trainable)
-   - Leverages pre-trained vision knowledge
-   - Prevents catastrophic forgetting
-
-3. **MoE Decoder Efficiency**
-   - 3B parameter capacity with 570M active
-   - Sparse activation = fast inference
-   - Specialized experts for different content types
-
----
-
-## 📖 Documentation
-
-📁 **Complete documentation is now organized in the [`docs/`](docs/) directory**
-
-| Document | Description |
-|----------|-------------|
-| **[docs/README.md](docs/README.md)** | 📚 Complete documentation index |
-| **[docs/QUICKSTART.md](docs/QUICKSTART.md)** | ⚡ 5-minute quick start guide |
-| **[docs/PRODUCTION_GUIDE.md](docs/PRODUCTION_GUIDE.md)** | 🚀 Production deployment guide |
-| **[docs/IMAGE_PIPELINE.md](docs/IMAGE_PIPELINE.md)** | 🖼️ Dataset preparation with images |
-| **[docs/deepseek-ocr-resume-prd.md](docs/deepseek-ocr-resume-prd.md)** | 📋 Product requirements document |
-
-## 🗂️ Repository Structure
-
+## 🗺️ Repository map
 ```
 DeepSynth/
-├── 📄 README.md                 # This file - project overview
-├── ⚙️ requirements.txt          # Python dependencies
-├── 🔧 .env.example              # Environment configuration template
-├──
-├── 📚 docs/                     # Complete documentation
-├── 🎯 examples/                 # Example scripts and tutorials
-├── 🔧 tools/                    # Utility tools and scripts
-├── 📜 scripts/                  # Shell scripts and automation
-├──
-├── 💻 src/                      # Source code
-├── 🧪 tests/                    # Test suites
-├── 🐳 deploy/                   # Docker and deployment configs
-├── 📊 benchmarks/               # Benchmark results
-├── 📦 datasets/                 # Local dataset cache
-└── 🎯 trained_model/            # Model outputs
+├── README.md                # Project overview (this file)
+├── docs/                    # Comprehensive documentation index & guides
+├── scripts/                 # Automation (dataset generation, Unsloth training, maintenance)
+├── src/deepsynth/           # Python package (data, training, inference, rag, pipelines)
+├── src/apps/web/            # Flask-based management UI
+├── tests/                   # Pytest suites mirroring src/
+├── tools/                   # Validation and end-to-end orchestration helpers
+└── deploy/                  # Dockerfiles and compose stacks
 ```
+Refer to `docs/PROJECT_STRUCTURE.md` for a full breakdown of modules and workflows.【F:docs/PROJECT_STRUCTURE.md†L1-L78】
 
 ---
 
-## 🤝 Contributing
+## 📚 Documentation & support
+- Start with the [documentation index](docs/README.md) for quick-start guides, architecture notes, and reports.【F:docs/README.md†L1-L52】
+- `make help` lists every convenience command for setup, pipelines, and Unsloth targets.【F:Makefile†L1-L88】
+- Report issues or feature requests through GitHub; secrets must remain in `.env` as outlined in the repository guidelines.【F:AGENTS.md†L1-L37】
 
-We welcome contributions! Areas for improvement:
-
-- [ ] Additional benchmark datasets
-- [ ] More evaluation metrics (METEOR, BLEU)
-- [ ] Docker deployment examples
-- [ ] Multi-language support
-- [ ] Streaming inference
-- [ ] Model distillation
-
-See the [contribution guidelines](docs/README.md#-collaboration--process) for details.
-
----
-
-## 📊 Benchmark Leaderboard
-
-Compare your results with the community:
-
-| Model | CNN/DM R-1 | CNN/DM R-2 | CNN/DM R-L | XSum R-1 | XSum R-2 |
-|-------|-----------|-----------|-----------|----------|----------|
-| BART-large | 44.16 | 21.28 | 40.90 | 45.14 | 22.27 |
-| Pegasus | 44.17 | 21.47 | 41.11 | 47.21 | 24.56 |
-| T5-large | 42.50 | 20.68 | 39.75 | 43.52 | 21.55 |
-| **Your Model** | ? | ? | ? | ? | ? |
-
-Run benchmarks and share your results!
-
----
-
-## 🎓 Research & Citations
-
-This implementation is based on:
-
-```bibtex
-@article{deepseek2024ocr,
-  title={DeepSeek-OCR: Unified Document Understanding with Vision-Language Models},
-  author={DeepSeek-AI},
-  journal={arXiv preprint arXiv:2510.18234},
-  year={2024}
-}
-```
-
-**Related Papers:**
-- [BART: Denoising Sequence-to-Sequence Pre-training](https://arxiv.org/abs/1910.13461)
-- [Pegasus: Pre-training with Extracted Gap-sentences](https://arxiv.org/abs/1912.08777)
-- [CNN/DailyMail Dataset](https://arxiv.org/abs/1506.03340)
-
----
-
-## 🔒 Security & Privacy
-
-- ✅ **No data leakage**: All secrets in `.env` (gitignored)
-- ✅ **HuggingFace authentication**: Secure token-based access
-- ✅ **Private models**: Support for private HuggingFace repos
-- ✅ **Local processing**: Train and deploy without external APIs
-
----
-
-## 💼 Commercial Use
-
-This project uses the DeepSeek-OCR model license. For commercial applications:
-
-1. Review [DeepSeek-OCR license](https://huggingface.co/deepseek-ai/DeepSeek-OCR)
-2. Ensure compliance with model terms
-3. Consider training custom models for proprietary data
-
----
-
-## 🌟 Success Stories
-
-> "Reduced our document processing time from 2 hours to 10 minutes"
-> — Enterprise Customer
-
-> "The visual encoding captures nuances that text-only models miss"
-> — ML Research Team
-
-> "Production deployment was surprisingly smooth—everything just worked"
-> — Startup Founder
-
----
-
-## 📞 Support
-
-- **Issues**: [GitHub Issues](https://github.com/bacoco/deepseek-synthesia/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/bacoco/deepseek-synthesia/discussions)
-- **Email**: support@example.com
-- **Docs**: Full documentation in `/docs`
-
----
-
-## 🚀 Get Started Now
-
-```bash
-# 1. Clone and setup
-git clone https://github.com/bacoco/DeepSynth.git
-cd DeepSynth && cp .env.example .env
-
-# 2. Launch container
-cd deploy && docker compose -f docker-compose.gpu.yml up -d
-
-# 3. Access web interface
-open http://localhost:5001
-```
-
-**Your AI-powered summarization system is just minutes away.** 🎉
-
----
-
-<p align="center">
-  <b>Built with ❤️ using DeepSeek-OCR</b><br>
-  <sub>Turn information overload into actionable insights</sub>
-</p>
-
-<p align="center">
-  <a href="docs/PRODUCTION_GUIDE.md">Production Guide</a> •
-  <a href="docs/IMAGE_PIPELINE.md">Image Pipeline</a> •
-  <a href="docs/deepseek-ocr-resume-prd.md">Technical Docs</a>
-</p>
+Happy summarising! 🎉
